@@ -17,6 +17,7 @@
 #include "gfxSharedImageSurface.h"
 #include "yuv_convert.h"
 #include "gfxUtils.h"
+#include "gfxPlatform.h"
 
 #ifdef XP_MACOSX
 #include "mozilla/gfx/QuartzSupport.h"
@@ -486,6 +487,9 @@ PlanarYCbCrImage::GetAsSurface()
   }
 
   gfxASurface::gfxImageFormat format = GetOffscreenFormat();
+  if (format == gfxASurface::ImageFormatUnknown) {
+    format = gfxPlatform::GetPlatform()->GetOffscreenFormat();
+  }
 
   gfxIntSize size(mSize);
   gfxUtils::GetYCbCrToRGBDestFormatAndSize(mData, format, size);
