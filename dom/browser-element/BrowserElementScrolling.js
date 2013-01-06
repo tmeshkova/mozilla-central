@@ -446,7 +446,7 @@ const ContentPanning = {
     this._domUtils.setContentState(elt, kStateActive);
   },
 
-  _asyncZoomPanEnabled: false;
+  _asyncZoomPanEnabled: false,
 
   _recvSetAZPEnabled: function(data) {
     this._asyncZoomPanEnabled = data.json;
