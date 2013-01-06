@@ -40,6 +40,7 @@ const ContentPanning = {
 
     addMessageListener("Viewport:Change", this._recvViewportChange.bind(this));
     addMessageListener("Gesture:DoubleTap", this._recvDoubleTap.bind(this));
+    addMessageListener("DocShell:SetAsyncZoomPanEnabled", this._recvSetAZPEnabled.bind(this));
   },
 
   handleEvent: function cp_handleEvent(evt) {
@@ -445,8 +446,14 @@ const ContentPanning = {
     this._domUtils.setContentState(elt, kStateActive);
   },
 
+  _asyncZoomPanEnabled: false;
+
+  _recvSetAZPEnabled: function(data) {
+    this._asyncZoomPanEnabled = data.json;
+  },
+
   get _asyncPanZoomForViewportFrame() {
-    return docShell.asyncPanZoomEnabled;
+    return docShell.asyncPanZoomEnabled || this._asyncZoomPanEnabled;
   },
 
   _recvViewportChange: function(data) {
