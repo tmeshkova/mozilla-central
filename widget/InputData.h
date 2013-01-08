@@ -52,6 +52,10 @@ public:
   INPUTDATA_AS_CHILD_TYPE(PinchGestureInput, PINCHGESTURE_INPUT)
   INPUTDATA_AS_CHILD_TYPE(TapGestureInput, TAPGESTURE_INPUT)
 
+  InputData()
+  {
+  }
+
 protected:
   InputData(InputType aInputType, uint32_t aTime)
     : mInputType(aInputType),
@@ -93,6 +97,10 @@ public:
   {
 
 
+  }
+
+  SingleTouchData()
+  {
   }
 
   // A unique number assigned to each SingleTouchData within a MultiTouchInput so
@@ -144,6 +152,10 @@ public:
   {
 
 
+  }
+
+  MultiTouchInput()
+  {
   }
 
   MultiTouchInput(const nsTouchEvent& aTouchEvent);
