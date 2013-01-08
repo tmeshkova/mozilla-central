@@ -740,7 +740,7 @@ void AsyncPanZoomController::UpdateWithTouchAtDevicePoint(const MultiTouchInput&
 }
 
 void AsyncPanZoomController::TrackTouch(const MultiTouchInput& aEvent) {
-  TimeDuration timeDelta = TimeDuration().FromMilliseconds(aEvent.mTime - mLastEventTime);
+  TimeDuration timeDelta = TimeDuration().FromMilliseconds(NS_MIN(aEvent.mTime - mLastEventTime, uint32_t(16)));
 
   // Probably a duplicate event, just throw it away.
   if (timeDelta.ToMilliseconds() <= EPSILON) {
@@ -757,13 +757,12 @@ void AsyncPanZoomController::TrackTouch(const MultiTouchInput& aEvent) {
     gfxFloat inverseResolution = 1 / CalculateResolution(mFrameMetrics).width;
 
     float xDisplacement = mX.GetDisplacementForDuration(inverseResolution,
-                                                        timeDelta);
+                                                        TimeDuration().FromMilliseconds(0));
     float yDisplacement = mY.GetDisplacementForDuration(inverseResolution,
-                                                        timeDelta);
+                                                        TimeDuration().FromMilliseconds(0));
     if (fabs(xDisplacement) <= EPSILON && fabs(yDisplacement) <= EPSILON) {
       return;
     }
-
     ScrollBy(gfx::Point(xDisplacement, yDisplacement));
     ScheduleComposite();
 
