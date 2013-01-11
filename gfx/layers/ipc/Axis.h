@@ -184,7 +184,7 @@ protected:
   // reach one of the extremes of the page.
   int32_t mAcceleration;
   nsRefPtr<AsyncPanZoomController> mAsyncPanZoomController;
-  int32_t mLastDiff;
+  int32_t mLastPos;
 };
 
 class AxisX : public Axis {
