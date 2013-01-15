@@ -34,6 +34,6 @@ int ReadStrings(const NS_tchar *path,
                 const char *keyList,
                 unsigned int numStrings,
                 char results[][MAX_TEXT_LEN],
-                const char *section = NULL);
+                const char *section = nullptr);
 
 #endif  // READSTRINGS_H__
