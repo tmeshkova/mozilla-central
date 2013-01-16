@@ -1312,6 +1312,7 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aViewportFr
   } else if (!mFrameMetrics.mScrollableRect.IsEqualEdges(aViewportFrame.mScrollableRect)) {
     mFrameMetrics.mScrollableRect = aViewportFrame.mScrollableRect;
     SetPageRect(mFrameMetrics.mScrollableRect);
+    needContentRepaint = true;
   }
 
   if (needContentRepaint) {
