@@ -1340,7 +1340,7 @@ void AsyncPanZoomController::UpdateCompositionBounds(const nsIntRect& aCompositi
     SetZoomAndResolution(mFrameMetrics.mZoom.width);
 
     // Repaint on a rotation so that our new resolution gets properly updated.
-    RequestContentRepaint();
+    RequestContentRepaint(true);
   }
 }
 
