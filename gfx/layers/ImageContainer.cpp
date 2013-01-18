@@ -478,6 +478,14 @@ PlanarYCbCrImage::SetData(const Data &aData)
   CopyData(aData);
 }
 
+gfxASurface::gfxImageFormat
+PlanarYCbCrImage::GetOffscreenFormat()
+{
+    return mOffscreenFormat != gfxASurface::ImageFormatUnknown ?
+        gfxPlatform::GetPlatform()->GetOffscreenFormat() :
+        mOffscreenFormat;
+}
+
 already_AddRefed<gfxASurface>
 PlanarYCbCrImage::GetAsSurface()
 {
@@ -487,10 +495,6 @@ PlanarYCbCrImage::GetAsSurface()
   }
 
   gfxASurface::gfxImageFormat format = GetOffscreenFormat();
-  if (format == gfxASurface::ImageFormatUnknown) {
-    format = gfxPlatform::GetPlatform()->GetOffscreenFormat();
-  }
-
   gfxIntSize size(mSize);
   gfxUtils::GetYCbCrToRGBDestFormatAndSize(mData, format, size);
   if (size.width > PlanarYCbCrImage::MAX_DIMENSION ||
