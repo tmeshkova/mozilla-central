@@ -1015,6 +1015,18 @@ GLContext::CreateRenderbuffersForOffscreen(const GLContext::GLFormats& aFormats,
     fBindRenderbuffer(LOCAL_GL_RENDERBUFFER, boundRB);
 }
 
+void
+GLContext::BindSharedRenderBuffer(const GLuint texture, GLuint& readFBO)
+{
+    fGenFramebuffers(1, &readFBO);
+    BindInternalFBO(readFBO);
+    fFramebufferTexture2D(LOCAL_GL_FRAMEBUFFER,
+                          LOCAL_GL_COLOR_ATTACHMENT0,
+                          LOCAL_GL_TEXTURE_2D,
+                          texture,
+                          0);
+}
+
 bool
 GLContext::AssembleOffscreenFBOs(const GLuint colorMSRB,
                                  const GLuint depthRB,
@@ -1035,13 +1047,7 @@ GLContext::AssembleOffscreenFBOs(const GLuint colorMSRB,
     GLuint boundReadFBO = GetUserBoundReadFBO();
 
     if (texture) {
-        fGenFramebuffers(1, &readFBO);
-        BindInternalFBO(readFBO);
-        fFramebufferTexture2D(LOCAL_GL_FRAMEBUFFER,
-                              LOCAL_GL_COLOR_ATTACHMENT0,
-                              LOCAL_GL_TEXTURE_2D,
-                              texture,
-                              0);
+        BindSharedRenderBuffer(texture, readFBO);
     }
 
     if (colorMSRB) {

@@ -129,6 +129,7 @@ static bool gUseBackingSurface = true;
 #else
 static bool gUseBackingSurface = false;
 #endif
+static bool forceFenceSync = getenv("FORCE_FENCE") != 0;
 
 #if defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_LINUXGL)
 extern nsIntRect gScreenBounds;
@@ -198,6 +199,100 @@ is_power_of_two(int v)
     return (v & (v-1)) == 0;
 }
 
+class EGLImageSingle
+{
+public:
+    EGLImageSingle(GLuint texture, GLuint& readFBO, GLContext* aContext)
+      : mTexture(texture)
+      , mEGLImage(nullptr)
+      , mContext(aContext)
+      , mSyncObject(nullptr)
+    {
+        int createAttribs[] = {
+            LOCAL_EGL_IMAGE_PRESERVED, LOCAL_EGL_TRUE,
+            LOCAL_EGL_NONE
+        };
+        mContext->MakeCurrent();
+        EGLClientBuffer buffer = reinterpret_cast<EGLClientBuffer>(mTexture);
+        EGLContext context = sEGLLibrary.fGetCurrentContext();
+        mEGLImage = sEGLLibrary.fCreateImage(EGL_DISPLAY(),
+                                             context,
+                                             LOCAL_EGL_GL_TEXTURE_2D,
+                                             buffer,
+                                             createAttribs);
+        mContext->fGenRenderbuffers(1, &mRenderbuffer);
+        mContext->fBindRenderbuffer(LOCAL_GL_RENDERBUFFER, mRenderbuffer);
+        sEGLLibrary.fImageTargetRenderbufferStorageOES(LOCAL_GL_RENDERBUFFER, mEGLImage);
+
+        mContext->fGenFramebuffers(1, &readFBO);
+        mContext->BindInternalFBO(readFBO);
+        mContext->fFramebufferRenderbuffer(LOCAL_GL_FRAMEBUFFER, LOCAL_GL_COLOR_ATTACHMENT0,
+                                           LOCAL_GL_RENDERBUFFER, mRenderbuffer);
+        GLenum result = mContext->fCheckFramebufferStatus(LOCAL_GL_FRAMEBUFFER);
+        if (result != LOCAL_GL_FRAMEBUFFER_COMPLETE) {
+          nsCString msg;
+          msg.Append("Framebuffer not complete -- error 0x");
+          msg.AppendInt(result, 16);
+          // Note: if you are hitting this, it is likely that
+          // your texture is not texture complete -- that is, you
+          // allocated a texture name, but didn't actually define its
+          // size via a call to TexImage2D.
+          NS_RUNTIMEABORT(msg.get());
+        }
+    }
+    ~EGLImageSingle()
+    {
+        mContext->fDeleteRenderbuffers(1, &mRenderbuffer);
+        sEGLLibrary.fDestroyImage(EGL_DISPLAY(), mEGLImage);
+    }
+    EGLImage GetEGLImage() { return mEGLImage; }
+
+    // Insert a sync point on the given context, which should be the current active
+    // context.
+    bool MakeSync(GLContext *ctx) {
+        MOZ_ASSERT(mSyncObject == nullptr);
+
+        if (sEGLLibrary.IsExtensionSupported(GLLibraryEGL::KHR_fence_sync)) {
+            mSyncObject = sEGLLibrary.fCreateSync(EGL_DISPLAY(), LOCAL_EGL_SYNC_FENCE, nullptr);
+            // We need to flush to make sure the sync object enters the command stream;
+            // we can't use EGL_SYNC_FLUSH_COMMANDS_BIT at wait time, because the wait
+            // happens on a different thread/context.
+            ctx->fFlush();
+        }
+
+        if (mSyncObject == EGL_NO_SYNC) {
+            // we failed to create one, so just do a finish
+            ctx->fFinish();
+        }
+
+        return true;
+    }
+
+    bool WaitSync() {
+        if (!mSyncObject) {
+            // if we have no sync object, then we did a Finish() earlier
+            return true;
+        }
+
+        // wait at most 1 second; this should really be never/rarely hit
+        const uint64_t ns_per_ms = 1000 * 1000;
+        EGLTime timeout = 1000 * ns_per_ms;
+
+        EGLint result = sEGLLibrary.fClientWaitSync(EGL_DISPLAY(), mSyncObject, 0, timeout);
+        sEGLLibrary.fDestroySync(EGL_DISPLAY(), mSyncObject);
+        mSyncObject = nullptr;
+
+        return result == LOCAL_EGL_CONDITION_SATISFIED;
+    }
+
+private:
+    GLuint mTexture;
+    EGLImage mEGLImage;
+    GLuint mRenderbuffer;
+    GLContext* mContext;
+    EGLSync mSyncObject;
+};
+
 class GLContextEGL : public GLContext
 {
     friend class TextureImageEGL;
@@ -259,6 +354,7 @@ public:
         , mCanBindToTexture(false)
         , mShareWithEGLImage(false)
         , mTemporaryEGLImageTexture(0)
+        , mEGLImageSingle(nullptr)
     {
         // any EGL contexts will always be GLESv2
         SetIsGLES2(true);
@@ -668,6 +764,17 @@ public:
                                         SharedHandleDetails& details);
     virtual bool AttachSharedHandle(SharedTextureShareType shareType,
                                     SharedTextureHandle sharedHandle);
+    virtual void BindSharedRenderBuffer(const GLuint texture, GLuint& readFBO)
+    {
+        MakeCurrent();
+        sEGLLibrary.LoadConfigSensitiveSymbols();
+        if (!sEGLLibrary.mPreferEGLSingle) {
+            GLContext::BindSharedRenderBuffer(texture, readFBO);
+            return;
+        }
+        delete mEGLImageSingle;
+        mEGLImageSingle = new EGLImageSingle(texture, readFBO, this);
+    }
 protected:
     friend class GLContextProviderEGL;
 
@@ -685,6 +792,7 @@ protected:
 #ifdef MOZ_WIDGET_GONK
     nsRefPtr<HwcComposer2D> mHwc;
 #endif
+    EGLImageSingle* mEGLImageSingle;
 
     // A dummy texture ID that can be used when we need a texture object whose
     // images we're going to define with EGLImageTargetTexture2D.
@@ -871,6 +979,16 @@ GLContextEGL::UpdateSharedHandle(SharedTextureShareType shareType,
         return;
     }
 
+    if (mEGLImageSingle) {
+        // Make Shared Handle fully resolved in order to
+        // guarantee content ready to draw in different thread GLContext
+        if (Renderer() == RendererSGX530 && !forceFenceSync)
+            GuaranteeResolve();
+        else
+            mEGLImageSingle->MakeSync(this);
+        return;
+    }
+
     SharedTextureHandleWrapper* wrapper = reinterpret_cast<SharedTextureHandleWrapper*>(sharedHandle);
 
     NS_ASSERTION(wrapper->Type() == SharedHandleType::Image, "Expected EGLImage shared handle");
@@ -900,7 +1018,10 @@ GLContextEGL::UpdateSharedHandle(SharedTextureShareType shareType,
     // Make sure our copy is finished, so that we can be ready to draw
     // in different thread GLContext.  If we have KHR_fence_sync, then
     // we insert a sync object, otherwise we have to do a GuaranteeResolve.
-    wrap->MakeSync(this);
+    if (Renderer() == RendererSGX530 && !forceFenceSync)
+        GuaranteeResolve();
+    else
+        wrap->MakeSync(this);
 }
 
 SharedTextureHandle
@@ -911,6 +1032,10 @@ GLContextEGL::CreateSharedHandle(SharedTextureShareType shareType)
 
     if (!mShareWithEGLImage)
         return 0;
+
+    if (mEGLImageSingle) {
+        return (SharedTextureHandle)mEGLImageSingle;
+    }
 
     MakeCurrent();
     ContextFormat fmt = ActualFormat();
@@ -979,6 +1104,10 @@ void GLContextEGL::ReleaseSharedHandle(SharedTextureShareType shareType,
         return;
     }
 
+    if (sEGLLibrary.mPreferEGLSingle) {
+        return;
+    }
+
     SharedTextureHandleWrapper* wrapper = reinterpret_cast<SharedTextureHandleWrapper*>(sharedHandle);
 
     switch (wrapper->Type()) {
@@ -1041,6 +1170,13 @@ bool GLContextEGL::AttachSharedHandle(SharedTextureShareType shareType,
 {
     if (shareType != SameProcess)
         return false;
+
+    if (sEGLLibrary.mPreferEGLSingle) {
+        EGLImageSingle* single = (EGLImageSingle*)sharedHandle;
+        single->WaitSync();
+        fEGLImageTargetTexture2D(LOCAL_GL_TEXTURE_2D, single->GetEGLImage());
+        return true;
+    }
 
     SharedTextureHandleWrapper* wrapper = reinterpret_cast<SharedTextureHandleWrapper*>(sharedHandle);
 

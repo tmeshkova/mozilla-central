@@ -421,6 +421,12 @@ public:
         return b;
     }
 
+    void fImageTargetRenderbufferStorageOES(GLenum target, GLeglImage image)
+    {
+        BEFORE_GL_CALL;
+        mSymbols.fImageTargetRenderbufferStorageOES(target, image);
+        AFTER_GL_CALL;
+    }
 
     EGLDisplay Display() {
         return mEGLDisplay;
@@ -535,8 +541,11 @@ public:
         pfnClientWaitSync fClientWaitSync;
         typedef EGLBoolean (GLAPIENTRY * pfnGetSyncAttrib)(EGLDisplay dpy, EGLSync sync, EGLint attribute, EGLint *value);
         pfnGetSyncAttrib fGetSyncAttrib;
+        typedef void (GLAPIENTRY * pfnImageTargetRenderbufferStorageOES)(GLenum target, GLeglImage image);
+        pfnImageTargetRenderbufferStorageOES fImageTargetRenderbufferStorageOES;
     } mSymbols;
 
+    bool mPreferEGLSingle;
 private:
     bool mInitialized;
     PRLibrary* mEGLLibrary;

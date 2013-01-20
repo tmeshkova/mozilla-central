@@ -143,6 +143,8 @@ GLLibraryEGL::EnsureInitialized()
 
 #endif // !Windows
 
+    mPreferEGLSingle = Preferences::GetBool("gl.eglimage.single", false) || getenv("GLEGLSINGLE") != 0;
+
 #define SYMBOL(name) \
 { (PRFuncPtr*) &mSymbols.f##name, { "egl" #name, NULL } }
 
@@ -299,6 +301,7 @@ GLLibraryEGL::LoadConfigSensitiveSymbols()
         GLLibraryLoader::SymLoadStruct imageSymbols[] = {
             { (PRFuncPtr*) &mSymbols.fCreateImage,  { "eglCreateImageKHR",  nullptr } },
             { (PRFuncPtr*) &mSymbols.fDestroyImage, { "eglDestroyImageKHR", nullptr } },
+            { (PRFuncPtr*) &mSymbols.fImageTargetRenderbufferStorageOES, { "glEGLImageTargetRenderbufferStorageOES", NULL } },
             { nullptr, { nullptr } }
         };
 

@@ -633,6 +633,7 @@ public:
                                     SharedTextureHandle sharedHandle)
     { }
 
+    virtual void BindSharedRenderBuffer(const GLuint texture, GLuint& readFBO);
 private:
     GLuint mUserBoundDrawFBO;
     GLuint mUserBoundReadFBO;
