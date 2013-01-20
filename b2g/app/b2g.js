@@ -655,3 +655,13 @@ pref("memory_info_dumper.watch_fifo.directory", "/data/local");
 pref("dom.disable_input_file", true);
 
 pref("general.useragent.enable_overrides", true);
+ 
+pref("browser.manifestURL","app://system.gaiamobile.org/manifest.webapp");
+pref("browser.homescreenURL","app://system.gaiamobile.org/index.html");
+pref("browser.dom.window.dump.enabled", true);
+pref("browser.newtab.url", "about:blank");
+pref("layers.acceleration.draw-fps", true);
+pref("webgl.force-enabled", true);
+pref("webgl.default-no-alpha", true);
+pref("webgl.prefer-16bpp", true);
+
