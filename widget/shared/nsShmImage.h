@@ -27,6 +27,8 @@
 #define DISPLAY gdk_x11_get_default_xdisplay
 #elif defined(MOZ_WIDGET_QT)
 #define DISPLAY mozilla::DefaultXDisplay
+#elif defined(MOZ_X11)
+#define DISPLAY mozilla::DefaultXDisplay
 #endif
 
 class QRect;
@@ -65,6 +67,8 @@ public:
     void Put(GdkWindow* aWindow, cairo_rectangle_list_t* aRects);
 #elif defined(MOZ_WIDGET_QT)
     void Put(QWidget* aWindow, QRect& aRect);
+#elif defined(MOZ_WIDGET_LINUXGL)
+    void Put(int win, const nsIntRegion& aRegion);
 #endif
 
     gfxIntSize Size() const { return mSize; }

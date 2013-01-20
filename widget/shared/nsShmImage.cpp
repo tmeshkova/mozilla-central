@@ -64,6 +64,8 @@ nsShmImage::Create(const gfxIntSize& aSize,
     xerror = gdk_error_trap_pop();
 #elif defined(MOZ_WIDGET_QT)
     Status attachOk = XShmAttach(dpy, &shm->mInfo);
+#elif defined(MOZ_X11)
+    Status attachOk = XShmAttach(dpy, &shm->mInfo);
 #endif
 
     if (!attachOk || xerror) {
@@ -182,6 +184,28 @@ nsShmImage::Put(QWidget* aWindow, QRect& aRect)
                  inter.x(), inter.y(),
                  inter.width(), inter.height(),
                  False);
+    XFreeGC(dpy, gc);
+}
+#elif defined(MOZ_WIDGET_LINUXGL)
+void
+nsShmImage::Put(int win, const nsIntRegion& aRegion)
+{
+    Display* dpy = gfxLinuxGLPlatform::GetXDisplay();
+    Drawable d = win;
+    int dx = 0, dy = 0;
+
+    GC gc = XCreateGC(dpy, d, 0, nsnull);
+    // Avoid out of bounds painting
+    nsIntRegionRectIterator iter(aRegion);
+    const nsIntRect* r;
+    while ((r = iter.Next()) != nsnull) {
+      XShmPutImage(dpy, d, gc, mImage,
+                   r->x, r->y,
+                   r->x - dx, r->y - dy,
+                   r->width, r->height,
+                   False);
+
+    }
     XFreeGC(dpy, gc);
 }
 #endif

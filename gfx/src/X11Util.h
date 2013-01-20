@@ -17,6 +17,9 @@
 #include "gfxQtPlatform.h"
 #undef CursorShape
 #  include <X11/Xlib.h>
+#elif defined(MOZ_WIDGET_LINUXGL)
+#include "gfxLinuxGLPlatform.h"
+#  include <X11/Xlib.h>
 #else
 #  error Unknown toolkit
 #endif 
@@ -38,6 +41,11 @@ DefaultXDisplay()
   return GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
 #elif defined(MOZ_WIDGET_QT)
   return gfxQtPlatform::GetXDisplay();
+#elif defined(MOZ_WIDGET_LINUXGL)
+  return gfxLinuxGLPlatform::GetXDisplay();
+#else
+  NS_WARNING("X11 build but no toolkit display defined");
+  return nsnull;
 #endif
 }
 

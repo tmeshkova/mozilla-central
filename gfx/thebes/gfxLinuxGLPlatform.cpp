@@ -16,6 +16,10 @@
 #include "nsXULAppAPI.h"
 #include "nsIScreen.h"
 #include "nsIScreenManager.h"
+#ifdef MOZ_X11
+#include "gfxXlibSurface.h"
+#include "mozilla/X11Util.h"
+#endif
 
 #include "cairo.h"
 
@@ -28,6 +32,9 @@ using namespace mozilla::dom;
 using namespace mozilla::gfx;
 
 static FT_Library gPlatformFTLibrary = NULL;
+#ifdef MOZ_X11
+static Display* sCachedPlatformDisplay = NULL;
+#endif
 
 #define LOG(args...)  __android_log_print(ANDROID_LOG_INFO, "GeckoFonts" , ## args)
 
@@ -117,7 +124,24 @@ gfxLinuxGLPlatform::~gfxLinuxGLPlatform()
 
     FT_Done_Library(gPlatformFTLibrary);
     gPlatformFTLibrary = NULL;
+#ifdef MOZ_X11
+    if (sCachedPlatformDisplay) {
+        XCloseDisplay(sCachedPlatformDisplay);
+        sCachedPlatformDisplay = NULL;
+    }
+#endif
 }
+
+#ifdef MOZ_X11
+Display*
+gfxLinuxGLPlatform::GetXDisplay()
+{
+    if (!sCachedPlatformDisplay) {
+        sCachedPlatformDisplay = XOpenDisplay(NULL);
+    }
+    return sCachedPlatformDisplay;
+}
+#endif
 
 already_AddRefed<gfxASurface>
 gfxLinuxGLPlatform::CreateOffscreenSurface(const gfxIntSize& size,

@@ -224,6 +224,9 @@ static int    gQtOnlyArgc;
 static char **gQtOnlyArgv;
 #endif
 
+#ifdef MOZ_X11
+#include "X11/Xlib.h"
+#endif
 #if defined(MOZ_WIDGET_GTK)
 #if defined(DEBUG) || defined(NS_BUILD_REFCNT_LOGGING) \
   || defined(NS_TRACE_MALLOC)

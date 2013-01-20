@@ -9,6 +9,9 @@
 #include "gfxPlatform.h"
 #include "gfxUserFontSet.h"
 #include "nsTArray.h"
+#ifdef MOZ_X11
+#include "X11/Xlib.h"
+#endif
 
 namespace mozilla {
     namespace dom {
@@ -69,6 +72,10 @@ public:
     FT_Library GetFTLibrary();
 
     virtual int GetScreenDepth() const;
+
+#ifdef MOZ_X11
+    static Display* GetXDisplay();
+#endif
 
 private:
     int mScreenDepth;
