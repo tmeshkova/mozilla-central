@@ -95,7 +95,7 @@ CPPSRCS += \
 endif
 endif
 
-ifeq ($(MOZ_WIDGET_TOOLKIT),$(findstring $(MOZ_WIDGET_TOOLKIT),android gtk2 gonk qt))
+ifeq ($(MOZ_WIDGET_TOOLKIT),$(findstring $(MOZ_WIDGET_TOOLKIT),android gtk2 gonk qt linuxgl))
 CPPSRCS	+= \
         ScaledFontFreetype.cpp \
         $(NULL)

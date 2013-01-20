@@ -31,6 +31,8 @@
 #include "gfxOS2Platform.h"
 #elif defined(ANDROID)
 #include "gfxAndroidPlatform.h"
+#elif defined(MOZ_WIDGET_LINUXGL)
+#include "gfxLinuxGLPlatform.h"
 #endif
 
 #include "nsGkAtoms.h"
@@ -319,6 +321,8 @@ gfxPlatform::Init()
     gPlatform = new gfxOS2Platform;
 #elif defined(ANDROID)
     gPlatform = new gfxAndroidPlatform;
+#elif defined(MOZ_WIDGET_LINUXGL)
+    gPlatform = new gfxLinuxGLPlatform;
 #else
     #error "No gfxPlatform implementation available"
 #endif

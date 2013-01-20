@@ -17,9 +17,11 @@
 #define GLdouble_defined 1
 // we're using default display for now
 #define GET_NATIVE_WINDOW(aWidget) (EGLNativeWindowType)static_cast<QWidget*>(aWidget->GetNativeData(NS_NATIVE_SHELLWIDGET))->winId()
-#elif defined(MOZ_WIDGET_GONK)
+#elif defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_LINUXGL)
 #define GET_NATIVE_WINDOW(aWidget) ((EGLNativeWindowType)aWidget->GetNativeData(NS_NATIVE_WINDOW))
+#if !defined(MOZ_WIDGET_LINUXGL)
 #include "HwcComposer2D.h"
+#endif
 #endif
 
 #if defined(MOZ_X11)
@@ -128,7 +130,7 @@ static bool gUseBackingSurface = true;
 static bool gUseBackingSurface = false;
 #endif
 
-#ifdef MOZ_WIDGET_GONK
+#if defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_LINUXGL)
 extern nsIntRect gScreenBounds;
 #endif
 
@@ -329,6 +331,10 @@ public:
         property_get("ro.build.version.sdk", propValue, "0");
         if (atoi(propValue) < 15)
             gUseBackingSurface = false;
+#endif
+#ifdef MOZ_WIDGET_LINUXGL
+        if (getenv("USE_BACKING_SURFACE"))
+            gUseBackingSurface = true;
 #endif
 
         bool current = MakeCurrent();
@@ -2129,7 +2135,7 @@ CreateSurfaceForWindow(nsIWidget *aWidget, EGLConfig config)
     surface = sEGLLibrary.fCreateWindowSurface(EGL_DISPLAY(), config, GET_NATIVE_WINDOW(aWidget), 0);
 #endif
 
-#ifdef MOZ_WIDGET_GONK
+#if defined(MOZ_WIDGET_GONK) || defined(MOZ_WIDGET_LINUXGL)
     gScreenBounds.x = 0;
     gScreenBounds.y = 0;
     sEGLLibrary.fQuerySurface(EGL_DISPLAY(), surface, LOCAL_EGL_WIDTH, &gScreenBounds.width);

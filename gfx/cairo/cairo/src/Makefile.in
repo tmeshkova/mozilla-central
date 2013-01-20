@@ -170,7 +170,7 @@ CSRCS   += $(PSPDF_BASE_CSRCS) $(PDF_CSRCS) $(PS_CSRCS)
 EXPORTS_cairo += $(PDF_EXPORTS) $(PS_EXPORTS)
 endif
 
-ifneq (,$(filter android gonk,$(MOZ_WIDGET_TOOLKIT)))
+ifneq (,$(filter android gonk linuxgl,$(MOZ_WIDGET_TOOLKIT)))
 CSRCS   += $(PSPDF_BASE_CSRCS) $(PDF_CSRCS)
 EXPORTS_cairo += $(PDF_EXPORTS)
 endif

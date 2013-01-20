@@ -82,6 +82,15 @@ EXPORTS += \
 	$(NULL)
 endif
 
+ifeq ($(MOZ_WIDGET_TOOLKIT),linuxgl)
+EXPORTS += \
+	gfxLinuxGLPlatform.h \
+	gfxFT2Fonts.h \
+	gfxFT2FontBase.h \
+	gfxPDFSurface.h \
+	$(NULL)
+endif
+
 ifeq ($(MOZ_WIDGET_TOOLKIT),cocoa)
 EXPORTS += \
 	gfxPlatformMac.h \
@@ -191,7 +200,7 @@ CPPSRCS	= \
 	gfxSVGGlyphs.cpp \
 	$(NULL)
 
-ifeq ($(MOZ_WIDGET_TOOLKIT),$(findstring $(MOZ_WIDGET_TOOLKIT),android gtk2 gonk qt))
+ifeq ($(MOZ_WIDGET_TOOLKIT),$(findstring $(MOZ_WIDGET_TOOLKIT),android gtk2 gonk qt linuxgl))
 DEFINES += -DMOZ_ENABLE_FREETYPE
 endif
 
@@ -273,6 +282,21 @@ EXPORTS	+= \
 	$(NULL)
 CPPSRCS += \
 	gfxAndroidPlatform.cpp \
+	gfxFT2Fonts.cpp \
+	gfxFT2FontBase.cpp \
+	gfxFT2Utils.cpp \
+	gfxFT2FontList.cpp \
+	gfxPDFSurface.cpp \
+	nsUnicodeRange.cpp \
+	$(NULL)
+endif
+
+ifeq ($(MOZ_WIDGET_TOOLKIT),linuxgl)
+EXPORTS	+= \
+	gfxPDFSurface.h \
+	$(NULL)
+CPPSRCS += \
+	gfxLinuxGLPlatform.cpp \
 	gfxFT2Fonts.cpp \
 	gfxFT2FontBase.cpp \
 	gfxFT2Utils.cpp \
@@ -368,6 +392,10 @@ CXXFLAGS += $(CAIRO_FT_CFLAGS)
 endif
 
 ifeq ($(MOZ_WIDGET_TOOLKIT),gonk)
+CXXFLAGS += $(CAIRO_FT_CFLAGS)
+endif
+
+ifeq ($(MOZ_WIDGET_TOOLKIT),linuxgl)
 CXXFLAGS += $(CAIRO_FT_CFLAGS)
 endif
 
