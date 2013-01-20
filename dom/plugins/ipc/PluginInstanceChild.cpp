@@ -1242,6 +1242,8 @@ PluginInstanceChild::AnswerNPP_SetWindow(const NPRemoteWindow& aWindow)
     // TODO: Need Android impl
 #elif defined(MOZ_WIDGET_QT)
     // TODO: Need QT-nonX impl
+#elif defined(MOZ_WIDGET_LINUXGL)
+    // TODO: Need LinuxGL impl
 #else
 #  error Implement me for your OS
 #endif

@@ -206,6 +206,9 @@ PluginInstanceParent::AnswerNPN_GetValue_NPNVnetscapeWindow(NativeWindowHandle* 
 #elif defined(MOZ_WIDGET_QT)
     // TODO: Need Qt non X impl
     int id;
+#elif defined(MOZ_WIDGET_LINUXGL)
+    // TODO: Need LinuxGL impl
+    int id;
 #else
 #warning Implement me
 #endif
