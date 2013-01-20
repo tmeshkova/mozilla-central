@@ -4585,6 +4585,11 @@ cairo-linuxgl)
     MOZ_PDF_PRINTING=1
     MOZ_TOUCH=1
     USE_FC_FREETYPE=1
+    if test -z "$WITHOUT_X11"; then
+        MOZ_X11=1
+        AC_DEFINE(MOZ_X11)
+        XT_LIBS=
+    fi
     ;;
 
 
