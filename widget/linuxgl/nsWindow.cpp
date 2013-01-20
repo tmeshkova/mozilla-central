@@ -38,6 +38,11 @@
 #include "nsIWidgetListener.h"
 #include "BasicLayers.h"
 #include "nsWindow.h"
+#include "gfxLinuxGLPlatform.h"
+#ifdef MOZ_X11
+#include <X11/Xlib.h>
+#include <X11/Xatom.h>
+#endif
 
 #define LOG(FMT, ARG...) printf("LinuxGL:%s:%s :%d: " FMT "\n", __FILE__, __FUNCTION__, __LINE__, ## ARG)
 #define LOGW(FMT, ARG...) printf("LinuxGL:%s:%s :%d: " FMT "\n", __FILE__, __FUNCTION__, __LINE__, ## ARG)
@@ -69,8 +74,68 @@ static bool sUsingHwc;
 static bool sScreenInitialized;
 static nsRefPtr<gfxASurface> sOMTCSurface;
 static pthread_t sFramebufferWatchThread;
+static bool sMayCreateNativeWindow = false;
 
 namespace {
+
+#ifdef MOZ_X11
+typedef struct xinfo_t
+{
+  Display *dpy;
+  Window win;
+  GC gc;
+
+  int screen;
+  int depth;
+  int xres;
+  int yres;
+  Visual* visual;
+  nsRefPtr<gfxASurface> backSurface;
+} xinfo;
+static xinfo xInfo;
+#endif
+
+void* NativeWindow()
+{
+    if (!gNativeWindow && sMayCreateNativeWindow) {
+#ifdef MOZ_X11
+        xInfo.dpy = gfxLinuxGLPlatform::GetXDisplay();
+        if (!xInfo.dpy) {
+            printf("X display init failed\n");
+            return false;
+        }
+
+        xInfo.screen = DefaultScreen(xInfo.dpy);
+        xInfo.depth = DefaultDepth(xInfo.dpy, xInfo.screen);
+        xInfo.xres = ScreenOfDisplay(xInfo.dpy, xInfo.screen)->width;
+        xInfo.yres = ScreenOfDisplay(xInfo.dpy, xInfo.screen)->height;
+
+        Atom fullscreen_atom;
+        xInfo.win = XCreateSimpleWindow(xInfo.dpy,
+                                        RootWindow(xInfo.dpy, xInfo.screen),
+                                        0, 0,
+                                        xInfo.xres,
+                                        xInfo.yres,
+                                        0, 0, 0);
+
+        fullscreen_atom = XInternAtom(xInfo.dpy,"_NET_WM_STATE_FULLSCREEN", False);
+        XChangeProperty(xInfo.dpy, xInfo.win, XInternAtom(xInfo.dpy, "_NET_WM_STATE", False), XA_ATOM, 32,
+                        PropModeReplace,(unsigned char *) &fullscreen_atom, 1);
+        XSelectInput(xInfo.dpy, xInfo.win,
+                     VisibilityNotify | ExposureMask |
+                     KeyPressMask | KeyReleaseMask |
+                     ButtonPressMask | ButtonReleaseMask |
+                     PointerMotionMask | FocusChangeMask);
+        XMapWindow(xInfo.dpy, xInfo.win);
+        xInfo.visual = 0;
+
+        XFlush(xInfo.dpy);
+        gNativeWindow = (void*)xInfo.win;
+#endif
+    }
+    return gNativeWindow;
+}
+
 
 static uint32_t
 EffectiveScreenRotation()
@@ -555,7 +620,7 @@ nsWindow::GetLayerManager(PLayersChild* aShadowManager,
 
     // Set mUseLayersAcceleration here to make it consistent with
     // nsBaseWidget::GetLayerManager
-    mUseLayersAcceleration = ComputeShouldAccelerate(mUseLayersAcceleration);
+    mUseLayersAcceleration = getenv("SWRENDER") ? false : ComputeShouldAccelerate(mUseLayersAcceleration);
     nsWindow *topWindow = sTopWindows[0];
 
     if (!topWindow) {
@@ -564,6 +629,7 @@ nsWindow::GetLayerManager(PLayersChild* aShadowManager,
     }
 
     if (sUsingOMTC) {
+        sMayCreateNativeWindow = true;
         CreateCompositor();
         if (mLayerManager)
             return mLayerManager;
@@ -572,6 +638,7 @@ nsWindow::GetLayerManager(PLayersChild* aShadowManager,
     if (mUseLayersAcceleration) {
         DebugOnly<nsIntRect> fbBounds = gScreenBounds;
         if (!sGLContext) {
+            sMayCreateNativeWindow = true;
             sGLContext = GLContextProvider::CreateForWindow(this);
         }
 
