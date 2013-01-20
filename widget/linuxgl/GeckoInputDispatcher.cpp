@@ -54,11 +54,15 @@ GeckoInputDispatcher::GeckoInputDispatcher(nsAppShell* aAppShell)
   : mQueueLock("GeckoInputDispatcher::mQueueMutex")
   , mAppShell(aAppShell)
   , mMouseDev(-1)
+  , mKBDDev(-1)
 {
     mTimerStarted = false;
+    mKTimerStarted = false;
     m_compression = true;
     m_jitterLimitSquared = 9;
     m_x = m_y = m_prevx = m_prevy = m_buttons = 0;
+    m_keycode = m_prevCode = 0;
+    m_keyvalue = m_prevValue = 0;
     Init();
 }
 
@@ -105,7 +109,56 @@ void GeckoInputDispatcher::Init()
                 mMouseDevNode.SetLength(0);
             }
         }
+        if (mKBDDev < 0) {
+            UdevDevicePath(UDev_Keyboard, mKBDDevNode);
+            if ((mKBDDev = open(mKBDDevNode.get(), O_RDONLY | O_NONBLOCK /*O_NDELAY*/ )) != -1) {
+                rv = mAppShell->AddFdHandler(mKBDDev, KBDGenericHandlerS, mKBDDevNode.get(), this);
+                NS_ENSURE_SUCCESS(rv,);
+                printf("Use usedv KBD: fd:%i\n", mKBDDev);
+            } else {
+                printf("error: opening KBD device\n");
+                mKBDDevNode.SetLength(0);
+            }
+        }
 #endif // MOZ_UDEV
+
+    }
+}
+
+static nsEventStatus
+sendKeyEventWithMsg(PRUint32 keyCode,
+                    PRUint32 msg,
+                    uint64_t timeMs)
+{
+    nsKeyEvent event(true, msg, NULL);
+    event.keyCode = keyCode;
+    event.location = nsIDOMKeyEvent::DOM_KEY_LOCATION_MOBILE;
+    event.time = timeMs;
+    return nsWindow::DispatchInputEvent(event);
+}
+
+static void
+sendKeyEvent(PRUint32 keyCode, bool down, uint64_t timeMs)
+{
+    nsEventStatus status =
+        sendKeyEventWithMsg(keyCode, down ? NS_KEY_DOWN : NS_KEY_UP, timeMs);
+    if (down) {
+        sendKeyEventWithMsg(keyCode, NS_KEY_PRESS, timeMs);
+    }
+}
+
+// Defines kKeyMapping
+#include "EvdevKeyMapping.h"
+
+static void
+maybeSendKeyEvent(int keyCode, bool pressed, uint64_t timeMs)
+{
+    if (keyCode < ArrayLength(kKeyMapping) && kKeyMapping[keyCode]) {
+        sendKeyEvent(kKeyMapping[keyCode], pressed, timeMs);
+    }
+    else {
+        printf("Got unknown key event code. type 0x%04x code 0x%04x value %d\n",
+                keyCode, pressed);
     }
 }
 
@@ -132,7 +185,9 @@ void GeckoInputDispatcher::dispatchOnce()
         break;
     }
     case UserInputData::KEY_DATA:
-        printf("Key Data event.type:%i\n", data.action);
+        maybeSendKeyEvent(data.key.keyCode,
+                          data.action == NS_KEY_DOWN,
+                          data.timeMs);
         break;
     }
 }
@@ -163,6 +218,8 @@ GeckoInputDispatcher::UdevDevicePath(int type, nsCString& aResult)
         udev_enumerate_add_match_property(ue, "ID_INPUT_TOUCHPAD", "1");
     if (type & UDev_Touchscreen)
         udev_enumerate_add_match_property(ue, "ID_INPUT_TOUCHSCREEN", "1");
+    if (type & UDev_Keyboard)
+        udev_enumerate_add_match_property(ue, "ID_INPUT_KEYBOARD", "1");
     udev_enumerate_scan_devices(ue);
     udev_list_entry *entry;
     udev_list_entry_foreach(entry, udev_enumerate_get_list_entry(ue)) {
@@ -234,6 +291,25 @@ GeckoInputDispatcher::SendMouseEvent()
     mTimerStarted = false;
 }
 
+void
+GeckoInputDispatcher::SendKeyEvent()
+{
+    int key_code = m_keycode;
+    int key_value = m_keyvalue;
+    PRUint32 msg = key_value ? NS_KEY_UP : NS_KEY_DOWN;
+    UserInputData data;
+    data.type = UserInputData::KEY_DATA;
+    data.action = msg;
+    data.timeMs = last_evtime.tv_usec;
+    data.key.keyCode = key_code;
+    PushUserData(data);
+    mAppShell->NotifyNativeEvent();
+
+    m_prevCode = m_keycode;
+    m_prevValue = m_keyvalue;
+    mKTimerStarted = false;
+}
+
 void GeckoInputDispatcher::DispatchMotionToMainThread()
 {
     if (!mTimerStarted) {
@@ -244,11 +320,21 @@ void GeckoInputDispatcher::DispatchMotionToMainThread()
     }
 }
 
+void GeckoInputDispatcher::DispatchKeyToMainThread()
+{
+    if (!mKTimerStarted) {
+        nsCOMPtr<nsIRunnable> event =
+          NS_NewRunnableMethod(this, &GeckoInputDispatcher::SendKeyEvent);
+        NS_DispatchToMainThread(event);
+        mKTimerStarted = true;
+    }
+}
+
 void
 GeckoInputDispatcher::MouseGenericHandlerS(int fd, FdHandler *data)
 {
     if (data->data) {
-      static_cast<GeckoInputDispatcher*>(data->data)->MouseGenericHandler(fd);
+        static_cast<GeckoInputDispatcher*>(data->data)->MouseGenericHandler(fd);
     }
 }
 
@@ -346,6 +432,48 @@ GeckoInputDispatcher::MouseGenericHandler(int fd)
         if (distanceSquared > m_jitterLimitSquared) {
             DispatchMotionToMainThread();
         }
+    }
+}
+
+void
+GeckoInputDispatcher::KBDGenericHandlerS(int fd, FdHandler *data)
+{
+    if (data->data) {
+      static_cast<GeckoInputDispatcher*>(data->data)->KBDGenericHandler(fd);
+    }
+}
+
+void
+GeckoInputDispatcher::KBDGenericHandler(int fd)
+{
+    struct ::input_event buffer[32];
+    int n = 0;
+    bool posChanged = false;
+    bool pendingMouseEvent = false;
+    int eventCompressCount = 0;
+
+    while (1 == 1) {
+        n = read(fd, reinterpret_cast<char *>(buffer) + n, sizeof(buffer) - n);
+        if (n == 0) {
+            printf("Got EOF from the input device.\n");
+            return;
+        } else if (n < 0 && (errno != EINTR && errno != EAGAIN)) {
+            printf("Could not read from input device: %s\n", strerror(errno));
+            return;
+        } else if (n % sizeof(buffer[0]) == 0) {
+            break;
+        }
+    }
+
+    n /= sizeof(buffer[0]);
+
+    for (int i = 0; i < n; ++i) {
+        if (buffer[i].type != EV_KEY)
+            continue;
+
+        m_keycode = buffer[i].code;
+        m_keyvalue = buffer[i].value;
+        DispatchKeyToMainThread();
     }
 }
 

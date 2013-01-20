@@ -49,7 +49,8 @@ extern "C" {
 enum MUDeviceType {
     UDev_Mouse = 0x01,
     UDev_Touchpad = 0x02,
-    UDev_Touchscreen = 0x04
+    UDev_Touchscreen = 0x04,
+    UDev_Keyboard = 0x08
 };
 #endif
 
@@ -99,10 +100,14 @@ private:
     void Init();
     static void MouseGenericHandlerS(int fd, FdHandler *data);
     void MouseGenericHandler(int fd);
+    static void KBDGenericHandlerS(int fd, FdHandler *data);
+    void KBDGenericHandler(int fd);
     static void x11HandleEvent(int fd, FdHandler*);
     inline void DispatchMotionToMainThread();
+    inline void DispatchKeyToMainThread();
     void SendMouseEvent();
     void SendMouseEventS(PRUint32 msg, uint64_t timeMs, int x, int y);
+    void SendKeyEvent();
 
     // mQueueLock should generally be locked while using mEventQueue.
     // UserInputData is pushed on on the InputReaderThread and
@@ -120,6 +125,13 @@ private:
     bool m_compression;
     int m_jitterLimitSquared;
     bool mTimerStarted;
+    int mKBDDev;
+    unsigned int m_keycode;
+    int m_keyvalue;
+    unsigned int m_prevCode;
+    int m_prevValue;
+    nsCString mKBDDevNode;
+    bool mKTimerStarted;
 };
 
 } // namespace mozilla
