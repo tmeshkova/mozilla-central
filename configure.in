@@ -4437,6 +4437,7 @@ MOZ_ARG_HEADER(Toolkit Options)
                             OS/2 - cairo-os2
                             Win32 - cairo-windows
                             * - cairo-gtk2
+                            * - cairo-linuxgl
                             * - cairo-qt],
     [ _DEFAULT_TOOLKIT=$enableval ],
     [ _DEFAULT_TOOLKIT=$_PLATFORM_DEFAULT_TOOLKIT])
@@ -4449,7 +4450,8 @@ MOZ_ARG_HEADER(Toolkit Options)
         -o "$_DEFAULT_TOOLKIT" = "cairo-cocoa" \
         -o "$_DEFAULT_TOOLKIT" = "cairo-uikit" \
         -o "$_DEFAULT_TOOLKIT" = "cairo-android" \
-        -o "$_DEFAULT_TOOLKIT" = "cairo-gonk"
+        -o "$_DEFAULT_TOOLKIT" = "cairo-gonk" \
+        -o "$_DEFAULT_TOOLKIT" = "cairo-linuxgl"
     then
         dnl nglayout only supports building with one toolkit,
         dnl so ignore everything after the first comma (",").
@@ -4574,6 +4576,17 @@ cairo-gonk)
     MOZ_PDF_PRINTING=1
     MOZ_TOUCH=1
     ;;
+
+cairo-linuxgl)
+    AC_DEFINE(MOZ_WIDGET_LINUXGL)
+    AC_DEFINE(MOZ_TOUCH)
+    MOZ_WIDGET_TOOLKIT=linuxgl
+    MOZ_WEBGL=1
+    MOZ_PDF_PRINTING=1
+    MOZ_TOUCH=1
+    USE_FC_FREETYPE=1
+    ;;
+
 
 esac
 
@@ -4855,7 +4868,7 @@ MOZ_ARG_DISABLE_BOOL(pango,
 dnl ========================================================
 dnl = Pango
 dnl ========================================================
-if test "$MOZ_ENABLE_GTK2" -o "$MOZ_ENABLE_QT"
+if test "$MOZ_ENABLE_GTK2" -o "$MOZ_ENABLE_QT" -o "${MOZ_WIDGET_TOOLKIT}" = "linuxgl"
 then
     AC_SUBST(MOZ_PANGO)
 
