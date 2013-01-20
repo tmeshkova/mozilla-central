@@ -43,6 +43,7 @@
 #include "nsScreenManagerLinuxGL.h"
 #include "nsWindow.h"
 #include "OrientationObserver.h"
+#include "GeckoInputDispatcher.h"
 
 #include "sampler.h"
 
@@ -157,11 +158,12 @@ nsAppShell::Exit()
 void
 nsAppShell::InitInputDevices()
 {
+    mDispatcher = new mozilla::GeckoInputDispatcher(this);
 }
 
 nsresult
 nsAppShell::AddFdHandler(int fd, FdHandlerCallback handlerFunc,
-                         const char* deviceName)
+                         const char* deviceName, void* data)
 {
     epoll_event event = {
         EPOLLIN,
@@ -170,6 +172,7 @@ nsAppShell::AddFdHandler(int fd, FdHandlerCallback handlerFunc,
 
     FdHandler *handler = mHandlers.AppendElement();
     handler->fd = fd;
+    handler->data = data;
     strncpy(handler->name, deviceName, sizeof(handler->name) - 1);
     handler->func = handlerFunc;
     event.data.u32 = mHandlers.Length() - 1;
@@ -199,6 +202,9 @@ nsAppShell::ProcessNextNativeEvent(bool mayWait)
 
     for (int i = 0; i < event_count; i++)
         mHandlers[events[i].data.u32].run();
+
+    if (mDispatcher.get())
+        mDispatcher->dispatchOnce();
 
     // NativeEventCallback always schedules more if it needs it
     // so we can coalesce these.

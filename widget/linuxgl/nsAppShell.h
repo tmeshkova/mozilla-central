@@ -22,10 +22,12 @@
 #include "nsBaseAppShell.h"
 #include "nsRect.h"
 #include "nsTArray.h"
+#include "nsAutoPtr.h"
 
 namespace mozilla {
 bool ProcessNextEvent();
 void NotifyEvent();
+class GeckoInputDispatcher;
 }
 
 extern bool gDrawRequest;
@@ -43,6 +45,7 @@ public:
     int fd;
     char name[64];
     FdHandlerCallback func;
+    void* data;
     void run()
     {
         func(fd, this);
@@ -82,8 +85,9 @@ protected:
     virtual void ScheduleNativeEventCallback();
 
 private:
+    friend class mozilla::GeckoInputDispatcher;
     nsresult AddFdHandler(int fd, FdHandlerCallback handlerFunc,
-                          const char* deviceName);
+                          const char* deviceName, void* data = 0);
     void InitInputDevices();
 
     // This is somewhat racy but is perfectly safe given how the callback works
@@ -94,6 +98,7 @@ private:
     // and can stop the boot animation
     bool mEnableDraw;
     nsTArray<FdHandler> mHandlers;
+    nsRefPtr<mozilla::GeckoInputDispatcher> mDispatcher;
 };
 
 #endif /* nsAppShell_h */

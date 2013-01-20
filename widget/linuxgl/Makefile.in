@@ -39,6 +39,7 @@ CPPSRCS	= \
 	nsLookAndFeel.cpp \
 	nsIdleServiceLinuxGL.cpp \
 	OrientationObserver.cpp \
+	GeckoInputDispatcher.cpp \
 	$(NULL)
 
 SHARED_LIBRARY_LIBS = ../xpwidgets/libxpwidgets_s.a
