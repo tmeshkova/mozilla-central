@@ -44,6 +44,8 @@
 #  define WIDGET_MODULES MODULE(nsWidgetAndroidModule)
 #elif defined(MOZ_WIDGET_GONK)
 #  define WIDGET_MODULES MODULE(nsWidgetGonkModule)
+#elif defined(MOZ_WIDGET_LINUXGL)
+#  define WIDGET_MODULES MODULE(nsWidgetLinuxGLModule)
 #else
 #  error Unknown widget module.
 #endif

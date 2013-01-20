@@ -16,7 +16,7 @@ include $(DEPTH)/config/autoconf.mk
 
 DIRS = shared xpwidgets
 
-ifneq (,$(filter os2 cocoa qt android gonk,$(MOZ_WIDGET_TOOLKIT)))
+ifneq (,$(filter os2 cocoa qt android gonk linuxgl,$(MOZ_WIDGET_TOOLKIT)))
 DIRS += $(MOZ_WIDGET_TOOLKIT)
 endif
 
@@ -86,13 +86,7 @@ ifeq ($(MOZ_WIDGET_TOOLKIT),os2)
 EXPORTS		+= nsIDragSessionOS2.h
 endif
 
-ifneq (,$(filter android gonk,$(MOZ_WIDGET_TOOLKIT)))
-EXPORTS		+= \
-		nsIPrintDialogService.h \
-		$(NULL)
-endif
-
-ifneq (,$(filter qt gtk2,$(MOZ_WIDGET_TOOLKIT)))
+ifneq (,$(filter android gonk qt gtk2 linuxgl,$(MOZ_WIDGET_TOOLKIT)))
 EXPORTS		+= \
 		nsIPrintDialogService.h \
 		$(NULL)

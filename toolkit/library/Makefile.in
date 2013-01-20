@@ -300,6 +300,10 @@ ifeq ($(MOZ_WIDGET_TOOLKIT),gonk)
 COMPONENT_LIBS += widget_gonk
 endif
 
+ifeq ($(MOZ_WIDGET_TOOLKIT),linuxgl)
+COMPONENT_LIBS += widget_linuxgl
+endif
+
 STATIC_LIBS += thebes gl ycbcr
 
 ifdef MOZ_ENABLE_PROFILER_SPS
