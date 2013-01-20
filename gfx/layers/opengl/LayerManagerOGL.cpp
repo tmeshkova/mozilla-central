@@ -390,6 +390,8 @@ LayerManagerOGL::LayerManagerOGL(nsIWidget *aWidget, int aSurfaceWidth, int aSur
   , mBackBufferSize(-1, -1)
   , mHasBGRA(0)
   , mIsRenderingToEGLSurface(aIsRenderingToEGLSurface)
+  , mPointerX(-1)
+  , mPointerY(-1)
 #ifdef DEBUG
   , mMaybeInvalidTree(false)
 #endif
@@ -1152,6 +1154,12 @@ LayerManagerOGL::Render()
     CopyToTarget(mTarget);
     mGLContext->fBindBuffer(LOCAL_GL_ARRAY_BUFFER, 0);
     return;
+  }
+
+  if (mPointerX >= 0 && mPointerY >= 0) {
+    mGLContext->fScissor(mPointerX, mPointerY, 3, 3);
+    mGLContext->fClearColor(1, 0, 0, 1);
+    mGLContext->fClear(LOCAL_GL_COLOR_BUFFER_BIT);
   }
 
   if (sDrawFPS && !mFPS) {

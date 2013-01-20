@@ -300,6 +300,7 @@ public:
 
   bool CompositingDisabled() { return mCompositingDisabled; }
   void SetCompositingDisabled(bool aCompositingDisabled) { mCompositingDisabled = aCompositingDisabled; }
+  void SetPointerIndicator(int aX, int aY) { mPointerX = aX; mPointerY = aY; }
 
   /**
    * Creates a DrawTarget which is optimized for inter-operating with this
@@ -428,6 +429,8 @@ private:
 
   static bool sDrawFPS;
   static bool sFrameCounter;
+  int mPointerX;
+  int mPointerY;
 };
 
 enum LayerRenderStateFlags {

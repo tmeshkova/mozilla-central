@@ -185,6 +185,7 @@ CompositorParent::CompositorParent(nsIWidget* aWidget,
   , mResumeCompositionMonitor("ResumeCompositionMonitor")
   , mOverrideComposeReadiness(false)
   , mForceCompositionTask(nullptr)
+  , mCursor(-1, -1)
 {
   NS_ABORT_IF_FALSE(sCompositorThread != nullptr || sCompositorThreadID,
                     "The compositor thread must be Initialized before instanciating a COmpositorParent.");
@@ -558,6 +559,14 @@ private:
   AutoResolveRefLayers& operator=(const AutoResolveRefLayers&) MOZ_DELETE;
 };
 
+bool
+CompositorParent::RecvUpdateCursor(const nsIntPoint& aCursor)
+{
+  mCursor = aCursor;
+  ScheduleComposition();
+  return true;
+}
+
 void
 CompositorParent::Composite()
 {
@@ -589,12 +598,14 @@ CompositorParent::Composite()
 
   RenderTraceLayers(layer, "0000");
 
-  if (LAYERS_OPENGL == mLayerManager->GetBackendType() &&
-      !mTargetConfig.naturalBounds().IsEmpty()) {
+  if (LAYERS_OPENGL == mLayerManager->GetBackendType()) {
     LayerManagerOGL* lm = static_cast<LayerManagerOGL*>(mLayerManager.get());
-    lm->SetWorldTransform(
-      ComputeGLTransformForRotation(mTargetConfig.naturalBounds(),
-                                    mTargetConfig.rotation()));
+    lm->SetPointerIndicator(mCursor.x, mCursor.y);
+    if (!mTargetConfig.naturalBounds().IsEmpty()) {
+      lm->SetWorldTransform(
+        ComputeGLTransformForRotation(mTargetConfig.naturalBounds(),
+                                      mTargetConfig.rotation()));
+    }
   }
   mLayerManager->EndEmptyTransaction();
 
@@ -1285,6 +1296,7 @@ public:
   virtual bool RecvStop() MOZ_OVERRIDE { return true; }
   virtual bool RecvPause() MOZ_OVERRIDE { return true; }
   virtual bool RecvResume() MOZ_OVERRIDE { return true; }
+  virtual bool RecvUpdateCursor(const nsIntPoint&) MOZ_OVERRIDE { return true; }
   virtual bool RecvMakeSnapshot(const SurfaceDescriptor& aInSnapshot,
                                 SurfaceDescriptor* aOutSnapshot)
   { return true; }

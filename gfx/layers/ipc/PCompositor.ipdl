@@ -60,6 +60,8 @@ parent:
   // FIXME/bug 783451
   sync PGrallocBuffer(gfxIntSize size, uint32_t format, uint32_t usage)
     returns (MaybeMagicGrallocBufferHandle handle);
+
+  async UpdateCursor(nsIntPoint cursor);
 };
 
 } // layers

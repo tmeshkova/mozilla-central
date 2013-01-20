@@ -69,6 +69,7 @@ public:
   virtual bool RecvStop() MOZ_OVERRIDE;
   virtual bool RecvPause() MOZ_OVERRIDE;
   virtual bool RecvResume() MOZ_OVERRIDE;
+  virtual bool RecvUpdateCursor(const nsIntPoint&) MOZ_OVERRIDE;
   virtual bool RecvMakeSnapshot(const SurfaceDescriptor& aInSnapshot,
                                 SurfaceDescriptor* aOutSnapshot);
 
@@ -303,6 +304,7 @@ private:
   mozilla::Monitor mResumeCompositionMonitor;
 
   uint64_t mCompositorID;
+  nsIntPoint mCursor;
 
   bool mOverrideComposeReadiness;
   CancelableTask* mForceCompositionTask;

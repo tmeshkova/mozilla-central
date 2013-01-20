@@ -18,6 +18,7 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include "mozilla/layers/CompositorChild.h"
 #include "mozilla/dom/TabParent.h"
 #include "mozilla/Hal.h"
 #include "mozilla/Preferences.h"
@@ -371,6 +372,10 @@ nsWindow::DispatchInputEvent(nsGUIEvent &aEvent, bool* aWasCaptured)
     }
     if (!gFocusedWindow) {
         return nsEventStatus_eIgnore;
+    }
+
+    if (aEvent.eventStructType == NS_MOUSE_EVENT && gFocusedWindow->mCompositorChild) {
+        gFocusedWindow->mCompositorChild->SendUpdateCursor(aEvent.refPoint);
     }
 
     gFocusedWindow->UserActivity();
