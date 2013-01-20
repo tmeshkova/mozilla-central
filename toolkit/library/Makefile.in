@@ -597,6 +597,10 @@ ifdef MOZ_ENABLE_LIBPROXY
 EXTRA_DSO_LDOPTS += $(MOZ_LIBPROXY_LIBS)
 endif
 
+ifdef MOZ_BROADCOM
+EXTRA_DSO_LDOPTS += -Wl,-rpath-link,/opt/vc/lib -lGLESv2 -lEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm
+endif
+
 ifeq ($(OS_ARCH),SunOS)
 ifdef GNU_CC
 EXTRA_DSO_LDOPTS += -lelf

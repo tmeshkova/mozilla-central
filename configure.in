@@ -4634,6 +4634,18 @@ if test -n "$USE_ARM_KUSER"; then
 fi
 
 dnl ========================================================
+dnl broadcom
+dnl ========================================================
+MOZ_ARG_ENABLE_BOOL(broadcom,
+[  --enable-broadcom          Enable broadcom specific tricks.],
+    MOZ_BROADCOM=1,
+    MOZ_BROADCOM= )
+if test -n "$MOZ_BROADCOM"; then
+    AC_DEFINE(MOZ_BROADCOM)
+fi
+AC_SUBST(MOZ_BROADCOM)
+
+dnl ========================================================
 dnl = startup-notification support module
 dnl ========================================================
 

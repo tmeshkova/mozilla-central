@@ -1450,9 +1450,12 @@ GetFrameBufferInternalFormat(GLContext* gl,
                              GLuint aCurrentFrameBuffer,
                              nsIWidget* aWidget)
 {
+#ifndef MOZ_BROADCOM
+  // Sounds like we should enable alpha for broadcom env
   if (aCurrentFrameBuffer == 0) { // default framebuffer
     return aWidget->GetGLFrameBufferFormat();
   }
+#endif
   return LOCAL_GL_RGBA;
 }
 

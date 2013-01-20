@@ -44,6 +44,10 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 #endif
+#ifdef MOZ_BROADCOM
+#include <bcm_host.h>
+#include <EGL/egl.h>
+#endif
 
 #define LOG(FMT, ARG...) printf("LinuxGL:%s:%s :%d: " FMT "\n", __FILE__, __FUNCTION__, __LINE__, ## ARG)
 #define LOGW(FMT, ARG...) printf("LinuxGL:%s:%s :%d: " FMT "\n", __FILE__, __FUNCTION__, __LINE__, ## ARG)
@@ -76,6 +80,11 @@ static bool sScreenInitialized;
 static nsRefPtr<gfxASurface> sOMTCSurface;
 static pthread_t sFramebufferWatchThread;
 static bool sMayCreateNativeWindow = false;
+static bool sPlatformInitialized = false;
+#ifdef MOZ_BROADCOM
+static DISPMANX_DISPLAY_HANDLE_T dispman_display = 0;
+static DISPMANX_UPDATE_HANDLE_T dispman_update = 0;
+#endif
 
 #include <sys/time.h>
 class MozFPSCounter
@@ -133,8 +142,52 @@ typedef struct xinfo_t
 static xinfo xInfo;
 #endif
 
+static void InitPlatform()
+{
+    if (!sPlatformInitialized) {
+#ifdef MOZ_BROADCOM
+        bcm_host_init();
+        dispman_display = vc_dispmanx_display_open(0/* LCD */);
+
+        VC_RECT_T dst_rect;
+        dst_rect.x = 0;
+        dst_rect.y = 0;
+        dst_rect.width = gScreenBounds.width;
+        dst_rect.height = gScreenBounds.height;
+
+        VC_RECT_T src_rect;
+        src_rect.x = 0;
+        src_rect.y = 0;
+        src_rect.width = gScreenBounds.width << 16;
+        src_rect.height = gScreenBounds.height << 16;
+
+        dispman_update = vc_dispmanx_update_start(0);
+
+        VC_DISPMANX_ALPHA_T alpha;
+        alpha.flags = (DISPMANX_FLAGS_ALPHA_T)(DISPMANX_FLAGS_ALPHA_FROM_SOURCE | DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS);
+        alpha.opacity = 0xFF;
+        alpha.mask = 0;
+
+        DISPMANX_ELEMENT_HANDLE_T dispman_element = vc_dispmanx_element_add(
+                dispman_update, dispman_display, 0, &dst_rect, 0, &src_rect,
+                DISPMANX_PROTECTION_NONE, &alpha, (DISPMANX_CLAMP_T *)NULL, (DISPMANX_TRANSFORM_T)0);
+
+        vc_dispmanx_update_submit_sync(dispman_update);
+
+        EGL_DISPMANX_WINDOW_T *eglWindow = new EGL_DISPMANX_WINDOW_T;
+        eglWindow->element = dispman_element;
+        eglWindow->width = gScreenBounds.width;
+        eglWindow->height = gScreenBounds.height;
+        gNativeWindow = eglWindow;
+        LOG("eglW:%p, sz[%i,%i], win:%p\n", eglWindow, gScreenBounds.width, gScreenBounds.height, gNativeWindow);
+#endif
+        sPlatformInitialized = true;
+    }
+}
+
 void* NativeWindow()
 {
+    InitPlatform();
     if (!gNativeWindow && sMayCreateNativeWindow) {
 #ifdef MOZ_X11
         xInfo.dpy = gfxLinuxGLPlatform::GetXDisplay();
@@ -298,6 +351,7 @@ nsWindow::nsWindow()
                                              gfxASurface::ImageFormatRGB24);
         }
     }
+    InitPlatform();
 }
 
 nsWindow::~nsWindow()
