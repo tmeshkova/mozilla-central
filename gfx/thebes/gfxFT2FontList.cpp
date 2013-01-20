@@ -22,10 +22,14 @@
 #include "nsIInputStream.h"
 #include "nsNetUtil.h"
 #define gfxToolkitPlatform gfxAndroidPlatform
+#elif defined(MOZ_WIDGET_LINUXGL)
+#include "mozilla/dom/ContentChild.h"
+#include "gfxLinuxGLPlatform.h"
+#define gfxToolkitPlatform gfxLinuxGLPlatform
 #endif
 
-#ifdef ANDROID
 #include "nsXULAppAPI.h"
+#ifdef ANDROID
 #include <dirent.h>
 #include <android/log.h>
 #define ALOG(args...)  __android_log_print(ANDROID_LOG_INFO, "Gecko" , ## args)
@@ -148,7 +152,7 @@ FT2FontEntry::~FT2FontEntry()
     // Do nothing for mFTFace here since FTFontDestroyFunc is called by cairo.
     mFTFace = nullptr;
 
-#ifndef ANDROID
+#if !defined(ANDROID) && !defined(MOZ_WIDGET_LINUXGL)
     if (mFontFace) {
         cairo_font_face_destroy(mFontFace);
         mFontFace = nullptr;
@@ -784,6 +788,8 @@ gfxFT2FontList::AppendFacesFromFontFile(nsCString& aFileName,
     FT_Library ftLibrary = gfxWindowsPlatform::GetPlatform()->GetFTLibrary();
 #elif defined(ANDROID)
     FT_Library ftLibrary = gfxAndroidPlatform::GetPlatform()->GetFTLibrary();
+#elif defined(MOZ_WIDGET_LINUXGL)
+    FT_Library ftLibrary = gfxLinuxGLPlatform::GetPlatform()->GetFTLibrary();
 #endif
     FT_Face dummy;
     if (FT_Err_Ok == FT_New_Face(ftLibrary, aFileName.get(), -1, &dummy)) {
@@ -1106,6 +1112,59 @@ gfxFT2FontList::FindFonts()
     // and marking "simple" families.
     // Passing non-null userData here says that we want faces to be sorted.
     mFontFamilies.Enumerate(FinalizeFamilyMemberList, this);
+#elif defined(MOZ_WIDGET_LINUXGL)
+    gfxFontCache *fc = gfxFontCache::GetCache();
+    if (fc)
+        fc->AgeAllGenerations();
+    mPrefFonts.Clear();
+    mCodepointsWithNoFonts.reset();
+
+    mCodepointsWithNoFonts.SetRange(0,0x1f);     // C0 controls
+    mCodepointsWithNoFonts.SetRange(0x7f,0x9f);  // C1 controls
+
+    if (XRE_GetProcessType() != GeckoProcessType_Default) {
+        // Content process: ask the Chrome process to give us the list
+        InfallibleTArray<FontListEntry> fonts;
+        mozilla::dom::ContentChild::GetSingleton()->SendReadFontList(&fonts);
+        for (PRUint32 i = 0, n = fonts.Length(); i < n; ++i) {
+            AppendFaceFromFontListEntry(fonts[i], false);
+        }
+        // Passing null for userdata tells Finalize that it does not need
+        // to sort faces (because they were already sorted by chrome,
+        // so we just maintain the existing order)
+        mFontFamilies.Enumerate(FinalizeFamilyMemberList, nullptr);
+        LOG(("got font list from chrome process: %d faces in %d families",
+            fonts.Length(), mFontFamilies.Count()));
+        return;
+    }
+
+    // Chrome process: get the cached list (if any)
+    FontNameCache fnc;
+
+    FcPattern *pat = NULL;
+    FcObjectSet *os = NULL;
+    FcFontSet *fs = NULL;
+    pat = FcPatternCreate();
+    os = FcObjectSetBuild(FC_FAMILY, FC_FILE, FC_INDEX, FC_WEIGHT, FC_SLANT, FC_WIDTH, NULL);
+    fs = FcFontList(NULL, pat, os);
+    for (int i = 0; i < fs->nfont; i++) {
+        char *file;
+        if (FcPatternGetString(fs->fonts[i], FC_FILE, 0, (FcChar8 **) &file) != FcResultMatch)
+            continue;
+        nsCString s(file);
+        AppendFacesFromFontFile(s, false, &fnc);
+    }
+    if (pat)
+        FcPatternDestroy(pat);
+    if (os)
+        FcObjectSetDestroy(os);
+    if (fs)
+        FcFontSetDestroy(fs);
+
+    // Finalize the families by sorting faces into standard order
+    // and marking "simple" families.
+    // Passing non-null userData here says that we want faces to be sorted.
+    mFontFamilies.Enumerate(FinalizeFamilyMemberList, this);
 #endif // XP_WIN && ANDROID
 }
 
@@ -1288,6 +1347,12 @@ gfxFT2FontList::GetDefaultFont(const gfxFontStyle* aStyle)
     nsAutoString resolvedName;
     if (ResolveFontName(NS_LITERAL_STRING("Roboto"), resolvedName) ||
         ResolveFontName(NS_LITERAL_STRING("Droid Sans"), resolvedName)) {
+        return FindFamily(resolvedName);
+    }
+#elif defined(MOZ_WIDGET_LINUXGL)
+    nsAutoString resolvedName;
+    if (ResolveFontName(NS_LITERAL_STRING("Serif"), resolvedName) ||
+        ResolveFontName(NS_LITERAL_STRING("DejaVu Sans"), resolvedName)) {
         return FindFamily(resolvedName);
     }
 #endif

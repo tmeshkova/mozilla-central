@@ -88,6 +88,8 @@
 
 #ifdef ANDROID
 # include "gfxAndroidPlatform.h"
+#elif defined(MOZ_WIDGET_LINUXGL)
+# include "gfxLinuxGLPlatform.h"
 #endif
 
 #ifdef MOZ_CRASHREPORTER
@@ -1184,6 +1186,8 @@ ContentParent::RecvReadFontList(InfallibleTArray<FontListEntry>* retValue)
 {
 #ifdef ANDROID
     gfxAndroidPlatform::GetPlatform()->GetFontList(retValue);
+#elif defined(MOZ_WIDGET_LINUXGL)
+    gfxLinuxGLPlatform::GetPlatform()->GetFontList(retValue);
 #endif
     return true;
 }

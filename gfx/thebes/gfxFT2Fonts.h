@@ -89,7 +89,7 @@ protected:
     CharGlyphMap mCharGlyphCache;
 };
 
-#ifndef ANDROID // not needed on Android, uses the standard gfxFontGroup directly
+#if !defined(ANDROID) && !defined(MOZ_WIDGET_LINUXGL) // not needed on Android, uses the standard gfxFontGroup directly
 class THEBES_API gfxFT2FontGroup : public gfxFontGroup {
 public: // new functions
     gfxFT2FontGroup (const nsAString& families,

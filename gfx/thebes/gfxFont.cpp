@@ -3344,7 +3344,7 @@ gfxFontGroup::BuildFontList()
 {
 // "#if" to be removed once all platforms are moved to gfxPlatformFontList interface
 // and subclasses of gfxFontGroup eliminated
-#if defined(XP_MACOSX) || defined(XP_WIN) || defined(ANDROID)
+#if defined(XP_MACOSX) || defined(XP_WIN) || defined(ANDROID) || defined(MOZ_WIDGET_LINUXGL)
     ForEachFont(FindPlatformFont, this);
 
     if (mFonts.Length() == 0) {
@@ -4302,7 +4302,7 @@ gfxFontGroup::UpdateFontList()
         mSkipDrawing = false;
 
         // bug 548184 - need to clean up FT2, OS/2 platform code to use BuildFontList
-#if defined(XP_MACOSX) || defined(XP_WIN) || defined(ANDROID)
+#if defined(XP_MACOSX) || defined(XP_WIN) || defined(ANDROID) || defined(MOZ_WIDGET_LINUXGL)
         BuildFontList();
 #else
         ForEachFont(FindPlatformFont, this);

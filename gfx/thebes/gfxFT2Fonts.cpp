@@ -16,6 +16,9 @@
 #elif defined(ANDROID)
 #include "gfxAndroidPlatform.h"
 #define gfxToolkitPlatform gfxAndroidPlatform
+#elif defined(MOZ_WIDGET_LINUXGL)
+#include "gfxLinuxGLPlatform.h"
+#define gfxToolkitPlatform gfxLinuxGLPlatform
 #endif
 
 #include "gfxTypes.h"
@@ -47,7 +50,7 @@
 #define CONVERT_DESIGN_UNITS_TO_PIXELS(v, s) \
         MOZ_FT_TRUNC(MOZ_FT_ROUND(FT_MulFix((v) , (s))))
 
-#ifndef ANDROID // not needed on Android, we use the generic gfxFontGroup
+#if !defined(ANDROID) && !defined(MOZ_WIDGET_LINUXGL) // not needed on Android, we use the generic gfxFontGroup
 /**
  * gfxFT2FontGroup
  */
@@ -121,6 +124,9 @@ gfxFT2FontGroup::gfxFT2FontGroup(const nsAString& families,
 #elif defined(ANDROID)
         familyArray.AppendElement(NS_LITERAL_STRING("Droid Sans"));
         familyArray.AppendElement(NS_LITERAL_STRING("Roboto"));
+#elif defined(MOZ_WIDGET_LINUXGL)
+        familyArray.AppendElement(NS_LITERAL_STRING("DejaVu Sans"));
+        familyArray.AppendElement(NS_LITERAL_STRING("DejaVu Serif"));
 #else
 #error "Platform not supported"
 #endif
@@ -376,7 +382,7 @@ gfxFT2FontGroup::WhichPrefFontSupportsChar(uint32_t aCh)
 already_AddRefed<gfxFont>
 gfxFT2FontGroup::WhichSystemFontSupportsChar(uint32_t aCh, int32_t aRunScript)
 {
-#if defined(XP_WIN) || defined(ANDROID)
+#if defined(XP_WIN) || defined(ANDROID) || defined(MOZ_WIDGET_LINUXGL)
     FontEntry *fe = static_cast<FontEntry*>
         (gfxPlatformFontList::PlatformFontList()->
             SystemFindFontForChar(aCh, aRunScript, &mStyle));
@@ -575,7 +581,7 @@ already_AddRefed<gfxFT2Font>
 gfxFT2Font::GetOrMakeFont(const nsAString& aName, const gfxFontStyle *aStyle,
                           bool aNeedsBold)
 {
-#ifdef ANDROID
+#if defined(ANDROID) || defined(MOZ_WIDGET_LINUXGL)
     FT2FontEntry *fe = static_cast<FT2FontEntry*>
         (gfxPlatformFontList::PlatformFontList()->
             FindFontForFamily(aName, aStyle, aNeedsBold));
