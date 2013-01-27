@@ -9,6 +9,9 @@
 
 #include <QGraphicsWidget>
 #include <QUrl>
+#include <QNetworkSession>
+#include <QNetworkConfiguration>
+#include <QNetworkConfigurationManager>
 
 class QMozContext;
 class QSyncMessage;
@@ -105,6 +108,8 @@ private Q_SLOTS:
     void onInitialized();
 
 private:
+    QNetworkSession* session;
+    
     void forceActiveFocus();
 
     QGraphicsMozViewPrivate* d;

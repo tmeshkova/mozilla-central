@@ -18,9 +18,9 @@
 #include <QtGui/QApplication>
 #include <QGraphicsObject>
 
-#ifdef HARMATTAN_BOOSTER
-#include <qplatformdefs.h> // MEEGO_EDITION_HARMATTAN
-#include <MDeclarativeCache>
+#include <qplatformdefs.h> 
+#ifdef MEEGO_EDITION_HARMATTAN
+#include "mdeclarativecache.h"
 #endif
 
 #if defined(QMLJSDEBUGGER) && QT_VERSION < 0x040800
@@ -170,7 +170,7 @@ QmlApplicationViewer::~QmlApplicationViewer()
 
 QmlApplicationViewer *QmlApplicationViewer::create()
 {
-#ifdef HARMATTAN_BOOSTER
+#ifdef MEEGO_EDITION_HARMATTAN
     return new QmlApplicationViewer(MDeclarativeCache::qDeclarativeView(), 0);
 #else
     return new QmlApplicationViewer();
@@ -256,7 +256,7 @@ QmlApplicationViewer::paintEvent(QPaintEvent* ev)
 
 QApplication *createApplication(int &argc, char **argv)
 {
-#ifdef HARMATTAN_BOOSTER
+#ifdef MEEGO_EDITION_HARMATTAN
     return MDeclarativeCache::qApplication(argc, argv);
 #else
     return new QApplication(argc, argv);

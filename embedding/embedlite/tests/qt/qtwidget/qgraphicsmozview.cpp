@@ -261,6 +261,10 @@ QGraphicsMozView::QGraphicsMozView(QGraphicsItem* parent)
     } else {
         QTimer::singleShot(0, this, SLOT(onInitialized()));
     }
+    
+    QNetworkConfigurationManager manager;
+    QNetworkConfiguration cfg = manager.defaultConfiguration();
+    session = new QNetworkSession(cfg);
 }
 
 QGraphicsMozView::~QGraphicsMozView()
@@ -360,6 +364,11 @@ void QGraphicsMozView::load(const QString& url)
         return;
     }
     LOGT("url: %s", url.toUtf8().data());
+    if (!session->isOpen())
+    {
+        session->open();
+        session->waitForOpened(-1);
+    }
     d->mView->LoadURL(QUrl::fromUserInput(url).toString().toUtf8().data());
 }
 
