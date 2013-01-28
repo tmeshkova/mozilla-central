@@ -21,6 +21,7 @@ public:
 
     void ViewportChange(const mozilla::layers::FrameMetrics& aMetrics, gfx::Rect cssCompositedRect);
     void GestureDoubleTap(const nsIntPoint& aPoint);
+    nsAutoString GestureLongTap(const nsIntPoint& aPoint);
     void ScrollToFocusedInput(bool aAllowZoom);
     void AsyncScrollDOMEvent(const gfxRect& contentRect, const gfxSize& scrollSize);
 

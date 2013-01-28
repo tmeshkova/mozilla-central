@@ -6,20 +6,22 @@ import com.nokia.extras 1.0
 
 QDeclarativeMozView {
     id: webViewport
+    anchors.fill: parent
     
     signal urlChanged(string url)
     signal titleChanged(string title)
+    signal holdOnUrl(string url)
     
     property string title: webViewport.child().title
     property string url: webViewport.child().url
-    property bool first: false
+    property string address: ""
     
     Connections {
 	target: webViewport.child()
 	onViewInitialized: {
-	    print("QML View Initialized first: " + first);
-	    if (first)
-		webViewport.child().load(startURL)
+	    print("QML View Initialized first");
+	    if (address!="")
+		webViewport.child().load(address);
 	}
 	onTitleChanged: {
 	    print("onTitleChanged: " + webViewport.child().title)
@@ -27,22 +29,24 @@ QDeclarativeMozView {
 	}
 	onUrlChanged: {
 	    print("onUrlChanged: " + webViewport.child().url)
-	    //addressLine.text = webViewport.child().url;
 	    urlChanged(webViewport.child().url)
 	}
 	onRecvAsyncMessage: {
 	    print("onRecvAsyncMessage:" + message + ", data:" + data);
+	    if (message == "LongTap:aHRef")
+		holdOnUrl(data);
 	}
 	onRecvSyncMessage: {
 	    print("onRecvSyncMessage:" + message + ", data:" + data);
 	    if (message == "browser-element-api:get-fullscreen-allowed") {
-		response.message = true
+		response.message = true;
 	    } else if (message == "browser-element-api:get-name") {
-		response.message = true
+		response.message = true;
 	    }
 	}
 	onAlert: {
 	    print("onAlert: title:" + title + ", msg:" + message + " winid:" + winid);
+	    webViewport.visible = false;
 	    alertDlg.winId = winid;
 	    alertDlg.titleText = title;
 	    alertDlg.message = message;
@@ -50,6 +54,7 @@ QDeclarativeMozView {
 	}
 	onConfirm: {
 	    print("onConfirm: title:" + title + ", msg:" + message);
+	    webViewport.visible = false;
 	    confirmDlg.winId = winid;
 	    confirmDlg.titleText = title;
 	    confirmDlg.message = message;
@@ -57,6 +62,7 @@ QDeclarativeMozView {
 	}
 	onPrompt: {
 	    print("onPrompt: title:" + title + ", msg:" + message);
+	    webViewport.visible = false;
 	    promptDlg.winId = winid;
 	    promptDlg.titleText = title;
 	    promptDlg.messageText = message;
@@ -65,6 +71,7 @@ QDeclarativeMozView {
 	}
 	onAuthRequired: {
 	    print("onAuthRequired: title:" + title + ", msg:" + message + ", winid:" + winid);
+	    webViewport.visible = false;
 	    authDlg.winId = winid;
 	    authDlg.titleText = title;
 	    authDlg.messageText = message;
@@ -78,7 +85,10 @@ QDeclarativeMozView {
 	property int winId: 0
 	acceptButtonText: "OK"
 	
-	onAccepted: webViewport.child().unblockPrompt(winId, 0, true, "", "", "");
+	onAccepted: {
+	    webViewport.visible = true;
+	    webViewport.child().unblockPrompt(winId, 0, true, "", "", "");
+	}
     }
     
     QueryDialog {
@@ -87,8 +97,14 @@ QDeclarativeMozView {
 	acceptButtonText: "OK"
 	rejectButtonText: "Cancel"
 	
-	onAccepted: webViewport.child().unblockPrompt(winId, 0, true, "", "", "");
-	onRejected: webViewport.child().unblockPrompt(winId, 0, false, "", "", "");
+	onAccepted: {
+	    webViewport.visible = true;
+	    webViewport.child().unblockPrompt(winId, 0, true, "", "", "");
+	}
+	onRejected: {
+	    webViewport.visible = true;
+	    webViewport.child().unblockPrompt(winId, 0, false, "", "", "");
+	}
     }
     
     Dialog {
@@ -139,9 +155,11 @@ QDeclarativeMozView {
 	    Button {text: "Cancel"; onClicked: promptDlg.reject(); }
 	}
 	onAccepted: {
+	    webViewport.visible = true;
 	    webViewport.child().unblockPrompt(winId, 0, true, valueField.text, "", "");
 	}
 	onRejected: {
+	    webViewport.visible = true;
 	    webViewport.child().unblockPrompt(winId, 0, false, "", "", "");
 	}
     }
@@ -213,9 +231,11 @@ QDeclarativeMozView {
 	    Button {text: "Cancel"; onClicked: authDlg.reject();}
 	}
 	onAccepted: {
+	    webViewport.visible = true;
 	    webViewport.child().unblockPrompt(winId, 0, true, "", usernameField.text, passwordField.text);
 	}
 	onRejected: {
+	    webViewport.visible = true;
 	    webViewport.child().unblockPrompt(winId, 0, false, "", "", "");
 	}
     }

@@ -331,11 +331,12 @@ EmbedLiteViewThreadChild::RecvHandleSingleTap(const nsIntPoint& aPoint)
 bool
 EmbedLiteViewThreadChild::RecvHandleLongTap(const nsIntPoint& aPoint)
 {
-    RecvMouseEvent(NS_LITERAL_STRING("contextmenu"), aPoint.x, aPoint.y,
-                  2 /* Right button */,
-                  1 /* Click count */,
-                  0 /* Modifiers */,
-                  false /* Ignore root scroll frame */);
+    //RecvMouseEvent(NS_LITERAL_STRING("contextmenu"), aPoint.x, aPoint.y,
+    //              2 /* Right button */,
+    //              1 /* Click count */,
+    //              0 /* Modifiers */,
+    //              false /* Ignore root scroll frame */);
+    mHelper->RecvHandleLongTap(aPoint);
 
     return true;
 }

@@ -23,7 +23,7 @@ FocusScope {
     //width: 800; height: 600
     
     Component.onCompleted: {
-	createWindow()
+	createWindow(startURL)
     }
     
     function load(address) {
@@ -43,6 +43,10 @@ FocusScope {
 	    addressLine.cursorPosition = 0;
 	}
 	onTitleChanged: pageTitle.text = title;
+	onHoldOnUrl: {
+	    if (url)
+		showContextMenu(url);
+	}
     }
     
     Rectangle {
@@ -127,10 +131,9 @@ FocusScope {
 		    anchors.verticalCenter: parent.verticalCenter
 		    platformIconId: viewport.child().loading ?"toolbar-stop-white":"toolbar-refresh-white"
 		    onClicked: {
-			viewport.child();
-			if (viewport.canStop) {
+			if (viewport.child().loading) {
 			    console.log("stop loading")
-			    viewport.stop()
+			    viewport.child().stop()
 			} else {
 			    console.log("reloading")
 			    viewport.child().reload()
@@ -271,16 +274,20 @@ FocusScope {
 	    property bool longPressed: false
 	    
 	    onClicked: {
+		viewport.focus = true;
 		navigationBar.anchors.topMargin = -70
 		tabsBar.anchors.bottomMargin = -100
 	    }
 	    
 	    onPressed: {
+		viewport.focus = true;
+		longPressed = false;
 		mouseY = mouse.y
 		mouseX = mouse.x
 	    }
 	    
 	    onReleased: {
+		viewport.focus = true;
 		if (longPressed) {
 		    if (navigationBar.anchors.topMargin > -35)
 			navigationBar.anchors.topMargin = 0;
@@ -307,7 +314,7 @@ FocusScope {
 	    
 	    onPositionChanged: {
 		var mapped = mapToItem(mainScope, mouse.x, mouse.y);
-		if (longPressed) {
+		if (longPressed && contextMenu.status==DialogStatus.Closed) {
 		    var topDelta = mapped.y - mouseY;
 		    if (topDelta > 70)
 			topDelta = 70;
@@ -322,6 +329,25 @@ FocusScope {
 	}
     }
     
+    function showContextMenu(address) {
+	contextMenu.url = address
+	contextMenu.open()
+    }
+    
+    Menu {
+	id: contextMenu
+	property string url: ""
+	visualParent: pageStack
+	MenuLayout {
+	    MenuItem {text: "Open in new tab"; onClicked: { 
+		contextMenu.close();
+		viewport.focus = true;
+		createWindow(contextMenu.url);
+	    } }
+//	    MenuItem {text: "Copy to clipboard"; onClicked: {  }}
+	}
+    }
+    
     Keys.onPressed: {
 	if (((event.modifiers & Qt.ControlModifier) && event.key == Qt.Key_L) || event.key == Qt.key_F6) {
 	    console.log("Focus address bar")
@@ -330,7 +356,11 @@ FocusScope {
 	}
     }
     
-    function createWindow(){
+    function createWindow(address){
+	for (var i=0; i<storage.count-1; i++){
+	    storage.get(i).element.visible = false
+	    storage.get(i).element.focus = false
+	}
 	var component = Qt.createComponent("FennecWindow.qml");
 	var object = component.createObject(browserArea);
 	object.anchors.fill = browserArea
@@ -341,15 +371,11 @@ FocusScope {
 	storage.pageIndex = storage.count-2
 	
 	mainScope.viewport = storage.get(storage.count-2).element
-	//mainScope.viewport.urlChanged.connect(onUrlChanged)
-	//mainScope.viewport.titleChanged.connect(onTitleChanged)
-	addressLine.text = ""
+	object.address = address
+	addressLine.text = address
+	addressLine.cursorPosition = 0
 	pageTitle.text = " "
 	navigationBar.anchors.topMargin = 0
-	
-	if (storage.count==2 && (startURL.length != 0)){
-	    object.first = true
-	}
     }
     
     ListModel{
@@ -381,7 +407,6 @@ FocusScope {
 	    
 		Label {
 		    anchors.centerIn: parent
-		    //visible: type=="newpage"
 		    font.pixelSize: 60
 		    text: name=="newpage"?"+":(index+1)
 		}
@@ -391,37 +416,31 @@ FocusScope {
 		anchors.fill: parent
 		
 		function activateIndex(m_index){
+		    for (var i=0; i<storage.count-1; i++){
+			storage.get(i).element.visible = false
+			storage.get(i).element.focus = false
+		    }
 		    storage.get(m_index).element.visible = true
 		    storage.get(m_index).element.focus = true
 		    storage.pageIndex = m_index
 		    mainScope.viewport = storage.get(m_index).element
-		    //mainScope.viewport.urlChanged.connect(onUrlChanged)
-		    //mainScope.viewport.titleChanged.connect(onTitleChanged)
 		    addressLine.text = storage.get(m_index).element.url
 		    addressLine.cursorPosition = 0
 		    pageTitle.text = storage.get(m_index).element.title
 		    if (pageTitle.text == "") { pageTitle.text = " " }
 		}
 		
-		onClicked: {
-		    for (var i=0; i<storage.count-1; i++){
-			storage.get(i).element.visible = false
-			storage.get(i).element.focus = false
-		    }
-		    
-		    //mainScope.viewport.urlChanged.disconnect()
-		    //mainScope.viewport.titleChanged.disconnect()
-		    
+		onClicked: {		    
 		    if (index==storage.count-1)
-			createWindow();
+			createWindow("");
 		    else
 			activateIndex(index);
 		    
 		    navigationBar.anchors.topMargin = 0
 		}
 		onPressAndHold: {
-		    vibra.play()
 		    if (index != storage.count-1 && storage.count > 2){
+			vibra.play()
 			if (index>1)
 			    activateIndex(index-1);
 			else
