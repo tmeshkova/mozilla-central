@@ -73,6 +73,11 @@ public:
                                             const bool& isOnlyPassword,
                                             const uint64_t& winID) {}
     virtual void IMENotification(int aEnabled, bool aOpen, int aCause, int aFocusChange) {}
+    // Notification after LongTap in browser window. aHRef contains anchor href attribute, aSrc contains image src attribute, empty values if not exists
+    virtual void OnContextUrl(const PRUnichar* aHRef, const PRUnichar* aSrc) {}
+    // Notification about browser window visible rect and full page (scrollable) size
+    virtual void OnRectChanged(float rectX, float rectY, float rectW, float rectH, float scrollW, float scrollH) {}
+
 };
 
 class EmbedLiteApp;

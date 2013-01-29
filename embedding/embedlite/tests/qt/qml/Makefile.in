@@ -42,8 +42,14 @@ LOCAL_INCLUDES	= -I$(srcdir) \
     $(TK_CFLAGS) \
     -I/usr/include/qt4/QtDeclarative \
     -I/usr/include/QtDeclarative \
+    -I/usr/share/qt4/mkspecs/linux-g++-maemo \
     -I$(srcdir)/../qtwidget \
     $(NULL)
+    
+ifndef $(Q_WS_MAEMO_5)
+    LIBS += -lmdeclarativecache
+endif
+
 
 LIBS += \
     $(TK_LIBS) \

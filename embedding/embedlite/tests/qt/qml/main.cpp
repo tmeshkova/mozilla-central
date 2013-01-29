@@ -36,8 +36,9 @@
 #include <QUrl>
 #include <QDir>
 #include <QDeclarativeEngine>
-#ifdef HAS_BOOSTER
-#include <applauncherd/MDeclarativeCache>
+#include <qplatformdefs.h> 
+#ifdef MEEGO_EDITION_HARMATTAN
+#include "mdeclarativecache.h"
 #endif
 #include "qmlapplicationviewer.h"
 #include "qdeclarativemozview.h"
@@ -47,7 +48,7 @@
 #include <X11/Xlib.h>
 #endif
 
-#ifdef HAS_BOOSTER
+#ifdef MEEGO_EDITION_HARMATTAN
 Q_DECL_EXPORT
 #endif
 int main(int argc, char *argv[])
@@ -61,12 +62,12 @@ int main(int argc, char *argv[])
 #endif
 #endif
 
+#ifdef MEEGO_EDITION_HARMATTAN
+    QScopedPointer<QApplication> application(createApplication(argc, argv));
+    QScopedPointer<QDeclarativeView> view(MDeclarativeCache::qDeclarativeView());
+#else
     QApplication *application;
     QDeclarativeView *view;
-#ifdef HARMATTAN_BOOSTER
-    application = MDeclarativeCache::qApplication(argc, argv);
-    view = MDeclarativeCache::qDeclarativeView();
-#else
     qWarning() << Q_FUNC_INFO << "Warning! Running without booster. This may be a bit slower.";
     QApplication stackApp(argc, argv);
     QmlApplicationViewer stackView;
@@ -114,7 +115,7 @@ int main(int argc, char *argv[])
         } else if (parameter == "-glwidget") {
             glwidget = true;
         } else if (parameter == "-help") {
-            qDebug() << "EMail application";
+            qDebug() << "Fennec options:";
             qDebug() << "-fullscreen   - show QML fullscreen";
             qDebug() << "-path         - path to cd to before launching -url";
             qDebug() << "-qml          - file to launch (default: main.qml inside -path)";
@@ -146,11 +147,15 @@ int main(int argc, char *argv[])
     else
         qDebug() << "Not using QGLWidget viewport";
 
-    view->setSource(qml);
     view->rootContext()->setContextProperty("startURL", QVariant(urlstring));
+    view->setSource(qml);
     QObject* item = view->rootObject()->findChild<QObject*>("mainScope");
     if (item) {
-        QObject::connect(item, SIGNAL(pageTitleChanged(QString)), view, SLOT(setWindowTitle(QString)));
+#ifdef MEEGO_EDITION_HARMATTAN
+        QObject::connect(item, SIGNAL(pageTitleChanged(QString)), view.data() , SLOT(setWindowTitle(QString)));
+#else
+        QObject::connect(item, SIGNAL(pageTitleChanged(QString)), view, SLOT(setWindowTitle(QString)));	
+#endif
     }
 
     // Important - simplify qml and resize, make it works good..

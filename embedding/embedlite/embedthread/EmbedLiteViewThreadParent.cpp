@@ -97,6 +97,7 @@ public:
     {
         LOGNI("contentR[%g,%g,%g,%g], scrSize[%g,%g]", aContentRect.x, aContentRect.y, aContentRect.width, aContentRect.height, aScrollableSize.width, aScrollableSize.height);
         unused << mRenderFrame->SendAsyncScrollDOMEvent(gfxRect(aContentRect.x, aContentRect.y, aContentRect.width, aContentRect.height), gfxSize(aScrollableSize.width, aScrollableSize.height));
+        mRenderFrame->mView->GetListener()->OnRectChanged(aContentRect.x, aContentRect.y, aContentRect.width, aContentRect.height, aScrollableSize.width, aScrollableSize.height);
     }
 
     void ClearRenderFrame() { mRenderFrame = nullptr; }
@@ -210,6 +211,18 @@ EmbedLiteViewThreadParent::RecvOnTitleChanged(const nsString& aTitle)
 
     NS_ENSURE_TRUE(mView, false);
     mView->GetListener()->OnTitleChanged(aTitle.get());
+    return true;
+}
+
+bool
+EmbedLiteViewThreadParent::RecvOnContextUrl(const nsString& aHref, const nsString& aSrc)
+{
+    LOGNI();
+    if (mViewAPIDestroyed)
+        return true;
+
+    NS_ENSURE_TRUE(mView, false);
+    mView->GetListener()->OnContextUrl(aHref.get(), aSrc.get());
     return true;
 }
 

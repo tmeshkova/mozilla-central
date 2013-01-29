@@ -62,6 +62,9 @@ protected:
     RecvOnTitleChanged(const nsString& aTitle);
 
     virtual bool
+    RecvOnContextUrl(const nsString& aHref, const nsString& aSrc);
+
+    virtual bool
     RecvOnLocationChanged(const nsCString& aLocation, const bool& aCanGoBack, const bool& aCanGoForward);
 
     virtual bool
@@ -172,6 +175,8 @@ protected:
 
 private:
     friend class EmbedLiteCompositorParent;
+    friend class EmbedContentController;
+    
     void SetCompositor(EmbedLiteCompositorParent* aCompositor);
     uint32_t mId;
     EmbedLiteView* mView;

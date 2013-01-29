@@ -596,3 +596,11 @@ TabChildHelper::RecvHandleDoubleTap(const nsIntPoint& aPoint)
     mView->mScrolling->GestureDoubleTap(aPoint);
     return true;
 }
+
+bool
+TabChildHelper::RecvHandleLongTap(const nsIntPoint& aPoint)
+{
+    mView->mScrolling->GestureLongTap(aPoint);
+//    mView->SendAsyncMessage(NS_LITERAL_STRING("LongTap:aHRef"), aHRef);
+    return true;
+}

@@ -1,4 +1,11 @@
 QT += opengl declarative
+
+contains(MEEGO_EDITION,harmattan) {
+    DEFINES += HARMATTAN_BOOSTER
+    CONFIG += qt-boostable qdeclarative-boostable
+    LIBS += -lmdeclarativecache
+}
+
 SOURCES += main.cpp qmlapplicationviewer.cpp
 HEADERS += qmlapplicationviewer.h 
 
@@ -35,10 +42,6 @@ LIBS += $$OBJ_PATH/dist/lib/libqtembedwidget.a
 
 target.path = $$PREFIX/bin
 INSTALLS += target
-
-contains(CONFIG,qdeclarative-boostable):contains(MEEGO_EDITION,harmattan) {
-    DEFINES += HARMATTAN_BOOSTER
-}
 
 *-g++*: QMAKE_CXXFLAGS += -Wno-attributes
 *-g++*: QMAKE_CXXFLAGS += -Wno-ignored-qualifiers

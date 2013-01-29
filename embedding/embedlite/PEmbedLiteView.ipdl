@@ -82,6 +82,7 @@ parent:
     async CancelDefaultPanZoom();
     ContentReceivedTouch(bool aPreventDefault);
     async DetectScrollableSubframe();
+    async OnContextUrl(nsString aHref, nsString aSrc);
 
     sync SyncMessage(nsString aMessage, nsString aJSON)
       returns (nsString[] retval);

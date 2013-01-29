@@ -213,6 +213,12 @@ public:
                                   float aDisplayResolution, bool aLayersUpdated,
                                   nsIntPoint& aScrollOffset, float& aScaleX, float& aScaleY) { LOGT(); }
     virtual void SetPageRect(const gfxRect& aCssPageRect) { LOGT(); }
+    virtual void OnContextUrl(const PRUnichar* aHRef, const PRUnichar* aSrc) {
+	Q_EMIT q->contextUrl(QString((QChar*)aHRef), QString((QChar*)aSrc));
+    }
+    virtual void OnRectChanged(float rectX, float rectY, float rectW, float rectH, float scrollW, float scrollH) {
+	Q_EMIT q->rectChanged(rectX, rectY, rectW, rectH, scrollW, scrollH);
+    }
 
     QGraphicsMozView* q;
     QMozContext* mContext;
@@ -261,6 +267,10 @@ QGraphicsMozView::QGraphicsMozView(QGraphicsItem* parent)
     } else {
         QTimer::singleShot(0, this, SLOT(onInitialized()));
     }
+    
+    QNetworkConfigurationManager manager;
+    QNetworkConfiguration cfg = manager.defaultConfiguration();
+    session = new QNetworkSession(cfg);
 }
 
 QGraphicsMozView::~QGraphicsMozView()
@@ -364,6 +374,11 @@ void QGraphicsMozView::load(const QString& url)
         return;
     }
     LOGT("url: %s", url.toUtf8().data());
+    if (!session->isOpen())
+    {
+        session->open();
+        session->waitForOpened(-1);
+    }
     d->mView->LoadURL(QUrl::fromUserInput(url).toString().toUtf8().data());
 }
 
