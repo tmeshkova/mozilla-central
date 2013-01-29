@@ -10,14 +10,34 @@ QDeclarativeMozView {
     
     signal urlChanged(string url)
     signal titleChanged(string title)
-    signal holdOnUrl(string url)
+    signal contextUrl(string url, string src)
     
     property string title: webViewport.child().title
     property string url: webViewport.child().url
     property string address: ""
     
+    property int rectX: 0
+    property int rectY: 0
+    property int rectW: 0
+    property int rectH: 0
+    property int scrollW: 0
+    property int scrollH: 0
+    
     Connections {
 	target: webViewport.child()
+	onContextUrl: {
+	    print("Should show context menu for url: " + aHRef + " - and Image Src: " + aSrc)
+	    contextUrl(aHRef, aSrc);
+	}
+	onRectChanged: {
+	    //print("onRectChanged rectX:" + rectX + " rectY:" + rectY + " rectW:" + rectW + " rectH:" + rectH + " scrollW:" + scrollW + " scrollH:" + scrollH)
+	    webViewport.rectX = rectX;
+	    webViewport.rectY = rectY;
+	    webViewport.rectW = rectW;
+	    webViewport.rectH = rectH;
+	    webViewport.scrollW = scrollW;
+	    webViewport.scrollH = scrollH;
+	}
 	onViewInitialized: {
 	    print("QML View Initialized first");
 	    if (address!="")

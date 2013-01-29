@@ -88,6 +88,8 @@ Q_SIGNALS:
     void confirm(QString title, QString message, QString checkMessage, bool checkValue, qulonglong winid);
     void prompt(QString title, QString message, QString defaultValue, QString checkMessage, bool checkValue, qulonglong winid);
     void authRequired(QString title, QString message, QString defaultUsername, bool onlyPassword, qulonglong winid);
+    void rectChanged(double rectX, double rectY, double rectW, double rectH, double scrollW, double scrollH);
+    void contextUrl(QString aHRef, QString aSrc);
 
 protected:
     virtual void setGeometry(const QRectF& rect);

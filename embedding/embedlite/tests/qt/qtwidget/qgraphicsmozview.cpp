@@ -213,6 +213,12 @@ public:
                                   float aDisplayResolution, bool aLayersUpdated,
                                   nsIntPoint& aScrollOffset, float& aScaleX, float& aScaleY) { LOGT(); }
     virtual void SetPageRect(const gfxRect& aCssPageRect) { LOGT(); }
+    virtual void OnContextUrl(const PRUnichar* aHRef, const PRUnichar* aSrc) {
+	Q_EMIT q->contextUrl(QString((QChar*)aHRef), QString((QChar*)aSrc));
+    }
+    virtual void OnRectChanged(float rectX, float rectY, float rectW, float rectH, float scrollW, float scrollH) {
+	Q_EMIT q->rectChanged(rectX, rectY, rectW, rectH, scrollW, scrollH);
+    }
 
     QGraphicsMozView* q;
     QMozContext* mContext;

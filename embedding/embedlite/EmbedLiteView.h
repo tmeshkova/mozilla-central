@@ -73,6 +73,9 @@ public:
                                             const bool& isOnlyPassword,
                                             const uint64_t& winID) {}
     virtual void IMENotification(int aEnabled, bool aOpen, int aCause, int aFocusChange) {}
+    virtual void OnContextUrl(const PRUnichar* aHRef, const PRUnichar* aSrc) {}
+    virtual void OnRectChanged(float rectX, float rectY, float rectW, float rectH, float scrollW, float scrollH) {}
+
 };
 
 class EmbedLiteApp;

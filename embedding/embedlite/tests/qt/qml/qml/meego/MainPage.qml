@@ -43,9 +43,8 @@ FocusScope {
 	    addressLine.cursorPosition = 0;
 	}
 	onTitleChanged: pageTitle.text = title;
-	onHoldOnUrl: {
-	    if (url)
-		showContextMenu(url);
+	onContextUrl: {
+	    showContextMenu(url, src);
 	}
     }
     
@@ -329,22 +328,39 @@ FocusScope {
 	}
     }
     
-    function showContextMenu(address) {
-	contextMenu.url = address
-	contextMenu.open()
+    function showContextMenu(url, img) {
+	contextMenu.url = url
+	contextMenu.img = img
+	if (url.length > 0 || img.length > 0)
+	    contextMenu.open()
     }
     
     Menu {
 	id: contextMenu
 	property string url: ""
+	property string img: ""
 	visualParent: pageStack
 	MenuLayout {
-	    MenuItem {text: "Open in new tab"; onClicked: { 
-		contextMenu.close();
-		viewport.focus = true;
-		createWindow(contextMenu.url);
-	    } }
-//	    MenuItem {text: "Copy to clipboard"; onClicked: {  }}
+	    MenuItem {
+		text: "Open link url in new tab"
+		visible: contextMenu.url.length > 0
+		onClicked: { 
+		    contextMenu.close();
+		    viewport.focus = true;
+		    createWindow(contextMenu.url);
+		} 
+	    }
+	    MenuItem {
+		text: "Open image url in new tab"
+		visible: contextMenu.img.length > 0
+		onClicked: { 
+		    contextMenu.close();
+		    viewport.focus = true;
+		    createWindow(contextMenu.img);
+		} 
+	    }
+//	    MenuItem {text: "Copy link url to clipboard"; onClicked: {  }}
+//	    MenuItem {text: "Copy image url to clipboard"; onClicked: {  }}
 	}
     }
     

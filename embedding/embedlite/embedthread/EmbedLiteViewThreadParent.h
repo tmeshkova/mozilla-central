@@ -62,6 +62,12 @@ protected:
     RecvOnTitleChanged(const nsString& aTitle);
 
     virtual bool
+    RecvOnContextUrl(const nsString& aHref, const nsString& aSrc);
+
+    virtual bool
+    RecvOnRectChanged(const float& rectX, const float& rectY, const float& rectW, const float& rectH, const float& scrollW, const float& scrollH);
+
+    virtual bool
     RecvOnLocationChanged(const nsCString& aLocation, const bool& aCanGoBack, const bool& aCanGoForward);
 
     virtual bool

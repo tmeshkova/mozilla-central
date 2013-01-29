@@ -214,6 +214,30 @@ EmbedLiteViewThreadParent::RecvOnTitleChanged(const nsString& aTitle)
 }
 
 bool
+EmbedLiteViewThreadParent::RecvOnContextUrl(const nsString& aHref, const nsString& aSrc)
+{
+    LOGNI();
+    if (mViewAPIDestroyed)
+        return true;
+
+    NS_ENSURE_TRUE(mView, false);
+    mView->GetListener()->OnContextUrl(aHref.get(), aSrc.get());
+    return true;
+}
+
+bool
+EmbedLiteViewThreadParent::RecvOnRectChanged(const float& rectX, const float& rectY, const float& rectW, const float& rectH, const float& scrollW, const float& scrollH)
+{
+    LOGNI();
+    if (mViewAPIDestroyed)
+        return true;
+
+    NS_ENSURE_TRUE(mView, false);
+    mView->GetListener()->OnRectChanged(rectX, rectY, rectW, rectH, scrollW, scrollH);
+    return true;
+}
+
+bool
 EmbedLiteViewThreadParent::RecvOnLocationChanged(const nsCString& aLocation,
                                                  const bool& aCanGoBack,
                                                  const bool& aCanGoForward)

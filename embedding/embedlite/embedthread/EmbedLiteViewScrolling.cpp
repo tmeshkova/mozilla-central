@@ -23,6 +23,7 @@
 #include "nsIDOMHTMLAnchorElement.h"
 #include "nsIDOMHTMLAreaElement.h"
 #include "nsIDOMHTMLLinkElement.h"
+#include "nsIDOMHTMLImageElement.h"
 
 using namespace mozilla::layers;
 
@@ -47,6 +48,8 @@ EmbedLiteViewScrolling::AsyncScrollDOMEvent(const gfxRect& contentRect, const gf
     LOGT();
     mContentRect = contentRect;
     mScrollSize = scrollSize;
+    
+    mView->SendOnRectChanged(contentRect.x, contentRect.y, contentRect.width, contentRect.height, scrollSize.width, scrollSize.height);
 }
 
 void
@@ -61,7 +64,7 @@ EmbedLiteViewScrolling::ViewportChange(const FrameMetrics& aMetrics, gfx::Rect c
                              aMetrics.mScrollableRect.width, aMetrics.mScrollableRect.height);
 }
 
-nsAutoString
+void
 EmbedLiteViewScrolling::GestureLongTap(const nsIntPoint& aPoint)
 {
     printf("EmbedLiteViewScrolling::GestureLongTap\n");
@@ -69,6 +72,7 @@ EmbedLiteViewScrolling::GestureLongTap(const nsIntPoint& aPoint)
     AnyElementFromPoint(mView->mDOMWindow, aPoint.x, aPoint.y, getter_AddRefs(element));
     nsAutoString localName;
     nsAutoString aHRef;
+    nsAutoString aSrc;
     if (element){
 	element->GetLocalName(localName);
     }
@@ -99,6 +103,17 @@ EmbedLiteViewScrolling::GestureLongTap(const nsIntPoint& aPoint)
 		}
 	    }
     }
+    else if (localName.EqualsLiteral("img")) {
+	bool hasAttr;
+	element->HasAttribute(NS_LITERAL_STRING("src"), &hasAttr);
+	if (hasAttr) {
+	    linkContent = element;
+	    nsCOMPtr<nsIDOMHTMLImageElement> anchor(do_QueryInterface(linkContent));
+	    if (anchor){
+		anchor->GetSrc(aSrc);
+	    }
+	}
+    }
     else {
 	nsCOMPtr<nsIDOMNode> curr;
 	element->GetParentNode(getter_AddRefs(curr));
@@ -121,12 +136,26 @@ EmbedLiteViewScrolling::GestureLongTap(const nsIntPoint& aPoint)
 		    linkContent = nullptr; // Links can't be nested.
 		    break;
 	    }
+	    else if (localName.EqualsLiteral("img")) {
+		bool hasAttr;
+		element->HasAttribute(NS_LITERAL_STRING("src"), &hasAttr);
+		if (hasAttr) {
+		    linkContent = element;
+		    nsCOMPtr<nsIDOMHTMLImageElement> anchor(do_QueryInterface(linkContent));
+		    if (anchor)
+			anchor->GetSrc(aSrc);
+		}
+		else
+		    linkContent = nullptr; // Links can't be nested.
+		    break;
+	    }
 	    
 	    nsCOMPtr<nsIDOMNode> temp = curr;
 	    temp->GetParentNode(getter_AddRefs(curr));
 	}
     }
-    return aHRef;
+    
+    mView->SendOnContextUrl(aHRef, aSrc);
 }
 
 void
