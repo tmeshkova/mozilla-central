@@ -48,8 +48,6 @@ EmbedLiteViewScrolling::AsyncScrollDOMEvent(const gfxRect& contentRect, const gf
     LOGT();
     mContentRect = contentRect;
     mScrollSize = scrollSize;
-    
-    mView->SendOnRectChanged(contentRect.x, contentRect.y, contentRect.width, contentRect.height, scrollSize.width, scrollSize.height);
 }
 
 void

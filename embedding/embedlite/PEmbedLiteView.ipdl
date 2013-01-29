@@ -83,7 +83,6 @@ parent:
     ContentReceivedTouch(bool aPreventDefault);
     async DetectScrollableSubframe();
     async OnContextUrl(nsString aHref, nsString aSrc);
-    async OnRectChanged(float rectX, float rectY, float rectW, float rectH, float scrollW, float scrollH);
 
     sync SyncMessage(nsString aMessage, nsString aJSON)
       returns (nsString[] retval);
