@@ -259,9 +259,6 @@ QGraphicsMozView::QGraphicsMozView(QGraphicsItem* parent)
     setInputMethodHints(Qt::ImhPreferLowercase);
 
     d->mContext = QMozContext::GetInstance();
-    if (QGLContext::currentContext()) {
-        d->mContext->GetApp()->SetIsAccelerated(true);
-    }
     if (!d->mContext->initialized()) {
         connect(d->mContext, SIGNAL(onInitialized()), this, SLOT(onInitialized()));
     } else {
@@ -464,6 +461,9 @@ bool QGraphicsMozView::event(QEvent* event)
     }
     case QEvent::Show: {
         printf(">>>>>>Func:%s::%d Event Show\n", __PRETTY_FUNCTION__, __LINE__);
+        if (QGLContext::currentContext()) {
+            d->mContext->GetApp()->SetIsAccelerated(true);
+        }
         break;
     }
     case QEvent::Hide: {
