@@ -278,6 +278,16 @@ QGraphicsMozView::onInitialized()
     d->mView = d->mContext->GetApp()->CreateView();
     d->mView->SetListener(d);
 }
+void QGraphicsMozView::EraseBackgroundGL(const QRect& r) {
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(r.x(), r.y(), r.width(), r.height());
+    glClearColor((GLfloat)d->mBgColor.red() / 255.0,
+                 (GLfloat)d->mBgColor.green() / 255.0, 
+                 (GLfloat)d->mBgColor.blue() / 255.0, 
+                 (GLfloat)d->mBgColor.alpha() / 255.0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_SCISSOR_TEST);      
+}
 
 void
 QGraphicsMozView::paint(QPainter* painter, const QStyleOptionGraphicsItem* opt, QWidget*)
@@ -294,12 +304,14 @@ QGraphicsMozView::paint(QPainter* painter, const QStyleOptionGraphicsItem* opt, 
                 d->UpdateViewSize();
             }
             if (d->mLastIsGoodRotation) {
-                painter->fillRect(r, d->mBgColor);
+                QRect eraseRect = painter->transform().transposed().mapRect(r);
+
                 painter->beginNativePainting();
+                EraseBackgroundGL(eraseRect);
                 bool retval = d->mView->RenderGL();
                 painter->endNativePainting();
                 if (!retval) {
-                    painter->fillRect(r, d->mBgColor);
+                    EraseBackgroundGL(eraseRect);
                 }
             }
         } else {

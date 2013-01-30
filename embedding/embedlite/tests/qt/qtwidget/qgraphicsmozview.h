@@ -100,6 +100,7 @@ protected:
     virtual void keyReleaseEvent(QKeyEvent*);
     virtual void inputMethodEvent(QInputMethodEvent*);
     virtual QVariant inputMethodQuery(Qt::InputMethodQuery aQuery) const;
+    virtual void EraseBackgroundGL(const QRect&);
 
 private Q_SLOTS:
     void onInitialized();
