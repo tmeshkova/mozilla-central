@@ -36,9 +36,6 @@ ac_add_options --with-system-bz2
 ac_add_options --disable-elf-hack
 ac_add_options --disable-webrtc
 
-#disable for now, until VP8 gst codec is fast enough
-ac_add_options --disable-webm
-
 ac_add_options --with-gl-provider=EGL
 ac_add_options --enable-libjpeg-turbo
 
