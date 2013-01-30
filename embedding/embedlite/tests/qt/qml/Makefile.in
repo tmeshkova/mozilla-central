@@ -48,6 +48,7 @@ LOCAL_INCLUDES	= -I$(srcdir) \
 LIBS += \
     $(TK_LIBS) \
     -lQtDeclarative \
+    -lGLESv2 \
     -lqjson \
     $(LIBXUL_DIST)/lib/$(LIB_PREFIX)qtembedwidget.$(LIB_SUFFIX) \
     $(NULL)
