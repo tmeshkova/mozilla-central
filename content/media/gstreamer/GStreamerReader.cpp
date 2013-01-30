@@ -88,7 +88,7 @@ GStreamerReader::~GStreamerReader()
 
   if (mPlayBin) {
     gst_app_src_end_of_stream(mSource);
-    if(mSource)
+    if (mSource)
       gst_object_unref(mSource);
     gst_element_set_state(mPlayBin, GST_STATE_NULL);
     gst_object_unref(mPlayBin);
