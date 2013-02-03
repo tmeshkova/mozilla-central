@@ -1031,9 +1031,8 @@ ShadowThebesLayerOGL::ShadowThebesLayerOGL(LayerManagerOGL *aManager)
   : ShadowThebesLayer(aManager, nullptr)
   , LayerOGL(aManager)
 {
-#ifdef FORCE_BASICTILEDTHEBESLAYER
-  NS_ABORT();
-#endif
+  if (ThebesLayer::UseTiledThebes())
+    NS_ABORT();
   mImplData = static_cast<LayerOGL*>(this);
 }
 
