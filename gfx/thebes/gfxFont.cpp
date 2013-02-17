@@ -2045,7 +2045,7 @@ gfxFont::Draw(gfxTextRun *aTextRun, uint32_t aStart, uint32_t aEnd,
           mat = ToMatrix(*reinterpret_cast<gfxMatrix*>(&matrix));
 
           mat._11 = mat._22 = 1.0;
-          float adjustedSize = mAdjustedSize ? mAdjustedSize : GetStyle()->size;
+          float adjustedSize = mAdjustedSize > 0 ? mAdjustedSize : GetStyle()->size;
           mat._21 /= adjustedSize;
 
           dt->SetTransform(mat * oldMat);
