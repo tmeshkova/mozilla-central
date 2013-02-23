@@ -62,6 +62,10 @@ ThrowMethodFailedWithDetails(JSContext* cx, ErrorResult& rv,
     rv.ReportTypeError(cx);
     return false;
   }
+  if (rv.IsJSException()) {
+    rv.ReportJSException(cx);
+    return false;
+  }
   return Throw<mainThread>(cx, rv.ErrorCode());
 }
 
@@ -1683,6 +1687,18 @@ NativeToString(JSContext* cx, JSObject* wrapper, JSObject* obj, const char* pre,
 
 nsresult
 ReparentWrapper(JSContext* aCx, JSObject* aObj);
+
+/**
+ * Used to implement the hasInstance hook of an interface object.
+ *
+ * instance should not be a security wrapper.
+ */
+JSBool
+InterfaceHasInstance(JSContext* cx, JSHandleObject obj, JSObject* instance,
+                     JSBool* bp);
+JSBool
+InterfaceHasInstance(JSContext* cx, JSHandleObject obj, JSMutableHandleValue vp,
+                     JSBool* bp);
 
 } // namespace dom
 } // namespace mozilla

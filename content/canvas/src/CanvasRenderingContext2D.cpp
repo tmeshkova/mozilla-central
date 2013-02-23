@@ -43,8 +43,6 @@
 #include "nsIDocShell.h"
 #include "nsIDOMWindow.h"
 #include "nsPIDOMWindow.h"
-#include "nsIDocShellTreeItem.h"
-#include "nsIDocShellTreeNode.h"
 #include "nsIXPConnect.h"
 #include "nsDisplayList.h"
 
@@ -2061,11 +2059,11 @@ CanvasRenderingContext2D::SetFont(const nsAString& font,
     return;
   }
 
-  const nsStyleFont* fontStyle = sc->GetStyleFont();
+  const nsStyleFont* fontStyle = sc->StyleFont();
 
   NS_ASSERTION(fontStyle, "Could not obtain font style");
 
-  nsIAtom* language = sc->GetStyleFont()->mLanguage;
+  nsIAtom* language = sc->StyleFont()->mLanguage;
   if (!language) {
     language = presShell->GetPresContext()->GetLanguageFromCharset();
   }
@@ -2302,7 +2300,7 @@ struct NS_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcesso
 
     uint32_t numRuns;
     const gfxTextRun::GlyphRun *runs = mTextRun->GetGlyphRuns(&numRuns);
-    const uint32_t appUnitsPerDevUnit = mAppUnitsPerDevPixel;
+    const int32_t appUnitsPerDevUnit = mAppUnitsPerDevPixel;
     const double devUnitsPerAppUnit = 1.0/double(appUnitsPerDevUnit);
     Point baselineOrigin =
       Point(point.x * devUnitsPerAppUnit, point.y * devUnitsPerAppUnit);
@@ -2426,7 +2424,7 @@ struct NS_STACK_CLASS CanvasBidiProcessor : public nsBidiPresUtils::BidiProcesso
   gfxFontGroup* mFontgrp;
 
   // dev pixel conversion factor
-  uint32_t mAppUnitsPerDevPixel;
+  int32_t mAppUnitsPerDevPixel;
 
   // operation (fill or stroke)
   CanvasRenderingContext2D::TextDrawOperation mOp;
@@ -2486,7 +2484,7 @@ CanvasRenderingContext2D::DrawOrMeasureText(const nsAString& aRawText,
       return NS_ERROR_FAILURE;
     }
 
-    isRTL = canvasStyle->GetStyleVisibility()->mDirection ==
+    isRTL = canvasStyle->StyleVisibility()->mDirection ==
       NS_STYLE_DIRECTION_RTL;
   } else {
     isRTL = GET_BIDI_OPTION_DIRECTION(document->GetBidiOptions()) == IBMBIDI_TEXTDIRECTION_RTL;

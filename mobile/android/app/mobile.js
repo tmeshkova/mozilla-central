@@ -675,5 +675,8 @@ pref("app.orientation.default", "");
 // back to the system.
 pref("memory.free_dirty_pages", true);
 
-// Enable tiled layers rendering by default on android
-pref("gfx.use_tiled_thebes", true);
+#ifdef MOZ_PKG_SPECIAL
+// Disable webgl on ARMv6 because running the reftests takes
+// too long for some reason (bug 843738)
+pref("webgl.disabled", true);
+#endif

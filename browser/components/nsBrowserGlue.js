@@ -36,10 +36,10 @@ XPCOMUtils.defineLazyModuleGetter(this, "webappsUI",
                                   "resource:///modules/webappsUI.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
-                                  "resource:///modules/PageThumbs.jsm");
+                                  "resource://gre/modules/PageThumbs.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "NewTabUtils",
-                                  "resource:///modules/NewTabUtils.jsm");
+                                  "resource://gre/modules/NewTabUtils.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "BrowserNewTabPreloader",
                                   "resource:///modules/BrowserNewTabPreloader.jsm");
@@ -438,7 +438,8 @@ BrowserGlue.prototype = {
   },
 
   _trackSlowStartup: function () {
-    if (Services.prefs.getBoolPref("browser.slowStartup.notificationDisabled"))
+    if (Services.startup.interrupted ||
+        Services.prefs.getBoolPref("browser.slowStartup.notificationDisabled"))
       return;
 
     let currentTime = Date.now() - Services.startup.getStartupInfo().process;

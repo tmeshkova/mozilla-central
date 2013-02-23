@@ -232,6 +232,9 @@ public:
     // "real" or user-friendly name, may be an internal identifier
     const nsString& Name() const { return mName; }
 
+    // family name
+    const nsString& FamilyName() const { return mFamilyName; }
+
     // The following two methods may be relatively expensive, as they
     // will (usually, except on Linux) load and parse the 'name' table;
     // they are intended only for the font-inspection API, not for
@@ -240,10 +243,6 @@ public:
     // The "real" name of the face, if available from the font resource;
     // returns Name() if nothing better is available.
     virtual nsString RealFaceName();
-
-    // The family name (if available) that would be used in css font-family
-    // properties; returns Name() if nothing better available.
-    virtual nsString FamilyName();
 
     uint16_t Weight() const { return mWeight; }
     int16_t Stretch() const { return mStretch; }
@@ -335,6 +334,7 @@ public:
                                      FontListSizes*    aSizes) const;
 
     nsString         mName;
+    nsString         mFamilyName;
 
     bool             mItalic      : 1;
     bool             mFixedPitch  : 1;
@@ -433,18 +433,14 @@ private:
     class FontTableBlobData;
 
     /**
-     * FontTableHashEntry manages the entries of hb_blob_ts for two
-     * different situations:
+     * FontTableHashEntry manages the entries of hb_blob_t's containing font
+     * table data.
      *
-     * The common situation is to share font table across fonts with the same
+     * This is used to share font tables across fonts with the same
      * font entry (but different sizes) for use by HarfBuzz.  The hashtable
      * does not own a strong reference to the blob, but keeps a weak pointer,
      * managed by FontTableBlobData.  Similarly FontTableBlobData keeps only a
      * weak pointer to the hashtable, managed by FontTableHashEntry.
-     *
-     * Some font tables are saved here before they would get stripped by OTS
-     * sanitizing.  These are retained for harfbuzz, which does its own
-     * sanitizing.  The hashtable owns a reference, so ownership is simple.
      */
 
     class FontTableHashEntry : public nsUint32HashKey
@@ -476,10 +472,6 @@ private:
         hb_blob_t *
         ShareTableAndGetBlob(FallibleTArray<uint8_t>& aTable,
                              nsTHashtable<FontTableHashEntry> *aHashtable);
-
-        // Transfer (not copy) elements of aTable to a new hb_blob_t that is
-        // owned by the hashtable entry.
-        void SaveTable(FallibleTArray<uint8_t>& aTable);
 
         // Return a strong reference to the blob.
         // Callers must hb_blob_destroy the returned blob.
@@ -561,6 +553,7 @@ public:
         {
             aFontEntry->mIgnoreGDEF = true;
         }
+        aFontEntry->mFamilyName = Name();
         mAvailableFonts.AppendElement(aFontEntry);
     }
 
@@ -3104,19 +3097,6 @@ public:
                      "Requesting a font index that doesn't exist");
 
         return mFonts[i].Font();
-    }
-
-    // Return the family name of the primary font in the group.
-    // Note that gfxPangoFontGroup (for the Linux/Fontconfig backend),
-    // which does not have gfxFontFamily objects, must override this.
-    virtual nsString GetFamilyNameAt(int32_t i) {
-        NS_ASSERTION(!mUserFontSet || mCurrGeneration == GetGeneration(),
-                     "Whoever was caching this font group should have "
-                     "called UpdateFontList on it");
-        NS_ASSERTION(mFonts.Length() > uint32_t(i) && mFonts[i].Family(),
-                     "No fonts in the group!");
-
-        return mFonts[i].Family()->Name();
     }
 
     uint32_t FontListLength() const {

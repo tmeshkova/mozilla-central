@@ -123,7 +123,7 @@ XPCOMUtils.defineLazyModuleGetter(this, "Social",
   "resource:///modules/Social.jsm");
 
 XPCOMUtils.defineLazyModuleGetter(this, "PageThumbs",
-  "resource:///modules/PageThumbs.jsm");
+  "resource://gre/modules/PageThumbs.jsm");
 
 #ifdef MOZ_SAFE_BROWSING
 XPCOMUtils.defineLazyModuleGetter(this, "SafeBrowsing",
@@ -994,6 +994,9 @@ let gGestureSupport = {
     let contentElement = content.document.body.firstElementChild;
     if (!contentElement)
       return;
+    // If we're currently snapping, cancel that snap
+    if (contentElement.classList.contains("completeRotation"))
+      this._clearCompleteRotation();
 
     this.rotation = Math.round(this.rotation + aEvent.delta);
     contentElement.style.transform = "rotate(" + this.rotation + "deg)";
@@ -1036,8 +1039,11 @@ let gGestureSupport = {
              this.rotation < transitionRotation)
       transitionRotation -= 90;
 
-    contentElement.classList.add("completeRotation");
-    contentElement.addEventListener("transitionend", this._clearCompleteRotation);
+    // Only add the completeRotation class if it is is necessary
+    if (transitionRotation != this.rotation) {
+      contentElement.classList.add("completeRotation");
+      contentElement.addEventListener("transitionend", this._clearCompleteRotation);
+    }
 
     contentElement.style.transform = "rotate(" + transitionRotation + "deg)";
     this.rotation = transitionRotation;
@@ -1094,8 +1100,14 @@ let gGestureSupport = {
    * Removes the transition rule by removing the completeRotation class
    */
   _clearCompleteRotation: function() {
-    this.classList.remove("completeRotation");
-    this.removeEventListener("transitionend", this._clearCompleteRotation);
+    let contentElement = content.document &&
+                         content.document instanceof ImageDocument &&
+                         content.document.body &&
+                         content.document.body.firstElementChild;
+    if (!contentElement)
+      return;
+    contentElement.classList.remove("completeRotation");
+    contentElement.removeEventListener("transitionend", this._clearCompleteRotation);
   },
 };
 
@@ -4005,8 +4017,6 @@ var XULBrowserWindow = {
   // Stored Status, Link and Loading values
   status: "",
   defaultStatus: "",
-  jsStatus: "",
-  jsDefaultStatus: "",
   overLink: "",
   startTime: 0,
   statusText: "",
@@ -4064,14 +4074,12 @@ var XULBrowserWindow = {
     delete this.statusText;
   },
 
-  setJSStatus: function (status) {
-    this.jsStatus = status;
-    this.updateStatusField();
+  setJSStatus: function () {
+    // unsupported
   },
 
-  setJSDefaultStatus: function (status) {
-    this.jsDefaultStatus = status;
-    this.updateStatusField();
+  setJSDefaultStatus: function () {
+    // unsupported
   },
 
   setDefaultStatus: function (status) {
@@ -4096,7 +4104,7 @@ var XULBrowserWindow = {
     var text, type, types = ["overLink"];
     if (this._busyUI)
       types.push("status");
-    types.push("jsStatus", "jsDefaultStatus", "defaultStatus");
+    types.push("defaultStatus");
     for (type of types) {
       text = this[type];
       if (text)
@@ -4333,18 +4341,6 @@ var XULBrowserWindow = {
         SocialShareButton.updateShareState();
       }
 
-      // Filter out anchor navigation, history.push/pop/replaceState and
-      // tab switches.
-      if (aRequest) {
-        // Only need to call locationChange if the PopupNotifications object
-        // for this window has already been initialized (i.e. its getter no
-        // longer exists)
-        // XXX bug 839445: We never tell PopupNotifications about location
-        // changes in background tabs.
-        if (!__lookupGetter__("PopupNotifications"))
-          PopupNotifications.locationChange();
-      }
-
       // Show or hide browser chrome based on the whitelist
       if (this.hideChromeForLocation(location)) {
         document.documentElement.setAttribute("disablechrome", "true");
@@ -4378,7 +4374,7 @@ var XULBrowserWindow = {
         if (e.target.readyState != "interactive" && e.target.readyState != "complete")
           return;
 
-        e.target.removeEventListener("readystate", onContentRSChange);
+        e.target.removeEventListener("readystatechange", onContentRSChange);
         disableFindCommands(shouldDisableFind(e.target));
       }
 
@@ -4721,12 +4717,16 @@ var TabsProgressListener = {
 #endif
 
     // Collect telemetry data about tab load times.
-    if (aWebProgress.DOMWindow == aWebProgress.DOMWindow.top &&
-        aStateFlags & Ci.nsIWebProgressListener.STATE_IS_WINDOW) {
-      if (aStateFlags & Ci.nsIWebProgressListener.STATE_START)
-        TelemetryStopwatch.start("FX_PAGE_LOAD_MS", aBrowser);
-      else if (aStateFlags & Ci.nsIWebProgressListener.STATE_STOP)
-        TelemetryStopwatch.finish("FX_PAGE_LOAD_MS", aBrowser);
+    if (aWebProgress.DOMWindow == aWebProgress.DOMWindow.top) {
+      if (aStateFlags & Ci.nsIWebProgressListener.STATE_IS_WINDOW) {
+        if (aStateFlags & Ci.nsIWebProgressListener.STATE_START)
+          TelemetryStopwatch.start("FX_PAGE_LOAD_MS", aBrowser);
+        else if (aStateFlags & Ci.nsIWebProgressListener.STATE_STOP)
+          TelemetryStopwatch.finish("FX_PAGE_LOAD_MS", aBrowser);
+      } else if (aStateFlags & Ci.nsIWebProgressListener.STATE_STOP &&
+                 aStatus == Cr.NS_BINDING_ABORTED) {
+        TelemetryStopwatch.cancel("FX_PAGE_LOAD_MS", aBrowser);
+      }
     }
 
     // Attach a listener to watch for "click" events bubbling up from error
@@ -4759,16 +4759,21 @@ var TabsProgressListener = {
 
   onLocationChange: function (aBrowser, aWebProgress, aRequest, aLocationURI,
                               aFlags) {
-    // Filter out any sub-frame loads
-    if (aBrowser.contentWindow == aWebProgress.DOMWindow) {
-      // Filter out any onLocationChanges triggered by anchor navigation
-      // or history.push/pop/replaceState.
-      if (aRequest) {
-        // Initialize the click-to-play state.
-        aBrowser._clickToPlayPluginsActivated = new Map();
-        aBrowser._clickToPlayAllPluginsActivated = false;
-        aBrowser._pluginScriptedState = gPluginHandler.PLUGIN_SCRIPTED_STATE_NONE;
-      }
+    // Filter out sub-frame loads and location changes caused by anchor
+    // navigation or history.push/pop/replaceState.
+    if (aBrowser.contentWindow == aWebProgress.DOMWindow &&
+        !(aFlags & Ci.nsIWebProgressListener.LOCATION_CHANGE_SAME_DOCUMENT)) {
+      // Initialize the click-to-play state.
+      aBrowser._clickToPlayPluginsActivated = new Map();
+      aBrowser._clickToPlayAllPluginsActivated = false;
+      aBrowser._pluginScriptedState = gPluginHandler.PLUGIN_SCRIPTED_STATE_NONE;
+
+      // Only need to call locationChange if the PopupNotifications object
+      // for this window has already been initialized (i.e. its getter no
+      // longer exists)
+      if (!Object.getOwnPropertyDescriptor(window, "PopupNotifications").get)
+        PopupNotifications.locationChange(aBrowser);
+
       FullZoom.onLocationChange(aLocationURI, false, aBrowser);
     }
   },
@@ -6877,7 +6882,8 @@ var gIdentityHandler = {
     } else if (state & nsIWebProgressListener.STATE_IS_SECURE) {
       this.setMode(this.IDENTITY_MODE_DOMAIN_VERIFIED);
     } else if (state & nsIWebProgressListener.STATE_IS_BROKEN) {
-      if (state & nsIWebProgressListener.STATE_LOADED_MIXED_ACTIVE_CONTENT) {
+      if ((state & nsIWebProgressListener.STATE_LOADED_MIXED_ACTIVE_CONTENT) &&
+          gPrefService.getBoolPref("security.mixed_content.block_active_content")) {
         this.setMode(this.IDENTITY_MODE_MIXED_ACTIVE_CONTENT);
       } else {
         this.setMode(this.IDENTITY_MODE_MIXED_CONTENT);
@@ -7096,25 +7102,27 @@ var gIdentityHandler = {
     this._identityPopup.hidePopup();
   },
 
-  _popupOpenTime : null,
-
   /**
    * Click handler for the identity-box element in primary chrome.
    */
   handleIdentityButtonEvent : function(event) {
-    this._popupOpenTime = new Date();
+    TelemetryStopwatch.start("FX_IDENTITY_POPUP_OPEN_MS");
     event.stopPropagation();
 
     if ((event.type == "click" && event.button != 0) ||
         (event.type == "keypress" && event.charCode != KeyEvent.DOM_VK_SPACE &&
-         event.keyCode != KeyEvent.DOM_VK_RETURN))
+         event.keyCode != KeyEvent.DOM_VK_RETURN)) {
+      TelemetryStopwatch.cancel("FX_IDENTITY_POPUP_OPEN_MS");
       return; // Left click, space or enter only
+    }
 
     // Don't allow left click, space or enter if the location
     // is chrome UI or the location has been modified.
     if (this._mode == this.IDENTITY_MODE_CHROMEUI ||
-        gURLBar.getAttribute("pageproxystate") != "valid")
+        gURLBar.getAttribute("pageproxystate") != "valid") {
+      TelemetryStopwatch.cancel("FX_IDENTITY_POPUP_OPEN_MS");
       return;
+    }
 
     // Make sure that the display:none style we set in xul is removed now that
     // the popup is actually needed
@@ -7136,13 +7144,7 @@ var gIdentityHandler = {
   },
 
   onPopupShown : function(event) {
-    let openingDuration = new Date() - this._popupOpenTime;
-    this._popupOpenTime = null;
-    try {
-      Services.telemetry.getHistogramById("FX_IDENTITY_POPUP_OPEN_MS").add(openingDuration);
-    } catch (ex) {
-      Components.utils.reportError("Unable to report telemetry for FX_IDENTITY_POPUP_OPEN_MS.");
-    }
+    TelemetryStopwatch.finish("FX_IDENTITY_POPUP_OPEN_MS");
     document.getElementById('identity-popup-more-info-button').focus();
   },
 

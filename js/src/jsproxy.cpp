@@ -217,9 +217,11 @@ BaseProxyHandler::set(JSContext *cx, JSObject *proxy_, JSObject *receiver_, jsid
 }
 
 bool
-BaseProxyHandler::keys(JSContext *cx, JSObject *proxy, AutoIdVector &props)
+BaseProxyHandler::keys(JSContext *cx, JSObject *proxyArg, AutoIdVector &props)
 {
     JS_ASSERT(props.length() == 0);
+
+    RootedObject proxy(cx, proxyArg);
 
     if (!getOwnPropertyNames(cx, proxy, props))
         return false;
@@ -427,9 +429,9 @@ DirectProxyHandler::getOwnPropertyNames(JSContext *cx, JSObject *proxy,
 bool
 DirectProxyHandler::delete_(JSContext *cx, JSObject *proxy, jsid id, bool *bp)
 {
-    Value v;
+    RootedValue v(cx);
     RootedObject target(cx, GetProxyTargetObject(proxy));
-    if (!JS_DeletePropertyById2(cx, target, id, &v))
+    if (!JS_DeletePropertyById2(cx, target, id, v.address()))
         return false;
     JSBool b;
     if (!JS_ValueToBoolean(cx, v, &b))
@@ -755,7 +757,7 @@ ScriptedIndirectProxyHandler::~ScriptedIndirectProxyHandler()
 }
 
 static bool
-ReturnedValueMustNotBePrimitive(JSContext *cx, JSObject *proxy, JSAtom *atom, const Value &v)
+ReturnedValueMustNotBePrimitive(JSContext *cx, HandleObject proxy, JSAtom *atom, const Value &v)
 {
     if (v.isPrimitive()) {
         JSAutoByteString bytes;
@@ -2340,8 +2342,14 @@ Proxy::get(JSContext *cx, HandleObject proxy, HandleObject receiver, HandleId id
 {
     JS_CHECK_RECURSION(cx, return false);
     BaseProxyHandler *handler = GetProxyHandler(proxy);
-    bool own = false;
-    if (!handler->hasPrototype() || (handler->hasOwn(cx, proxy, id, &own) && own))
+    bool own;
+    if (!handler->hasPrototype()) {
+        own = true;
+    } else {
+        if (!handler->hasOwn(cx, proxy, id, &own))
+            return false;
+    }
+    if (own)
         return handler->get(cx, proxy, receiver, id, vp.address());
     INVOKE_ON_PROTOTYPE(cx, handler, proxy, JSObject::getGeneric(cx, proto, receiver, id, vp));
 }
@@ -2382,20 +2390,23 @@ Proxy::set(JSContext *cx, HandleObject proxy, HandleObject receiver, HandleId id
 {
     JS_CHECK_RECURSION(cx, return false);
     BaseProxyHandler *handler = GetProxyHandler(proxy);
-    RootedObject proto(cx);
     if (handler->hasPrototype()) {
         // If we're using a prototype, we still want to use the proxy trap unless
         // we have a non-own property with a setter.
         bool hasOwn;
-        AutoPropertyDescriptorRooter desc(cx);
-        if (handler->hasOwn(cx, proxy, id, &hasOwn) && !hasOwn &&
-            handler->getPrototypeOf(cx, proxy, proto.address()) && proto &&
-            JS_GetPropertyDescriptorById(cx, proto, id, 0, &desc) &&
-            desc.obj && desc.setter)
-        {
-            return JSObject::setGeneric(cx, proto, receiver, id, vp, strict);
-        } else if (cx->isExceptionPending()) {
+        if (!handler->hasOwn(cx, proxy, id, &hasOwn))
             return false;
+        if (!hasOwn) {
+            RootedObject proto(cx);
+            if (!handler->getPrototypeOf(cx, proxy, proto.address()))
+                return false;
+            if (proto) {
+                AutoPropertyDescriptorRooter desc(cx);
+                if (!JS_GetPropertyDescriptorById(cx, proto, id, 0, &desc))
+                    return false;
+                if (desc.obj && desc.setter)
+                    return JSObject::setGeneric(cx, proto, receiver, id, vp, strict);
+            }
         }
     }
     return handler->set(cx, proxy, receiver, id, strict, vp.address());
@@ -3094,7 +3105,10 @@ js::RenewProxyObject(JSContext *cx, JSObject *obj,
     JS_ASSERT(obj->getParent() == cx->global());
     JS_ASSERT(obj->getClass() == &ObjectProxyClass);
     JS_ASSERT(obj->getTaggedProto().isLazy());
+#ifdef DEBUG
+    AutoSuppressGC suppressGC(cx);
     JS_ASSERT(!handler->isOuterWindow());
+#endif
 
     obj->setSlot(JSSLOT_PROXY_HANDLER, PrivateValue(handler));
     obj->setCrossCompartmentSlot(JSSLOT_PROXY_PRIVATE, priv);

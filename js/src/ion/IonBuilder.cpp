@@ -14,6 +14,7 @@
 #include "Ion.h"
 #include "IonAnalysis.h"
 #include "IonSpewer.h"
+#include "builtin/Eval.h"
 #include "frontend/BytecodeEmitter.h"
 
 #include "jsscriptinlines.h"
@@ -233,6 +234,8 @@ IonBuilder::popCfgStack()
 {
     if (cfgStack_.back().isLoop())
         loops_.popBack();
+    if (cfgStack_.back().state == CFGState::LABEL)
+        labels_.popBack();
     cfgStack_.popBack();
 }
 
@@ -722,16 +725,15 @@ IonBuilder::snoopControlFlow(JSOp op)
             return processBreak(op, sn);
 
           case SRC_CONTINUE:
-          case SRC_CONT2LABEL:
-            return processContinue(op, sn);
+            return processContinue(op);
 
           case SRC_SWITCHBREAK:
-            return processSwitchBreak(op, sn);
+            return processSwitchBreak(op);
 
           case SRC_WHILE:
           case SRC_FOR_IN:
             // while (cond) { }
-            return whileOrForInLoop(op, sn);
+            return whileOrForInLoop(sn);
 
           default:
             // Hard assert for now - make an error later.
@@ -771,10 +773,11 @@ IonBuilder::inspectOpcode(JSOp op)
         return true;
 
       case JSOP_NOP:
+      case JSOP_LINENO:
         return true;
 
       case JSOP_LABEL:
-        return true;
+        return jsop_label();
 
       case JSOP_UNDEFINED:
         return pushConstant(UndefinedValue());
@@ -938,6 +941,9 @@ IonBuilder::inspectOpcode(JSOp op)
       case JSOP_CALL:
       case JSOP_NEW:
         return jsop_call(GET_ARGC(pc), (JSOp)*pc == JSOP_NEW);
+
+      case JSOP_EVAL:
+        return jsop_eval(GET_ARGC(pc));
 
       case JSOP_INT8:
         return pushConstant(Int32Value(GET_INT8(pc)));
@@ -1198,6 +1204,9 @@ IonBuilder::processCfgEntry(CFGState &state)
 
       case CFGState::AND_OR:
         return processAndOrEnd(state);
+
+      case CFGState::LABEL:
+        return processLabelEnd(state);
 
       default:
         JS_NOT_REACHED("unknown cfgstate");
@@ -1628,45 +1637,67 @@ IonBuilder::processAndOrEnd(CFGState &state)
 }
 
 IonBuilder::ControlStatus
+IonBuilder::processLabelEnd(CFGState &state)
+{
+    JS_ASSERT(state.state == CFGState::LABEL);
+
+    // If there are no breaks and no current, controlflow is terminated.
+    if (!state.label.breaks && !current)
+        return ControlStatus_Ended;
+
+    // If there are no breaks to this label, there's nothing to do.
+    if (!state.label.breaks)
+        return ControlStatus_Joined;
+
+    MBasicBlock *successor = createBreakCatchBlock(state.label.breaks, state.stopAt);
+    if (!successor)
+        return ControlStatus_Error;
+
+    if (current) {
+        current->end(MGoto::New(successor));
+        successor->addPredecessor(current);
+    }
+
+    pc = state.stopAt;
+    current = successor;
+    return ControlStatus_Joined;
+}
+
+IonBuilder::ControlStatus
 IonBuilder::processBreak(JSOp op, jssrcnote *sn)
 {
     JS_ASSERT(op == JSOP_GOTO);
 
-    // Find the target loop.
-    CFGState *found = NULL;
+    JS_ASSERT(SN_TYPE(sn) == SRC_BREAK ||
+              SN_TYPE(sn) == SRC_BREAK2LABEL);
+
+    // Find the break target.
     jsbytecode *target = pc + GetJumpOffset(pc);
-    for (size_t i = loops_.length() - 1; i < loops_.length(); i--) {
-        CFGState &cfg = cfgStack_[loops_[i].cfgEntry];
-        if (cfg.loop.exitpc == target) {
-            found = &cfg;
-            break;
+    DebugOnly<bool> found = false;
+
+    if (SN_TYPE(sn) == SRC_BREAK2LABEL) {
+        for (size_t i = labels_.length() - 1; i < labels_.length(); i--) {
+            CFGState &cfg = cfgStack_[labels_[i].cfgEntry];
+            JS_ASSERT(cfg.state == CFGState::LABEL);
+            if (cfg.stopAt == target) {
+                cfg.label.breaks = new DeferredEdge(current, cfg.label.breaks);
+                found = true;
+                break;
+            }
+        }
+    } else {
+        for (size_t i = loops_.length() - 1; i < loops_.length(); i--) {
+            CFGState &cfg = cfgStack_[loops_[i].cfgEntry];
+            JS_ASSERT(cfg.isLoop());
+            if (cfg.loop.exitpc == target) {
+                cfg.loop.breaks = new DeferredEdge(current, cfg.loop.breaks);
+                found = true;
+                break;
+            }
         }
     }
 
-    if (!found) {
-        // Sometimes, we can't determine the structure of a labeled break. For
-        // example:
-        //
-        // 0:    label: {
-        // 1:        for (;;) {
-        // 2:            break label;
-        // 3:        }
-        // 4:        stuff;
-        // 5:    }
-        //
-        // In this case, the successor of the block is 4, but the target of the
-        // single-level break is actually 5. To recognize this case we'd need
-        // to know about the label structure at 0,5 ahead of time - and lacking
-        // those source notes for now, we just abort instead.
-        abort("could not find the target of a break");
-        return ControlStatus_Error;
-    }
-
-    // There must always be a valid target loop structure. If not, there's
-    // probably an off-by-something error in which pc we track.
-    CFGState &state = *found;
-
-    state.loop.breaks = new DeferredEdge(current, state.loop.breaks);
+    JS_ASSERT(found);
 
     current = NULL;
     pc += js_CodeSpec[op].length;
@@ -1682,7 +1713,7 @@ EffectiveContinue(jsbytecode *pc)
 }
 
 IonBuilder::ControlStatus
-IonBuilder::processContinue(JSOp op, jssrcnote *sn)
+IonBuilder::processContinue(JSOp op)
 {
     JS_ASSERT(op == JSOP_GOTO);
 
@@ -1711,7 +1742,7 @@ IonBuilder::processContinue(JSOp op, jssrcnote *sn)
 }
 
 IonBuilder::ControlStatus
-IonBuilder::processSwitchBreak(JSOp op, jssrcnote *sn)
+IonBuilder::processSwitchBreak(JSOp op)
 {
     JS_ASSERT(op == JSOP_GOTO);
 
@@ -1921,7 +1952,7 @@ IonBuilder::doWhileLoop(JSOp op, jssrcnote *sn)
 }
 
 IonBuilder::ControlStatus
-IonBuilder::whileOrForInLoop(JSOp op, jssrcnote *sn)
+IonBuilder::whileOrForInLoop(jssrcnote *sn)
 {
     // while (cond) { } loops have the following structure:
     //    GOTO cond   ; SRC_WHILE (offset to IFNE)
@@ -1932,8 +1963,8 @@ IonBuilder::whileOrForInLoop(JSOp op, jssrcnote *sn)
     //    ...
     //    IFNE        ; goes to LOOPHEAD
     // for (x in y) { } loops are similar; the cond will be a MOREITER.
-    size_t which = (SN_TYPE(sn) == SRC_FOR_IN) ? 1 : 0;
-    int ifneOffset = js_GetSrcNoteOffset(sn, which);
+    JS_ASSERT(SN_TYPE(sn) == SRC_FOR_IN || SN_TYPE(sn) == SRC_WHILE);
+    int ifneOffset = js_GetSrcNoteOffset(sn, 0);
     jsbytecode *ifne = pc + ifneOffset;
     JS_ASSERT(ifne > pc);
 
@@ -2088,7 +2119,7 @@ IonBuilder::tableSwitch(JSOp op, jssrcnote *sn)
     // .: Offset of case high
 
     JS_ASSERT(op == JSOP_TABLESWITCH);
-    JS_ASSERT(SN_TYPE(sn) == SRC_SWITCH);
+    JS_ASSERT(SN_TYPE(sn) == SRC_TABLESWITCH);
 
     // Pop input.
     MDefinition *ins = current->pop();
@@ -2182,6 +2213,21 @@ IonBuilder::tableSwitch(JSOp op, jssrcnote *sn)
 }
 
 bool
+IonBuilder::jsop_label()
+{
+    JS_ASSERT(JSOp(*pc) == JSOP_LABEL);
+
+    jsbytecode *endpc = pc + GET_JUMP_OFFSET(pc);
+    JS_ASSERT(endpc > pc);
+
+    ControlFlowInfo label(cfgStack_.length(), endpc);
+    if (!labels_.append(label))
+        return false;
+
+    return cfgStack_.append(CFGState::Label(endpc));
+}
+
+bool
 IonBuilder::jsop_condswitch()
 {
     // CondSwitch op looks as follows:
@@ -2214,6 +2260,7 @@ IonBuilder::jsop_condswitch()
 
     JS_ASSERT(JSOp(*pc) == JSOP_CONDSWITCH);
     jssrcnote *sn = info().getNote(cx, pc);
+    JS_ASSERT(SN_TYPE(sn) == SRC_CONDSWITCH);
 
     // Get the exit pc
     jsbytecode *exitpc = pc + js_GetSrcNoteOffset(sn, 0);
@@ -2275,6 +2322,16 @@ IonBuilder::CFGState::CondSwitch(jsbytecode *exitpc, jsbytecode *defaultTarget)
     state.condswitch.defaultIdx = uint32_t(-1);
     state.condswitch.exitpc = exitpc;
     state.condswitch.breaks = NULL;
+    return state;
+}
+
+IonBuilder::CFGState
+IonBuilder::CFGState::Label(jsbytecode *exitpc)
+{
+    CFGState state;
+    state.state = LABEL;
+    state.stopAt = exitpc;
+    state.label.breaks = NULL;
     return state;
 }
 
@@ -2851,7 +2908,7 @@ IonBuilder::inlineScriptedCall(HandleFunction target, CallInfo &callInfo)
 {
     AssertCanGC();
     JS_ASSERT(target->isInterpreted());
-    JS_ASSERT(callInfo.hasTypeInfo());
+    JS_ASSERT(callInfo.hasCallType());
 
     // Remove the MPassArg if still present.
     if (callInfo.isWrapped())
@@ -2887,9 +2944,21 @@ IonBuilder::inlineScriptedCall(HandleFunction target, CallInfo &callInfo)
     callInfo.popFormals(current);
     current->push(callInfo.fun());
 
+    RootedScript calleeScript(cx, target->nonLazyScript());
+    TypeInferenceOracle oracle;
+    if (!oracle.init(cx, calleeScript))
+        return false;
+
+    // Add exclude type barriers.
+    if (callInfo.argsBarrier()) {
+        addTypeBarrier(0, callInfo, oracle.thisTypeSet(calleeScript));
+        int32_t max = (callInfo.argc() < target->nargs) ? callInfo.argc() : target->nargs;
+        for (int32_t i = 1; i <= max; i++)
+            addTypeBarrier(i, callInfo, oracle.parameterTypeSet(calleeScript, i - 1));
+    }
+
     // Start inlining
     LifoAlloc *alloc = GetIonContext()->temp->lifoAlloc();
-    RootedScript calleeScript(cx, target->nonLazyScript());
     CompileInfo *info = alloc->new_<CompileInfo>(calleeScript.get(), target,
                                                  (jsbytecode *)NULL, callInfo.constructing(),
                                                  SequentialExecution);
@@ -2898,10 +2967,6 @@ IonBuilder::inlineScriptedCall(HandleFunction target, CallInfo &callInfo)
 
     MIRGraphExits saveExits;
     AutoAccumulateExits aae(graph(), saveExits);
-
-    TypeInferenceOracle oracle;
-    if (!oracle.init(cx, calleeScript))
-        return false;
 
     IonBuilder inlineBuilder(cx, &temp(), &graph(), &oracle,
                              info, inliningDepth + 1, loopDepth_);
@@ -2948,6 +3013,68 @@ IonBuilder::inlineScriptedCall(HandleFunction target, CallInfo &callInfo)
     current = bottom;
 
     return true;
+}
+
+void
+IonBuilder::addTypeBarrier(uint32_t i, CallInfo &callinfo, types::StackTypeSet *calleeObs)
+{
+    MDefinition *ins = NULL;
+    types::StackTypeSet *callerObs = NULL;
+    types::TypeBarrier *excluded = callinfo.argsBarrier();
+
+    if (i == 0) {
+        ins = callinfo.thisArg();
+        callerObs = callinfo.thisType();
+    } else {
+        ins = callinfo.getArg(i - 1);
+        callerObs = callinfo.getArgType(i - 1);
+    }
+
+    while (excluded) {
+        if (excluded->target == calleeObs) {
+            JS_ASSERT(callerObs->hasType(excluded->type));
+
+            if (excluded->type == types::Type::DoubleType() &&
+                calleeObs->hasType(types::Type::Int32Type())) {
+                // The double type also implies int32, so this implies that
+                // double should be coerced into int if possible, and other
+                // types should remain.
+
+                JSValueType callerType = callerObs->getKnownTypeTag();
+                if (callerType == JSVAL_TYPE_DOUBLE) {
+                    MInstruction *bailType = MToInt32::New(ins);
+                    current->add(bailType);
+                    ins = bailType;
+                    break;
+                } else {
+                    // We expect either an Int or a Value, this variant is not
+                    // optimized and favor the int variant by filtering out all
+                    // other inputs.
+                    JS_ASSERT(callerType == JSVAL_TYPE_UNKNOWN);
+                    // Bail if the input is not a number.
+                    MInstruction *toDouble = MUnbox::New(ins, MIRType_Double, MUnbox::Fallible);
+                    // Bail if the double does not fit in an int.
+                    MInstruction *toInt = MToInt32::New(ins);
+                    current->add(toDouble);
+                    current->add(toInt);
+                    ins = toInt;
+                }
+            } else {
+                JS_ASSERT(!calleeObs->hasType(excluded->type));
+
+                // Filter out unexpected type which are not yet added to the set
+                // observed type but which are infered by type inference.
+                MInstruction *bailType = MExcludeType::New(ins, excluded->type);
+                current->add(bailType);
+            }
+        }
+        excluded = excluded->next;
+    }
+
+    if (i == 0)
+        callinfo.setThis(ins);
+    else
+        callinfo.setArg(i - 1, ins);
 }
 
 MDefinition *
@@ -3008,6 +3135,7 @@ IonBuilder::jsop_call_inline(HandleFunction callee, CallInfo &callInfo, MBasicBl
                              Vector<MDefinition *, 8, IonAllocPolicy> &retvalDefns)
 {
     AssertCanGC();
+    JS_ASSERT(callInfo.hasCallType());
 
     // Push formals to capture them in the inline resume point.
     int calleePos = -((int) callInfo.argc() + 2);
@@ -3029,8 +3157,20 @@ IonBuilder::jsop_call_inline(HandleFunction callee, CallInfo &callInfo, MBasicBl
     // Inlining JSOP_FUNCALL uses inlineScriptedCall
     JS_ASSERT(callInfo.argc() == GET_ARGC(inlineResumePoint->pc()));
 
-    LifoAlloc *alloc = GetIonContext()->temp->lifoAlloc();
     RootedScript calleeScript(cx, callee->nonLazyScript());
+    TypeInferenceOracle oracle;
+    if (!oracle.init(cx, calleeScript))
+        return false;
+
+    // Add exclude type barriers.
+    if (callInfo.argsBarrier()) {
+        addTypeBarrier(0, callInfo, oracle.thisTypeSet(calleeScript));
+        int32_t max = (callInfo.argc() < callee->nargs) ? callInfo.argc() : callee->nargs;
+        for (int32_t i = 1; i <= max; i++)
+            addTypeBarrier(i, callInfo, oracle.parameterTypeSet(calleeScript, i - 1));
+    }
+
+    LifoAlloc *alloc = GetIonContext()->temp->lifoAlloc();
     CompileInfo *info = alloc->new_<CompileInfo>(calleeScript.get(), callee,
                                                  (jsbytecode *)NULL, callInfo.constructing(),
                                                  SequentialExecution);
@@ -3039,10 +3179,6 @@ IonBuilder::jsop_call_inline(HandleFunction callee, CallInfo &callInfo, MBasicBl
 
     MIRGraphExits saveExits;
     AutoAccumulateExits aae(graph(), saveExits);
-
-    TypeInferenceOracle oracle;
-    if (!oracle.init(cx, calleeScript))
-        return false;
 
     IonBuilder inlineBuilder(cx, &temp(), &graph(), &oracle,
                              info, inliningDepth + 1, loopDepth_);
@@ -3142,10 +3278,45 @@ IonBuilder::makeInliningDecision(AutoObjectVector &targets)
         return false;
     }
 
+    JSOp op = JSOp(*pc);
     for (size_t i = 0; i < targets.length(); i++) {
-        if (!canInlineTarget(targets[i]->toFunction())) {
+        JSFunction *target = targets[i]->toFunction();
+
+        if (!canInlineTarget(target)) {
             IonSpew(IonSpew_Inlining, "Decided not to inline");
             return false;
+        }
+
+        // For fun.apply we need to make sure the types of the argument is a subset
+        // of the types used in the callee. Because adding a typeset in the callee,
+        // doesn't update the types in the "apply" function, resulting in missed types.
+        if (op == JSOP_FUNAPPLY) {
+            types::TypeSet *calleeType, *callerType;
+            size_t nargs = Min<size_t>(target->nargs, inlinedArguments_.length());
+            for (size_t i = 0; i < nargs; i++) {
+                calleeType = types::TypeScript::ArgTypes(targetScript, i);
+                // The arguments to this function aren't always available in this script.
+                // We need to get them from the caller at the position where
+                // the function gets called.
+                callerType = oracle->getCallArg(callerBuilder_->script_.get(),
+                                                inlinedArguments_.length(),
+                                                i+1, callerBuilder_->pc);
+
+                if (!callerType->isSubset(calleeType)) {
+                    IonSpew(IonSpew_Inlining, "Funapply inlining failed due to wrong types");
+                    return false;
+                }
+            }
+            // Arguments that weren't provided will be Undefined
+            for (size_t i = nargs; i < target->nargs; i++) {
+                calleeType = types::TypeScript::ArgTypes(targetScript, i);
+                if (calleeType->unknown() ||
+                    !calleeType->hasType(types::Type::UndefinedType()))
+                {
+                    IonSpew(IonSpew_Inlining, "Funapply inlining failed due to wrong types");
+                    return false;
+                }
+            }
         }
     }
 
@@ -3416,14 +3587,19 @@ IonBuilder::inlineScriptedCalls(AutoObjectVector &targets, AutoObjectVector &ori
         // guaranteed to fail.
         JSFunction *func = originals[i]->toFunction();
         MConstant *constFun = MConstant::New(ObjectValue(*func));
+        top->add(constFun);
 
         // Create new entry block for the inlined callee graph.
         MBasicBlock *entryBlock = newBlock(current, pc);
         if (!entryBlock)
             return false;
 
+        // Modify the resume point to account for the callee selection.
+        int funIndex = entryBlock->entryResumePoint()->numOperands();
+        funIndex -= ((int) callInfo.argc() + 2);
+        entryBlock->entryResumePoint()->replaceOperand(funIndex, constFun);
+
         // Add case to PolyInlineDispatch
-        entryBlock->add(constFun);
         disp->addCallee(constFun, entryBlock);
     }
     top->end(disp);
@@ -3943,6 +4119,9 @@ IonBuilder::jsop_funapplyarguments(uint32_t argc)
     if (!args.append(inlinedArguments_.begin(), inlinedArguments_.end()))
         return false;
     callInfo.setArgs(&args);
+    RootedScript scriptRoot(cx, script());
+    if (!callInfo.initFunApplyArguments(oracle, scriptRoot, pc, info().nargs()))
+        return false;
 
     // This
     MPassArg *passThis = current->pop()->toPassArg();
@@ -4027,6 +4206,8 @@ IonBuilder::jsop_call(uint32_t argc, bool constructing)
     }
 
     // Inline scriped call(s).
+    if (!callInfo.initCallType(oracle, scriptRoot, pc))
+        return false;
     if (inliningEnabled() && targets.length() > 0 && makeInliningDecision(targets))
         return inlineScriptedCalls(targets, originals, callInfo);
 
@@ -4280,6 +4461,58 @@ IonBuilder::makeCall(HandleFunction target, CallInfo &callInfo,
     callInfo.setTypeInfo(types, barrier);
 
     return makeCallBarrier(target, callInfo, calleeTypes, cloneAtCallsite);
+}
+
+bool
+IonBuilder::jsop_eval(uint32_t argc)
+{
+    types::StackTypeSet *calleeTypes = oracle->getCallTarget(script(), argc, pc);
+
+    // Emit a normal call if the eval has never executed. This keeps us from
+    // disabling compilation for the script when testing with --ion-eager.
+    if (calleeTypes && calleeTypes->empty())
+        return jsop_call(argc, /* constructing = */ false);
+
+    RootedFunction singleton(cx, getSingleCallTarget(calleeTypes));
+    if (!singleton)
+        return abort("No singleton callee for eval()");
+
+    if (IsBuiltinEvalForScope(&script()->global(), ObjectValue(*singleton))) {
+        if (argc != 1)
+            return abort("Direct eval with more than one argument");
+
+        if (!info().fun())
+            return abort("Direct eval in global code");
+
+        types::StackTypeSet *thisTypes = oracle->thisTypeSet(script());
+        if (!thisTypes) {
+            // The 'this' value for the outer and eval scripts must be the
+            // same. This is not guaranteed if a primitive string/number/etc.
+            // is passed through to the eval invoke as the primitive may be
+            // boxed into different objects if accessed via 'this'.
+            JSValueType type = thisTypes->getKnownTypeTag();
+            if (type != JSVAL_TYPE_OBJECT && type != JSVAL_TYPE_NULL && type != JSVAL_TYPE_UNDEFINED)
+                return abort("Direct eval from script with maybe-primitive 'this'");
+        }
+
+        CallInfo callInfo(cx, /* constructing = */ false);
+        if (!callInfo.init(current, argc))
+            return false;
+        callInfo.unwrapArgs();
+
+        MDefinition *scopeChain = current->scopeChain();
+        MDefinition *string = callInfo.getArg(0);
+
+        current->pushSlot(info().thisSlot());
+        MDefinition *thisValue = current->pop();
+
+        MInstruction *ins = MCallDirectEval::New(scopeChain, string, thisValue);
+        current->add(ins);
+        current->push(ins);
+        return resumeAfter(ins);
+    }
+
+    return jsop_call(argc, /* constructing = */ false);
 }
 
 bool
@@ -5289,6 +5522,27 @@ IonBuilder::jsop_bindname(PropertyName *name)
     return resumeAfter(ins);
 }
 
+static JSValueType
+GetElemKnownType(bool needsHoleCheck, types::StackTypeSet *types)
+{
+    JSValueType knownType = types->getKnownTypeTag();
+
+    // Null and undefined have no payload so they can't be specialized.
+    // Since folding null/undefined while building SSA is not safe (see the
+    // comment in IsPhiObservable), we just add an untyped load instruction
+    // and rely on pushTypeBarrier and DCE to replace it with a null/undefined
+    // constant.
+    if (knownType == JSVAL_TYPE_UNDEFINED || knownType == JSVAL_TYPE_NULL)
+        knownType = JSVAL_TYPE_UNKNOWN;
+
+    // Different architectures may want typed element reads which require
+    // hole checks to be done as either value or typed reads.
+    if (needsHoleCheck && !LIRGenerator::allowTypedElementHoleCheck())
+        knownType = JSVAL_TYPE_UNKNOWN;
+
+    return knownType;
+}
+
 bool
 IonBuilder::jsop_getelem()
 {
@@ -5321,8 +5575,9 @@ IonBuilder::jsop_getelem()
     // getprop stubs.
     bool mustMonitorResult = false;
     bool cacheable = false;
+    bool intIndex = false;
 
-    oracle->elementReadGeneric(script, pc, &cacheable, &mustMonitorResult);
+    oracle->elementReadGeneric(script, pc, &cacheable, &mustMonitorResult, &intIndex);
 
     if (cacheable)
         ins = MGetElementCache::New(lhs, rhs, mustMonitorResult);
@@ -5337,6 +5592,14 @@ IonBuilder::jsop_getelem()
 
     types::StackTypeSet *barrier = oracle->propertyReadBarrier(script, pc);
     types::StackTypeSet *types = oracle->propertyRead(script, pc);
+
+    if (cacheable && intIndex && !barrier && !mustMonitorResult) {
+        bool needHoleCheck = !oracle->elementReadIsPacked(script, pc);
+        JSValueType knownType = GetElemKnownType(needHoleCheck, types);
+
+        if (knownType != JSVAL_TYPE_UNKNOWN && knownType != JSVAL_TYPE_DOUBLE)
+            ins->setResultType(MIRTypeFromValueType(knownType));
+    }
 
     if (mustMonitorResult)
         monitorResult(ins, barrier, types);
@@ -5362,22 +5625,8 @@ IonBuilder::jsop_getelem_dense()
     MDefinition *obj = current->pop();
 
     JSValueType knownType = JSVAL_TYPE_UNKNOWN;
-    if (!barrier) {
-        knownType = types->getKnownTypeTag();
-
-        // Null and undefined have no payload so they can't be specialized.
-        // Since folding null/undefined while building SSA is not safe (see the
-        // comment in IsPhiObservable), we just add an untyped load instruction
-        // and rely on pushTypeBarrier and DCE to replace it with a null/undefined
-        // constant.
-        if (knownType == JSVAL_TYPE_UNDEFINED || knownType == JSVAL_TYPE_NULL)
-            knownType = JSVAL_TYPE_UNKNOWN;
-
-        // Different architectures may want typed element reads which require
-        // hole checks to be done as either value or typed reads.
-        if (needsHoleCheck && !LIRGenerator::allowTypedElementHoleCheck())
-            knownType = JSVAL_TYPE_UNKNOWN;
-    }
+    if (!barrier)
+        knownType = GetElemKnownType(needsHoleCheck, types);
 
     // Ensure id is an integer.
     MInstruction *idInt32 = MToInt32::New(id);
@@ -5436,7 +5685,7 @@ IonBuilder::jsop_getelem_dense()
 MInstruction *
 IonBuilder::getTypedArrayLength(MDefinition *obj)
 {
-    if (obj->isConstant()) {
+    if (obj->isConstant() && obj->toConstant()->value().isObject()) {
         JSObject *array = &obj->toConstant()->value().toObject();
         int32_t length = (int32_t) TypedArray::length(array);
         obj->setFoldedUnchecked();
@@ -5448,7 +5697,7 @@ IonBuilder::getTypedArrayLength(MDefinition *obj)
 MInstruction *
 IonBuilder::getTypedArrayElements(MDefinition *obj)
 {
-    if (obj->isConstant()) {
+    if (obj->isConstant() && obj->toConstant()->value().isObject()) {
         JSObject *array = &obj->toConstant()->value().toObject();
         void *data = TypedArray::viewData(array);
         obj->setFoldedUnchecked();

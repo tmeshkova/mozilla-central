@@ -152,6 +152,12 @@ XPCOMUtils.defineLazyGetter(this, "WAP", function () {
   return WAP;
 });
 
+XPCOMUtils.defineLazyGetter(this, "PhoneNumberUtils", function () {
+  let ns = {};
+  Cu.import("resource://gre/modules/PhoneNumberUtils.jsm", ns);
+  return ns.PhoneNumberUtils;
+});
+
 function convertRILCallState(state) {
   switch (state) {
     case RIL.CALL_STATE_ACTIVE:
@@ -586,7 +592,13 @@ RadioInterfaceLayer.prototype = {
         this.handleCallWaitingStatusChange(message);
         break;
       case "sms-received":
-        this.handleSmsReceived(message);
+        let ackOk = this.handleSmsReceived(message);
+        if (ackOk) {
+          this.worker.postMessage({
+            rilMessageType: "ackSMS",
+            result: RIL.PDU_FCS_OK
+          });
+        }
         return;
       case "sms-sent":
         this.handleSmsSent(message);
@@ -1433,12 +1445,12 @@ RadioInterfaceLayer.prototype = {
       if (handler) {
         handler(message);
       }
-      return;
+      return true;
     }
 
     if (message.encoding == RIL.PDU_DCS_MSG_CODING_8BITS_ALPHABET) {
       // Don't know how to handle binary data yet.
-      return;
+      return true;
     }
 
     // TODO: Bug #768441
@@ -1451,7 +1463,7 @@ RadioInterfaceLayer.prototype = {
       mwi.returnNumber = message.sender || null;
       mwi.returnMessage = message.fullBody || null;
       this._sendTargetMessage("voicemail", "RIL:VoicemailNotification", mwi);
-      return;
+      return true;
     }
 
     let notifyReceived = function notifyReceived(rv, sms) {
@@ -1505,6 +1517,9 @@ RadioInterfaceLayer.prototype = {
                                              false);
       notifyReceived(Cr.NS_OK, sms);
     }
+
+    // SMS ACK will be sent in notifyReceived. Return false here.
+    return false;
   },
 
   /**
@@ -1975,6 +1990,14 @@ RadioInterfaceLayer.prototype = {
 
   dial: function dial(number) {
     debug("Dialing " + number);
+    if (!PhoneNumberUtils.isViablePhoneNumber(number)) {
+      this.handleCallError({
+        callIndex: -1,
+        error: RIL.RIL_CALL_FAILCAUSE_TO_GECKO_CALL_ERROR[RIL.CALL_FAIL_UNOBTAINABLE_NUMBER]
+      });
+      debug("Number '" + number + "' doesn't seem to be a viable number. Drop.");
+      return;
+    }
     this.worker.postMessage({rilMessageType: "dial",
                              number: number,
                              isDialEmergency: false});

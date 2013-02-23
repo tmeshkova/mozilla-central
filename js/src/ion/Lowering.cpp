@@ -410,6 +410,26 @@ LIRGenerator::visitApplyArgs(MApplyArgs *apply)
     return true;
 }
 
+bool
+LIRGenerator::visitCallDirectEval(MCallDirectEval *ins)
+{
+    MDefinition *scopeChain = ins->getScopeChain();
+    JS_ASSERT(scopeChain->type() == MIRType_Object);
+
+    MDefinition *string = ins->getString();
+    JS_ASSERT(string->type() == MIRType_String);
+
+    MDefinition *thisValue = ins->getThisValue();
+
+    LCallDirectEval *lir = new LCallDirectEval(useRegisterAtStart(scopeChain),
+                                               useRegisterAtStart(string));
+
+    if (!useBoxAtStart(lir, LCallDirectEval::ThisValueInput, thisValue))
+        return false;
+
+    return defineReturn(lir, ins) && assignSafepoint(lir, ins);
+}
+
 static JSOp
 ReorderComparison(JSOp op, MDefinition **lhsp, MDefinition **rhsp)
 {
@@ -1614,6 +1634,18 @@ LIRGenerator::visitMonitorTypes(MMonitorTypes *ins)
 }
 
 bool
+LIRGenerator::visitExcludeType(MExcludeType *ins)
+{
+    LExcludeType *filter = new LExcludeType(temp());
+    if (!useBox(filter, LExcludeType::Input, ins->input()))
+        return false;
+    if (!assignSnapshot(filter, ins->bailoutKind()))
+        return false;
+    filter->setMir(ins);
+    return add(filter);
+}
+
+bool
 LIRGenerator::visitArrayLength(MArrayLength *ins)
 {
     JS_ASSERT(ins->elements()->type() == MIRType_Elements);
@@ -2069,15 +2101,19 @@ bool
 LIRGenerator::visitGetElementCache(MGetElementCache *ins)
 {
     JS_ASSERT(ins->object()->type() == MIRType_Object);
-    JS_ASSERT(ins->index()->type() == MIRType_Value);
-    JS_ASSERT(ins->type() == MIRType_Value);
 
-    LGetElementCacheV *lir = new LGetElementCacheV(useRegister(ins->object()));
-    if (!useBox(lir, LGetElementCacheV::Index, ins->index()))
-        return false;
-    if (!defineBox(lir, ins))
-        return false;
-    return assignSafepoint(lir, ins);
+    if (ins->type() == MIRType_Value) {
+        JS_ASSERT(ins->index()->type() == MIRType_Value);
+        LGetElementCacheV *lir = new LGetElementCacheV(useRegister(ins->object()));
+        if (!useBox(lir, LGetElementCacheV::Index, ins->index()))
+            return false;
+        return defineBox(lir, ins) && assignSafepoint(lir, ins);
+    }
+
+    JS_ASSERT(ins->index()->type() == MIRType_Int32);
+    LGetElementCacheT *lir = new LGetElementCacheT(useRegister(ins->object()),
+                                                   useRegister(ins->index()));
+    return define(lir, ins) && assignSafepoint(lir, ins);
 }
 
 bool
