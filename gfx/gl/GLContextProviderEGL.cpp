@@ -2038,7 +2038,7 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
 
     EGLContext eglContext = sEGLLibrary.fGetCurrentContext();
     if (aWidget->HasGLContext() && eglContext) {
-        //int colorDepth = gfxPlatform::GetPlatform()->GetScreenDepth();
+        int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
         void* platformContext = eglContext;
 #ifdef MOZ_WIDGET_QT
         QGLContext* context = const_cast<QGLContext*>(QGLContext::currentContext());
