@@ -495,6 +495,7 @@ void EmbedLitePuppetWidget::CreateCompositor()
   bool renderToEGLSurface = true;
   nsIntRect rect;
   GetBounds(rect);
+  gfxPlatform::GetPlatform();
   EmbedLiteCompositorParent* parent = new EmbedLiteCompositorParent(this, renderToEGLSurface, rect.width, rect.height, mId);
   mCompositorParent = parent;
   LayerManager* lm = CreateBasicLayerManager();
