@@ -2038,6 +2038,8 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
 
     EGLContext eglContext = sEGLLibrary.fGetCurrentContext();
     if (aWidget->HasGLContext() && eglContext) {
+        // HasGLContext might change current context to real one, so get it here again
+        eglContext = sEGLLibrary.fGetCurrentContext();
         int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
         void* platformContext = eglContext;
 #ifdef MOZ_WIDGET_QT
