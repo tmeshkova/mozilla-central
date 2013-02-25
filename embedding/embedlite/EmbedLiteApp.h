@@ -37,7 +37,11 @@ public:
   virtual void Destroyed() {}
   // Messaging interface, allow to receive json messages from content child scripts
   virtual void OnObserve(const char* aMessage, const PRUnichar* aData) {}
-  virtual uint32_t CreateNewWindowRequested(const uint32_t& chromeFlags, const char* uri, const uint32_t& contextFlags, EmbedLiteView* aParentView) { return 0; }
+  // New Window request which is usually coming from WebPage new window request
+  virtual uint32_t CreateNewWindowRequested(const uint32_t& chromeFlags,
+                                            const char* uri,
+                                            const uint32_t& contextFlags,
+                                            EmbedLiteView* aParentView) { return 0; }
 };
 
 class EmbedLiteApp

@@ -105,18 +105,12 @@ EmbedLiteViewThreadChild::InitGeckoWindow(const uint32_t& parentId)
 
   mWidget = new EmbedLitePuppetWidget(this, mId);
 
-  nsCOMPtr<nsIWidget> parentWidget;
-  EmbedLiteViewThreadChild* parentView = EmbedLiteAppThreadChild::GetInstance()->GetViewByID(parentId);
-  if (parentView) {
-    parentWidget = parentView->mWidget;
-  }
-
   nsWidgetInitData  widgetInit;
   widgetInit.clipChildren = true;
   widgetInit.mWindowType = eWindowType_toplevel;
   mWidget->Create(
-    parentWidget, 0,              // no parents
-    nsIntRect(nsIntPoint(0, 0), nsIntSize(800, 600)),
+    nullptr, 0,              // no parents
+    nsIntRect(nsIntPoint(0, 0), nsIntSize(mGLViewSize.width, mGLViewSize.height)),
     nullptr,                 // HandleWidgetEvent
     &widgetInit              // nsDeviceContext
   );
@@ -406,6 +400,14 @@ EmbedLiteViewThreadChild::RecvSetViewSize(const gfxSize& aSize)
   baseWindow->SetPositionAndSize(0, 0, mViewSize.width, mViewSize.height, true);
   baseWindow->SetVisibility(true);
 
+  return true;
+}
+
+bool
+EmbedLiteViewThreadChild::RecvSetGLViewSize(const gfxSize& aSize)
+{
+  mGLViewSize = aSize;
+  LOGT("sz[%g,%g]", mGLViewSize.width, mGLViewSize.height);
   return true;
 }
 

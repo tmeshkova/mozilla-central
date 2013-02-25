@@ -86,6 +86,15 @@ bool EmbedLiteCompositorParent::RenderGL()
   return retval;
 }
 
+bool
+EmbedLiteCompositorParent::RequestHasHWAcceleratedContext()
+{
+  EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
+  if (view && view->GetListener())
+    return view->GetListener()->RequestCurrentGLContext();
+  return false;
+}
+
 void EmbedLiteCompositorParent::SetSurfaceSize(int width, int height)
 {
   NS_ENSURE_TRUE(IsGLBackend(),);

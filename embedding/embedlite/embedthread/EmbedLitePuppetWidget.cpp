@@ -107,6 +107,7 @@ EmbedLitePuppetWidget::EmbedLitePuppetWidget(EmbedLiteViewThreadChild* aEmbed, u
   , mVisible(false)
   , mEnabled(false)
   , mIMEComposing(false)
+  , mParent(nullptr)
   , mId(aId)
 {
   MOZ_COUNT_CTOR(EmbedLitePuppetWidget);
@@ -122,6 +123,19 @@ EmbedLitePuppetWidget::~EmbedLitePuppetWidget()
 }
 
 NS_IMETHODIMP
+EmbedLitePuppetWidget::SetParent(nsIWidget* aParent)
+{
+  mParent = aParent;
+  return NS_OK;
+}
+
+nsIWidget*
+EmbedLitePuppetWidget::GetParent(void)
+{
+  return mParent;
+}
+
+NS_IMETHODIMP
 EmbedLitePuppetWidget::Create(nsIWidget*        aParent,
                               nsNativeWidget   aNativeParent,
                               const nsIntRect&  aRect,
@@ -131,7 +145,8 @@ EmbedLitePuppetWidget::Create(nsIWidget*        aParent,
   LOGT();
   NS_ABORT_IF_FALSE(!aNativeParent, "got a non-Puppet native parent");
 
-  BaseCreate(nullptr, aRect, aContext, aInitData);
+  mParent = aParent;
+  BaseCreate(aParent, aRect, aContext, aInitData);
 
   mBounds = aRect;
   mEnabled = true;
@@ -140,9 +155,6 @@ EmbedLitePuppetWidget::Create(nsIWidget*        aParent,
   EmbedLitePuppetWidget* parent = static_cast<EmbedLitePuppetWidget*>(aParent);
   if (parent) {
     parent->mChild = this;
-    if (aInitData->mWindowType == eWindowType_child) {
-      mLayerManager = parent->GetLayerManager();
-    }
   } else {
     Resize(mBounds.x, mBounds.y, mBounds.width, mBounds.height, false);
   }
@@ -195,7 +207,7 @@ EmbedLitePuppetWidget::Destroy()
 NS_IMETHODIMP
 EmbedLitePuppetWidget::Show(bool aState)
 {
-  LOGF("state:", aState);
+  LOGF("t:%p, state: %i, LM:%p", this, aState, mLayerManager.get());
   NS_ASSERTION(mEnabled,
                "does it make sense to Show()/Hide() a disabled widget?");
 
@@ -206,7 +218,8 @@ EmbedLitePuppetWidget::Show(bool aState)
     mChild->mVisible = aState;
   }
 
-  if (!mVisible && mLayerManager) {
+  nsIWidget* topWidget = GetTopLevelWidget();
+  if (!mVisible && mLayerManager && topWidget == this) {
     mLayerManager->ClearCachedResources();
   }
 
@@ -434,6 +447,15 @@ EmbedLitePuppetWidget::GetLayerManager(PLayersChild* aShadowManager,
 
   LOGF();
 
+  nsIWidget* topWidget = GetTopLevelWidget();
+  if (topWidget != this) {
+    mLayerManager = topWidget->GetLayerManager();
+  }
+
+  if (mLayerManager) {
+    return mLayerManager;
+  }
+
   EmbedLitePuppetWidget* topWindow = TopWindow();
 
   if (!topWindow) {
@@ -496,7 +518,9 @@ void EmbedLitePuppetWidget::CreateCompositor()
   nsIntRect rect;
   GetBounds(rect);
   gfxPlatform::GetPlatform();
-  EmbedLiteCompositorParent* parent = new EmbedLiteCompositorParent(this, renderToEGLSurface, rect.width, rect.height, mId);
+  gfxSize glSize = mEmbed->GetGLViewSize();
+  EmbedLiteCompositorParent* parent =
+    new EmbedLiteCompositorParent(this, renderToEGLSurface, glSize.width, glSize.height, mId);
   mCompositorParent = parent;
   LayerManager* lm = CreateBasicLayerManager();
   MessageLoop* childMessageLoop = CompositorParent::CompositorLoop();
@@ -542,7 +566,9 @@ EmbedLitePuppetWidget::GetNaturalBounds()
 bool
 EmbedLitePuppetWidget::HasGLContext()
 {
-  return true;
+  EmbedLiteCompositorParent* parent =
+    static_cast<EmbedLiteCompositorParent*>(mCompositorParent.get());
+  return parent->RequestHasHWAcceleratedContext();
 }
 
 }  // namespace widget

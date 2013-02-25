@@ -31,6 +31,7 @@ child:
     async Reload(bool hardReload);
     async LoadFrameScript(nsString uri);
     async SetViewSize(gfxSize aSize);
+    async SetGLViewSize(gfxSize aSize);
     async SetIsActive(bool aIsActive);
     async SuspendTimeouts();
     async ResumeTimeouts();

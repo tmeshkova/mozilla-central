@@ -54,6 +54,8 @@ public:
   nsresult GetBrowser(nsIWebBrowser** outBrowser);
   nsresult GetBrowserChrome(nsIWebBrowserChrome** outChrome);
   uint32_t GetID() { return mId; }
+  gfxSize GetGLViewSize() { return mGLViewSize; }
+
 protected:
   virtual void ActorDestroy(ActorDestroyReason aWhy) MOZ_OVERRIDE;
   virtual bool RecvDestroy();
@@ -96,6 +98,9 @@ protected:
   RecvRemoveMessageListener(const nsCString&);
   void RecvAsyncMessage(const nsAString& aMessage,
                         const nsAString& aData);
+  virtual bool RecvSetGLViewSize(const gfxSize&);
+
+  void RequestHasHWAcceleratedContextLooped();
 
 private:
   friend class TabChildHelper;
@@ -114,6 +119,7 @@ private:
   nsCOMPtr<nsIWebNavigation> mWebNavigation;
   WebBrowserChrome* mBChrome;
   gfxSize mViewSize;
+  gfxSize mGLViewSize;
 
   nsCOMPtr<TabChildHelper> mHelper;
   bool mDispatchSynthMouseEvents;

@@ -149,6 +149,9 @@ public:
   virtual nsIntRect GetNaturalBounds();
   virtual bool HasGLContext();
 
+  NS_IMETHOD         SetParent(nsIWidget* aNewParent);
+  virtual nsIWidget *GetParent(void);
+
 private:
   nsresult Paint();
   void DestroyCompositor();
@@ -165,6 +168,7 @@ private:
   bool mIMEComposing;
   nsString mIMEComposingText;
   nsRefPtr<EmbedLitePuppetWidget> mChild;
+  nsCOMPtr<nsIWidget> mParent;
 
   uint32_t mId;
 };

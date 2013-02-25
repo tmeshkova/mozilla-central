@@ -42,6 +42,7 @@ public:
     return mChildCompositor;
   }
   virtual mozilla::layers::AsyncPanZoomController* GetEmbedPanZoomController();
+  virtual bool RequestHasHWAcceleratedContext();
 protected:
   virtual void ScheduleTask(CancelableTask*, int);
   virtual void SetFirstPaintViewport(const nsIntPoint& aOffset, float aZoom, const nsIntRect& aPageRect, const gfx::Rect& aCssPageRect);

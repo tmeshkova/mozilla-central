@@ -184,7 +184,8 @@ EmbedLiteViewThreadParent::SetCompositor(EmbedLiteCompositorParent* aCompositor)
   LOGT();
   mCompositor = aCompositor;
   UpdateScrollController();
-  SetGLViewPortSize(mGLViewPortSize.width, mGLViewPortSize.height);
+  if (mCompositor)
+    mCompositor->SetSurfaceSize(mGLViewPortSize.width, mGLViewPortSize.height);
 }
 
 void
@@ -598,6 +599,7 @@ EmbedLiteViewThreadParent::SetGLViewPortSize(int width, int height)
   if (mCompositor) {
     mCompositor->SetSurfaceSize(width, height);
   }
+  SendSetGLViewSize(mGLViewPortSize);
 }
 
 void
