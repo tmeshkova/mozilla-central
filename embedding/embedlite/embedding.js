@@ -65,5 +65,12 @@ pref("media.gstreamer.enabled", true);
 // Disable X backend on GTK
 pref("gfx.xrender.enabled", false);
 pref("signon.debug", true);
-pref("embedlite.azpc.handle_default", true);
-pref("embedlite.azpc.post_json", true);
+pref("embedlite.azpc.handle.viewport", true);
+pref("embedlite.azpc.handle.singletap", true);
+pref("embedlite.azpc.handle.longtap", true);
+pref("embedlite.azpc.handle.scroll", true);
+pref("embedlite.azpc.json.viewport", false);
+pref("embedlite.azpc.json.singletap", false);
+pref("embedlite.azpc.json.doubletap", false);
+pref("embedlite.azpc.json.longtap", false);
+pref("embedlite.azpc.json.scroll", false);

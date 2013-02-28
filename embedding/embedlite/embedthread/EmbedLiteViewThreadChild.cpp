@@ -36,17 +36,52 @@ using namespace mozilla::widget;
 namespace mozilla {
 namespace embedlite {
 
+static struct {
+    bool viewport;
+    bool scroll;
+    bool singleTap;
+    bool doubleTap;
+    bool longTap;
+} sHandleDefaultAZPC;
+static struct {
+    bool viewport;
+    bool scroll;
+    bool singleTap;
+    bool doubleTap;
+    bool longTap;
+} sPostAZPCAsJson;
+
+static void ReadAZPCPrefs()
+{
+  // Init default azpc notifications behavior
+  Preferences::AddBoolVarCache(&sHandleDefaultAZPC.viewport, "embedlite.azpc.handle.viewport", true);
+  Preferences::AddBoolVarCache(&sHandleDefaultAZPC.singleTap, "embedlite.azpc.handle.singletap", true);
+  Preferences::AddBoolVarCache(&sHandleDefaultAZPC.doubleTap, "embedlite.azpc.handle.doubletap", true);
+  Preferences::AddBoolVarCache(&sHandleDefaultAZPC.longTap, "embedlite.azpc.handle.longtap", true);
+  Preferences::AddBoolVarCache(&sHandleDefaultAZPC.scroll, "embedlite.azpc.handle.scroll", true);
+
+  Preferences::AddBoolVarCache(&sPostAZPCAsJson.viewport, "embedlite.azpc.json.viewport", false);
+  Preferences::AddBoolVarCache(&sPostAZPCAsJson.singleTap, "embedlite.azpc.json.singletap", false);
+  Preferences::AddBoolVarCache(&sPostAZPCAsJson.doubleTap, "embedlite.azpc.json.doubletap", false);
+  Preferences::AddBoolVarCache(&sPostAZPCAsJson.longTap, "embedlite.azpc.json.longtap", false);
+  Preferences::AddBoolVarCache(&sPostAZPCAsJson.scroll, "embedlite.azpc.json.scroll", false);
+}
+
 EmbedLiteViewThreadChild::EmbedLiteViewThreadChild(const uint32_t& aId, const uint32_t& parentId)
   : mId(aId)
   , mOuterId(0)
   , mViewSize(0, 0)
   , mDispatchSynthMouseEvents(true)
   , mIMEComposing(false)
-  , mHandleDefaultAZPC(true)
-  , mPostAZPCAsJson(true)
 {
   LOGT("id:%u, parentID:%u", aId, parentId);
   AddRef();
+  // Init default prefs
+  static bool sPrefInitialized = false;
+  if (!sPrefInitialized) {
+    sPrefInitialized = true;
+    ReadAZPCPrefs();
+  }
   MessageLoop::current()->
   PostTask(FROM_HERE,
            NewRunnableMethod(this,
@@ -100,8 +135,6 @@ EmbedLiteViewThreadChild::InitGeckoWindow(const uint32_t& parentId)
     return;
   }
 
-  mHandleDefaultAZPC = Preferences::GetBool("embedlite.azpc.handle_default", mHandleDefaultAZPC);
-  mPostAZPCAsJson = Preferences::GetBool("embedlite.azpc.post_json", mPostAZPCAsJson);
 
   nsCOMPtr<nsIBaseWindow> baseWindow = do_QueryInterface(mWebBrowser, &rv);
   if (NS_FAILED(rv)) {
@@ -438,7 +471,7 @@ EmbedLiteViewThreadChild::RecvAsyncScrollDOMEvent(const gfxRect& contentRect,
     mControllerListeners[i]->SendAsyncScrollDOMEvent(rect, size);
   }
 
-  if (mPostAZPCAsJson) {
+  if (sPostAZPCAsJson.scroll) {
     nsString data;
     data.AppendPrintf("{ \"contentRect\" : { \"x\" : %f, \"y\" : %f", contentRect.x, contentRect.y);
     data.AppendPrintf(", \"width\" : %f, \"height\" : %f", contentRect.width, contentRect.height);
@@ -460,7 +493,7 @@ EmbedLiteViewThreadChild::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
     mControllerListeners[i]->RequestContentRepaint(aFrameMetrics);
   }
 
-  if (mPostAZPCAsJson) {
+  if (sPostAZPCAsJson.viewport) {
     nsString data;
     gfxSize resolution = AsyncPanZoomController::CalculateResolution(aFrameMetrics);
     data.AppendPrintf("{ \"x\" : %d", NS_lround(aFrameMetrics.mScrollOffset.x));
@@ -497,7 +530,7 @@ EmbedLiteViewThreadChild::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
   }
 
   bool ret = false;
-  if (mHandleDefaultAZPC) {
+  if (sHandleDefaultAZPC.viewport) {
     ret = mHelper->RecvUpdateFrame(aFrameMetrics);
   }
 
@@ -515,7 +548,7 @@ EmbedLiteViewThreadChild::RecvHandleDoubleTap(const nsIntPoint& aPoint)
     mControllerListeners[i]->HandleDoubleTap(aPoint);
   }
 
-  if (mPostAZPCAsJson) {
+  if (sPostAZPCAsJson.doubleTap) {
     nsString data;
     data.AppendPrintf("{ \"x\" : %d, \"y\" : %d }", aPoint.x, aPoint.y);
     mHelper->RecvAsyncMessage(NS_LITERAL_STRING("Gesture:DoubleTap"), data);
@@ -531,13 +564,13 @@ EmbedLiteViewThreadChild::RecvHandleSingleTap(const nsIntPoint& aPoint)
     mControllerListeners[i]->HandleSingleTap(aPoint);
   }
 
-  if (mPostAZPCAsJson) {
+  if (sPostAZPCAsJson.singleTap) {
     nsString data;
     data.AppendPrintf("{ \"x\" : %d, \"y\" : %d }", aPoint.x, aPoint.y);
     mHelper->RecvAsyncMessage(NS_LITERAL_STRING("Gesture:SingleTap"), data);
   }
 
-  if (mHandleDefaultAZPC) {
+  if (sHandleDefaultAZPC.singleTap) {
     RecvMouseEvent(NS_LITERAL_STRING("mousemove"), aPoint.x, aPoint.y, 0, 1, 0, false);
     RecvMouseEvent(NS_LITERAL_STRING("mousedown"), aPoint.x, aPoint.y, 0, 1, 0, false);
     RecvMouseEvent(NS_LITERAL_STRING("mouseup"), aPoint.x, aPoint.y, 0, 1, 0, false);
@@ -553,13 +586,13 @@ EmbedLiteViewThreadChild::RecvHandleLongTap(const nsIntPoint& aPoint)
     mControllerListeners[i]->HandleLongTap(aPoint);
   }
 
-  if (mPostAZPCAsJson) {
+  if (sPostAZPCAsJson.longTap) {
     nsString data;
     data.AppendPrintf("{ \"x\" : %d, \"y\" : %d }", aPoint.x, aPoint.y);
     mHelper->RecvAsyncMessage(NS_LITERAL_STRING("Gesture:LongTap"), data);
   }
 
-  if (mHandleDefaultAZPC) {
+  if (sHandleDefaultAZPC.longTap) {
     RecvMouseEvent(NS_LITERAL_STRING("contextmenu"), aPoint.x, aPoint.y,
                    2 /* Right button */,
                    1 /* Click count */,
