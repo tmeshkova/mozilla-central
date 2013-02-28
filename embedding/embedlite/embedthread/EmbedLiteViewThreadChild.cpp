@@ -42,6 +42,8 @@ EmbedLiteViewThreadChild::EmbedLiteViewThreadChild(const uint32_t& aId, const ui
   , mViewSize(0, 0)
   , mDispatchSynthMouseEvents(true)
   , mIMEComposing(false)
+  , mHandleDefaultAZPC(true)
+  , mPostAZPCAsJson(true)
 {
   LOGT("id:%u, parentID:%u", aId, parentId);
   AddRef();
@@ -97,6 +99,9 @@ EmbedLiteViewThreadChild::InitGeckoWindow(const uint32_t& parentId)
   if (NS_FAILED(rv)) {
     return;
   }
+
+  mHandleDefaultAZPC = Preferences::GetBool("embedlite.azpc.handle_default", mHandleDefaultAZPC);
+  mPostAZPCAsJson = Preferences::GetBool("embedlite.azpc.post_json", mPostAZPCAsJson);
 
   nsCOMPtr<nsIBaseWindow> baseWindow = do_QueryInterface(mWebBrowser, &rv);
   if (NS_FAILED(rv)) {
@@ -433,6 +438,14 @@ EmbedLiteViewThreadChild::RecvAsyncScrollDOMEvent(const gfxRect& contentRect,
     mControllerListeners[i]->SendAsyncScrollDOMEvent(rect, size);
   }
 
+  if (mPostAZPCAsJson) {
+    nsString data;
+    data.AppendPrintf("{ \"contentRect\" : { \"x\" : %f, \"y\" : %f", contentRect.x, contentRect.y);
+    data.AppendPrintf(", \"width\" : %f, \"height\" : %f", contentRect.width, contentRect.height);
+    data.AppendPrintf("}, \"scrollSize\" : { \"width\" : %f, \"height\" : %f }}", scrollSize.width, scrollSize.height);
+    mHelper->RecvAsyncMessage(NS_LITERAL_STRING("AZPC:ScrollDOMEvent"), data);
+  }
+
   return true;
 }
 
@@ -447,7 +460,46 @@ EmbedLiteViewThreadChild::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
     mControllerListeners[i]->RequestContentRepaint(aFrameMetrics);
   }
 
-  bool ret = mHelper->RecvUpdateFrame(aFrameMetrics);
+  if (mPostAZPCAsJson) {
+    nsString data;
+    gfxSize resolution = AsyncPanZoomController::CalculateResolution(aFrameMetrics);
+    data.AppendPrintf("{ \"x\" : %d", NS_lround(aFrameMetrics.mScrollOffset.x));
+    data.AppendPrintf(", \"y\" : %d", NS_lround(aFrameMetrics.mScrollOffset.y));
+    data.AppendPrintf(", \"viewport\" : ");
+    data.AppendPrintf("{ \"width\" : %f", aFrameMetrics.mViewport.width);
+    data.AppendPrintf(", \"height\" : %f", aFrameMetrics.mViewport.height);
+    data.AppendPrintf(" }");
+    data.AppendPrintf(", \"displayPort\" : ");
+    data.AppendPrintf("{ \"x\" : %f", aFrameMetrics.mDisplayPort.x);
+    data.AppendPrintf(", \"y\" : %f", aFrameMetrics.mDisplayPort.y);
+    data.AppendPrintf(", \"width\" : %f", aFrameMetrics.mDisplayPort.width);
+    data.AppendPrintf(", \"height\" : %f", aFrameMetrics.mDisplayPort.height);
+    data.AppendPrintf(" }");
+    data.AppendPrintf(", \"compositionBounds\" : ");
+    data.AppendPrintf("{ \"x\" : %d", aFrameMetrics.mCompositionBounds.x);
+    data.AppendPrintf(", \"y\" : %d", aFrameMetrics.mCompositionBounds.y);
+    data.AppendPrintf(", \"width\" : %d", aFrameMetrics.mCompositionBounds.width);
+    data.AppendPrintf(", \"height\" : %d", aFrameMetrics.mCompositionBounds.height);
+    data.AppendPrintf(" }");
+    data.AppendPrintf(", \"cssPageRect\" : ");
+    data.AppendPrintf("{ \"x\" : %f", aFrameMetrics.mScrollableRect.x);
+    data.AppendPrintf(", \"y\" : %f", aFrameMetrics.mScrollableRect.y);
+    data.AppendPrintf(", \"width\" : %f", aFrameMetrics.mScrollableRect.width);
+    data.AppendPrintf(", \"height\" : %f", aFrameMetrics.mScrollableRect.height);
+    data.AppendPrintf(" }");
+    data.AppendPrintf(", \"resolution\" : ");
+    data.AppendPrintf("{ \"width\" : %f", resolution.width);
+    data.AppendPrintf(", \"height\" : %f", resolution.height);
+    data.AppendPrintf(" }");
+    data.AppendPrintf(" }");
+
+    mHelper->RecvAsyncMessage(NS_LITERAL_STRING("Viewport:Change"), data);
+  }
+
+  bool ret = false;
+  if (mHandleDefaultAZPC) {
+    ret = mHelper->RecvUpdateFrame(aFrameMetrics);
+  }
 
   return ret;
 }
@@ -459,16 +511,13 @@ EmbedLiteViewThreadChild::RecvHandleDoubleTap(const nsIntPoint& aPoint)
     return true;
   }
 
-  nsString data;
-  data.AppendPrintf("{ \"x\" : %d", aPoint.x);
-  data.AppendPrintf(", \"y\" : %d", aPoint.y);
-  data.AppendPrintf(" }");
-
   for (unsigned int i = 0; i < mControllerListeners.Length(); i++) {
     mControllerListeners[i]->HandleDoubleTap(aPoint);
   }
 
-  if (getenv("LOAD_BR_CHILD")) {
+  if (mPostAZPCAsJson) {
+    nsString data;
+    data.AppendPrintf("{ \"x\" : %d, \"y\" : %d }", aPoint.x, aPoint.y);
     mHelper->RecvAsyncMessage(NS_LITERAL_STRING("Gesture:DoubleTap"), data);
   }
 
@@ -482,9 +531,17 @@ EmbedLiteViewThreadChild::RecvHandleSingleTap(const nsIntPoint& aPoint)
     mControllerListeners[i]->HandleSingleTap(aPoint);
   }
 
-  RecvMouseEvent(NS_LITERAL_STRING("mousemove"), aPoint.x, aPoint.y, 0, 1, 0, false);
-  RecvMouseEvent(NS_LITERAL_STRING("mousedown"), aPoint.x, aPoint.y, 0, 1, 0, false);
-  RecvMouseEvent(NS_LITERAL_STRING("mouseup"), aPoint.x, aPoint.y, 0, 1, 0, false);
+  if (mPostAZPCAsJson) {
+    nsString data;
+    data.AppendPrintf("{ \"x\" : %d, \"y\" : %d }", aPoint.x, aPoint.y);
+    mHelper->RecvAsyncMessage(NS_LITERAL_STRING("Gesture:SingleTap"), data);
+  }
+
+  if (mHandleDefaultAZPC) {
+    RecvMouseEvent(NS_LITERAL_STRING("mousemove"), aPoint.x, aPoint.y, 0, 1, 0, false);
+    RecvMouseEvent(NS_LITERAL_STRING("mousedown"), aPoint.x, aPoint.y, 0, 1, 0, false);
+    RecvMouseEvent(NS_LITERAL_STRING("mouseup"), aPoint.x, aPoint.y, 0, 1, 0, false);
+  }
 
   return true;
 }
@@ -496,11 +553,19 @@ EmbedLiteViewThreadChild::RecvHandleLongTap(const nsIntPoint& aPoint)
     mControllerListeners[i]->HandleLongTap(aPoint);
   }
 
-  RecvMouseEvent(NS_LITERAL_STRING("contextmenu"), aPoint.x, aPoint.y,
-                 2 /* Right button */,
-                 1 /* Click count */,
-                 0 /* Modifiers */,
-                 false /* Ignore root scroll frame */);
+  if (mPostAZPCAsJson) {
+    nsString data;
+    data.AppendPrintf("{ \"x\" : %d, \"y\" : %d }", aPoint.x, aPoint.y);
+    mHelper->RecvAsyncMessage(NS_LITERAL_STRING("Gesture:LongTap"), data);
+  }
+
+  if (mHandleDefaultAZPC) {
+    RecvMouseEvent(NS_LITERAL_STRING("contextmenu"), aPoint.x, aPoint.y,
+                   2 /* Right button */,
+                   1 /* Click count */,
+                   0 /* Modifiers */,
+                   false /* Ignore root scroll frame */);
+  }
 
   return true;
 }
@@ -659,44 +724,44 @@ EmbedLiteViewThreadChild::RecvInputDataTouchMoveEvent(const mozilla::MultiTouchI
   return RecvInputDataTouchEvent(aData, res, diff);
 }
 
-/* void onLocationChanged (in string aLocation) */
-NS_IMETHODIMP EmbedLiteViewThreadChild::OnLocationChanged(const char* aLocation, bool aCanGoBack, bool aCanGoForward)
+NS_IMETHODIMP
+EmbedLiteViewThreadChild::OnLocationChanged(const char* aLocation, bool aCanGoBack, bool aCanGoForward)
 {
   return SendOnLocationChanged(nsDependentCString(aLocation), aCanGoBack, aCanGoForward) ? NS_OK : NS_ERROR_FAILURE;
 }
 
-/* void onLoadStarted (in string aLocation) */
-NS_IMETHODIMP EmbedLiteViewThreadChild::OnLoadStarted(const char* aLocation)
+NS_IMETHODIMP
+EmbedLiteViewThreadChild::OnLoadStarted(const char* aLocation)
 {
   return SendOnLoadStarted(nsDependentCString(aLocation)) ? NS_OK : NS_ERROR_FAILURE;
 }
 
-/* void onLoadFinished () */
-NS_IMETHODIMP EmbedLiteViewThreadChild::OnLoadFinished()
+NS_IMETHODIMP
+EmbedLiteViewThreadChild::OnLoadFinished()
 {
   return SendOnLoadFinished() ? NS_OK : NS_ERROR_FAILURE;
 }
 
-/* void onLoadRedirect () */
-NS_IMETHODIMP EmbedLiteViewThreadChild::OnLoadRedirect()
+NS_IMETHODIMP
+EmbedLiteViewThreadChild::OnLoadRedirect()
 {
   return SendOnLoadRedirect() ? NS_OK : NS_ERROR_FAILURE;
 }
 
-/* void onLoadProgress (in int32_t aProgress) */
-NS_IMETHODIMP EmbedLiteViewThreadChild::OnLoadProgress(int32_t aProgress, int32_t aCurTotal, int32_t aMaxTotal)
+NS_IMETHODIMP
+EmbedLiteViewThreadChild::OnLoadProgress(int32_t aProgress, int32_t aCurTotal, int32_t aMaxTotal)
 {
   return SendOnLoadProgress(aProgress, aCurTotal, aMaxTotal) ? NS_OK : NS_ERROR_FAILURE;
 }
 
-/* void onSecurityChanged (in string aStatus, in uint32_t aState) */
-NS_IMETHODIMP EmbedLiteViewThreadChild::OnSecurityChanged(const char* aStatus, uint32_t aState)
+NS_IMETHODIMP
+EmbedLiteViewThreadChild::OnSecurityChanged(const char* aStatus, uint32_t aState)
 {
   return SendOnSecurityChanged(nsDependentCString(aStatus), aState) ? NS_OK : NS_ERROR_FAILURE;
 }
 
-/* void onFirstPaint (in int32_t aX, in int32_t aY) */
-NS_IMETHODIMP EmbedLiteViewThreadChild::OnFirstPaint(int32_t aX, int32_t aY)
+NS_IMETHODIMP
+EmbedLiteViewThreadChild::OnFirstPaint(int32_t aX, int32_t aY)
 {
   nsresult rv = NS_OK;
   nsCOMPtr <nsIDOMWindow> window;
@@ -721,19 +786,20 @@ NS_IMETHODIMP EmbedLiteViewThreadChild::OnFirstPaint(int32_t aX, int32_t aY)
   return SendOnFirstPaint(aX, aY) ? NS_OK : NS_ERROR_FAILURE;
 }
 
-/* void onScrolledAreaChanged (in uint32_t aWidth, in uint32_t aHeight) */
-NS_IMETHODIMP EmbedLiteViewThreadChild::OnScrolledAreaChanged(uint32_t aWidth, uint32_t aHeight)
+NS_IMETHODIMP
+EmbedLiteViewThreadChild::OnScrolledAreaChanged(uint32_t aWidth, uint32_t aHeight)
 {
   return SendOnScrolledAreaChanged(aWidth, aHeight) ? NS_OK : NS_ERROR_FAILURE;
 }
 
-/* void onScrollChanged (in int32_t offSetX, in int32_t offSetY) */
-NS_IMETHODIMP EmbedLiteViewThreadChild::OnScrollChanged(int32_t offSetX, int32_t offSetY)
+NS_IMETHODIMP
+EmbedLiteViewThreadChild::OnScrollChanged(int32_t offSetX, int32_t offSetY)
 {
   return SendOnScrollChanged(offSetX, offSetY) ? NS_OK : NS_ERROR_FAILURE;
 }
 
-NS_IMETHODIMP EmbedLiteViewThreadChild::OnUpdateDisplayPort()
+NS_IMETHODIMP
+EmbedLiteViewThreadChild::OnUpdateDisplayPort()
 {
   LOGNI();
   return NS_OK;

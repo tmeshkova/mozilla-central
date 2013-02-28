@@ -58,7 +58,6 @@ pref("gfx.axis.max_event_acceleration", "12.0f");
 pref("gfx.axis.fling_friction", "0.00245f");
 pref("gfx.azpc.min_skate_speed", "10.0f");
 pref("gfx.azpc.tweak_fling_velocity", false);
-pref("embedlite.handle_viewport", false);
 pref("ui.dragThresholdX", 25);
 pref("ui.dragThresholdY", 25);
 pref("embedlite.dispatch_mouse_events", false); // Will dispatch mouse events if page using them
@@ -66,3 +65,5 @@ pref("media.gstreamer.enabled", true);
 // Disable X backend on GTK
 pref("gfx.xrender.enabled", false);
 pref("signon.debug", true);
+pref("embedlite.azpc.handle_default", true);
+pref("embedlite.azpc.post_json", true);

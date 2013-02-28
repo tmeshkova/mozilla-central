@@ -127,6 +127,8 @@ private:
 
   nsDataHashtable<nsStringHashKey, bool/*start with key*/> mRegisteredMessages;
   nsTArray<RefPtr<mozilla::layers::GeckoContentController>> mControllerListeners;
+  bool mHandleDefaultAZPC;
+  bool mPostAZPCAsJson;
 
   DISALLOW_EVIL_CONSTRUCTORS(EmbedLiteViewThreadChild);
 };
