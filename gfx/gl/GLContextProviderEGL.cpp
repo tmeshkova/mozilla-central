@@ -2027,16 +2027,6 @@ CreateSurfaceForWindow(nsIWidget *aWidget, EGLConfig config)
 }
 #endif
 
-#ifdef MOZ_WIDGET_QT
-static void
-GetCapsFromQGLFormat(const QGLFormat& aFormat, mozilla::gfx::SurfaceCaps& drawCaps)
-{
-    drawCaps.alpha = aFormat.rgba();
-    drawCaps.depth = aFormat.depth();
-    drawCaps.stencil = aFormat.stencil();
-}
-#endif
-
 already_AddRefed<GLContext>
 GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
 {
@@ -2046,10 +2036,9 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
 
     bool doubleBuffered = true;
 
+    bool hasNativeContext = aWidget->HasGLContext();
     EGLContext eglContext = sEGLLibrary.fGetCurrentContext();
-    if (aWidget->HasGLContext() && eglContext) {
-        // HasGLContext might change current context to real one, so get it here again
-        eglContext = sEGLLibrary.fGetCurrentContext();
+    if (hasNativeContext && eglContext) {
         int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
         void* platformContext = eglContext;
         SurfaceCaps caps = SurfaceCaps::Any();
@@ -2058,10 +2047,13 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
         if (context && context->device()) {
             depth = context->device()->depth();
         }
-        doubleBuffered = context->format().doubleBuffer();
+        const QGLFormat& format = context->format();
+        doubleBuffered = format.doubleBuffer();
         platformContext = context;
         caps.bpp16 = depth == 16 ? true : false;
-        GetCapsFromQGLFormat(context->format(), caps);
+        caps.alpha = format.rgba();
+        caps.depth = format.depth();
+        caps.stencil = format.stencil();
 #endif
         EGLConfig config = EGL_NO_CONFIG;
         EGLSurface surface = sEGLLibrary.fGetCurrentSurface(LOCAL_EGL_DRAW);
@@ -2231,8 +2223,10 @@ CreateEGLSurfaceForXSurface(gfxASurface* aSurface, EGLConfig* aConfig)
     if (!sEGLLibrary.fChooseConfig(EGL_DISPLAY(),
                                    sEGLLibrary.HasKHRLockSurface() ?
                                        pixmap_lock_config : pixmap_config,
-                                   configs, numConfigs, &numConfigs) || numConfigs == 0) {
-        NS_WARNING("Failed to choose EGLConfig!");
+                                   configs, numConfigs, &numConfigs)
+        || numConfigs == 0)
+    {
+        NS_WARNING("No EGL Config for pixmap!");
         return nullptr;
     }
 
@@ -2246,6 +2240,7 @@ CreateEGLSurfaceForXSurface(gfxASurface* aSurface, EGLConfig* aConfig)
             surface = sEGLLibrary.fCreatePixmapSurface(EGL_DISPLAY(), configs[i],
                                                        (EGLNativePixmapType)xsurface->XDrawable(),
                                                        pixmap_config_rgba);
+
         if (surface != EGL_NO_SURFACE)
             break;
     }
@@ -2302,9 +2297,9 @@ GLContextEGL::CreateEGLPixmapOffscreenContext(const gfxIntSize& size)
     GLContextEGL* shareContext = GetGlobalContextEGL();
     SurfaceCaps dummyCaps = SurfaceCaps::Any();
     nsRefPtr<GLContextEGL> glContext =
-    GLContextEGL::CreateGLContext(dummyCaps,
-                                  shareContext, true,
-                                  config, surface);
+        GLContextEGL::CreateGLContext(dummyCaps,
+                                      shareContext, true,
+                                      config, surface);
     if (!glContext) {
         NS_WARNING("Failed to create GLContext from XSurface");
         sEGLLibrary.fDestroySurface(EGL_DISPLAY(), surface);
