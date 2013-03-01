@@ -56,6 +56,9 @@ public:
   uint32_t GetID() { return mId; }
   gfxSize GetGLViewSize() { return mGLViewSize; }
 
+  virtual bool RecvAsyncMessage(const nsString& aMessage,
+                                const nsString& aData);
+
 protected:
   virtual void ActorDestroy(ActorDestroyReason aWhy) MOZ_OVERRIDE;
   virtual bool RecvDestroy();
@@ -90,8 +93,6 @@ protected:
   virtual bool RecvInputDataTouchEvent(const mozilla::MultiTouchInput&, const gfxSize& res, const gfxPoint& diff);
   virtual bool RecvInputDataTouchMoveEvent(const mozilla::MultiTouchInput&, const gfxSize& res, const gfxPoint& diff);
 
-  virtual bool RecvAsyncMessage(const nsString& aMessage,
-                                const nsString& aData);
   virtual bool
   RecvAddMessageListener(const nsCString&);
   virtual bool

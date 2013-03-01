@@ -529,7 +529,7 @@ EmbedLiteViewThreadChild::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
     mHelper->RecvAsyncMessage(NS_LITERAL_STRING("Viewport:Change"), data);
   }
 
-  bool ret = false;
+  bool ret = true;
   if (sHandleDefaultAZPC.viewport) {
     ret = mHelper->RecvUpdateFrame(aFrameMetrics);
   }
