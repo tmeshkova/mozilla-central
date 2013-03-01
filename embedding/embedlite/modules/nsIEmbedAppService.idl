@@ -36,17 +36,28 @@ interface nsIEmbedMessageListener : nsISupports
 [scriptable, uuid(3c61976a-710b-11e2-a4a0-1354c757920d)]
 interface nsIEmbedAppService : nsISupports
 {
+    // Get Embed View ID by DOMWindow
+    void getIDByWindow(in nsIDOMWindow aWin, out uint32_t aId);
+    // Send JSON Message to Embed View with related View ID
     void sendAsyncMessage(in uint32_t aId, in wstring messageName, in wstring message);
     void sendSyncMessage(in uint32_t aId, in wstring messageName, in wstring message,
                          out AString retval);
-    void getIDByWindow(in nsIDOMWindow aWin, out uint32_t aId);
+    // Subscribe to specific JSON Message which EmbedView posting to content from UI
     void addMessageListener(in string name, in nsIEmbedMessageListener listener);
+    // Un Subscribe from specific JSON Message which EmbedView posting to content from UI
     void removeMessageListener(in string name, in nsIEmbedMessageListener listener);
+    // Push Native secure JSContext into stuck in order to avoid security restrictions
+    // in case if XPCOM api was executed from non priveledged script, like prompt calls
     void enterSecureJSContext();
     void leaveSecureJSContext();
+    // Add listener for AZPC Gecko notifications (single/long/double tap..)
     [noscript] void addContentListener(in uint32_t aId, in GeckoContentController listener);
     [noscript] void removeContentListener(in uint32_t aId, in GeckoContentController listener);
+    // Get EmbedLite nsIWebBrowser by unique ID
     void getBrowserByID(in uint32_t aId, out nsIWebBrowser outBrowser);
+
+    // Simple interface which allow to send JSON message from XPCOM C++ components to related JS Frame script which handle this message
+    void sendAsyncMessageLocal(in uint32_t aId, in wstring messageName, in wstring message);
 
     // AZPC Interface
     void getCompositedRectInCSS(in nsConstFrameMetrics aMetrics, out float aX, out float aY, out float aWidth, out float aHeight);

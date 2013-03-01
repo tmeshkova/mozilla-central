@@ -289,3 +289,12 @@ EmbedLiteAppService::GetCompositedRectInCSS(const mozilla::layers::FrameMetrics&
 
   return NS_OK;
 }
+
+NS_IMETHODIMP
+EmbedLiteAppService::SendAsyncMessageLocal(uint32_t aId, const PRUnichar* messageName, const PRUnichar* message)
+{
+  EmbedLiteViewThreadChild* view = sGetViewById(aId);
+  NS_ENSURE_TRUE(view, NS_ERROR_FAILURE);
+  view->RecvAsyncMessage(nsDependentString(messageName), nsDependentString(message));
+  return NS_OK;
+}
