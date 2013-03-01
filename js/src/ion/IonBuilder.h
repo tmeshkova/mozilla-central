@@ -441,7 +441,7 @@ class IonBuilder : public MIRGenerator
     InliningStatus inlineUnsafeSetElement(CallInfo &callInfo);
     bool inlineUnsafeSetDenseArrayElement(CallInfo &callInfo, uint32_t base);
     bool inlineUnsafeSetTypedArrayElement(CallInfo &callInfo, uint32_t base, int arrayType);
-    InliningStatus inlineForceSequentialOrInParallelSection(CallInfo &callInfo);
+    InliningStatus inlineShouldForceSequentialOrInParallelSection(CallInfo &callInfo);
     InliningStatus inlineNewDenseArray(CallInfo &callInfo);
     InliningStatus inlineNewDenseArrayForSequentialExecution(CallInfo &callInfo);
     InliningStatus inlineNewDenseArrayForParallelExecution(CallInfo &callInfo);
@@ -502,7 +502,7 @@ class IonBuilder : public MIRGenerator
 
     void clearForBackEnd();
 
-    UnrootedScript script() const { return script_.get(); }
+    JSScript *script() const { return script_.get(); }
 
     CodeGenerator *backgroundCodegen() const { return backgroundCodegen_; }
     void setBackgroundCodegen(CodeGenerator *codegen) { backgroundCodegen_ = codegen; }

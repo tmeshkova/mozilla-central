@@ -1687,10 +1687,40 @@ CodeGenerator::visitApplyArgsGeneric(LApplyArgsGeneric *apply)
     return true;
 }
 
+bool
+CodeGenerator::visitGetDynamicName(LGetDynamicName *lir)
+{
+    Register scopeChain = ToRegister(lir->getScopeChain());
+    Register name = ToRegister(lir->getName());
+    Register temp1 = ToRegister(lir->temp1());
+    Register temp2 = ToRegister(lir->temp2());
+    Register temp3 = ToRegister(lir->temp3());
+
+    masm.loadJSContext(temp3);
+
+    /* Make space for the outparam. */
+    masm.adjustStack(-int32_t(sizeof(Value)));
+    masm.movePtr(StackPointer, temp2);
+
+    masm.setupUnalignedABICall(4, temp1);
+    masm.passABIArg(temp3);
+    masm.passABIArg(scopeChain);
+    masm.passABIArg(name);
+    masm.passABIArg(temp2);
+    masm.callWithABI(JS_FUNC_TO_DATA_PTR(void *, GetDynamicName));
+
+    const ValueOperand out = ToOutValue(lir);
+
+    masm.loadValue(Address(StackPointer, 0), out);
+    masm.adjustStack(sizeof(Value));
+
+    Assembler::Condition cond = masm.testUndefined(Assembler::Equal, out);
+    return bailoutIf(cond, lir->snapshot());
+}
+
 typedef bool (*DirectEvalFn)(JSContext *, HandleObject, HandleScript, HandleValue, HandleString,
                              MutableHandleValue);
-static const VMFunction DirectEvalInfo =
-    FunctionInfo<DirectEvalFn>(DirectEvalFromIon);
+static const VMFunction DirectEvalInfo = FunctionInfo<DirectEvalFn>(DirectEvalFromIon);
 
 bool
 CodeGenerator::visitCallDirectEval(LCallDirectEval *lir)
@@ -4392,8 +4422,6 @@ CodeGenerator::link()
 
     if (executionMode == ParallelExecution)
         ionScript->zeroParallelInvalidatedScripts();
-
-    linkAbsoluteLabels();
 
     // The correct state for prebarriers is unknown until the end of compilation,
     // since a GC can occur during code generation. All barriers are emitted

@@ -17,12 +17,10 @@
 
 interface Attr;
 interface Comment;
-interface NodeIterator;
 interface Range;
 interface StyleSheetList;
 interface Touch;
 interface TouchList;
-interface TreeWalker;
 interface WindowProxy;
 interface nsISupports;
 
@@ -203,6 +201,9 @@ partial interface Document {
    */
   void mozSetImageElement(DOMString aImageElementId,
                           Element? aImageElement);
+
+  [ChromeOnly]
+  readonly attribute URI? documentURIObject;
 
 };
 

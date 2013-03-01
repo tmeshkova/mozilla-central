@@ -52,7 +52,9 @@ static float gAccelerationMultiplier = 1.125f;
 static float gFlingStoppedThreshold = 0.01f;
 
 /**
- * Maximum size of velocity queue
+ * Maximum size of velocity queue. The queue contains last N velocity records.
+ * On touch end we calculate the average velocity in order to compensate
+ * touch/mouse drivers misbehaviour.
  */
 static int gMaxVelocityQueueSize = 5;
 
@@ -63,7 +65,7 @@ static void ReadAxisPrefs()
   Preferences::AddFloatVarCache(&gVelocityThreshold, "gfx.axis.velocity_threshold", gVelocityThreshold);
   Preferences::AddFloatVarCache(&gAccelerationMultiplier, "gfx.axis.acceleration_multiplier", gAccelerationMultiplier);
   Preferences::AddFloatVarCache(&gFlingStoppedThreshold, "gfx.axis.fling_stopped_threshold", gFlingStoppedThreshold);
-  Preferences::AddIntVarCache(&gMaxVelocityQueueSize, "gfx.max_velocity_queue", gMaxVelocityQueueSize);
+  Preferences::AddIntVarCache(&gMaxVelocityQueueSize, "gfx.axis.max_velocity_queue_size", gMaxVelocityQueueSize);
 }
 
 class ReadAxisPref MOZ_FINAL : public nsRunnable {
@@ -124,6 +126,12 @@ void Axis::UpdateWithTouchAtDevicePoint(int32_t aPos, const TimeDuration& aTimeD
   }
   mLastPos = mPos;
   mPos = aPos;
+
+  // Keep last gMaxVelocityQueueSize or less velocities in the queue.
+  mVelocityQueue.AppendElement(mVelocity);
+  if (mVelocityQueue.Length() > gMaxVelocityQueueSize) {
+    mVelocityQueue.RemoveElementAt(0);
+  }
 }
 
 void Axis::StartTouch(int32_t aPos) {
@@ -162,12 +170,14 @@ float Axis::PanDistance() {
 
 void Axis::EndTouch() {
   mAcceleration++;
-  int count = mVelocityQueue.size();
+
+  // Calculate the mean velocity and empty the queue.
+  int count = mVelocityQueue.Length();
   if (count) {
     mVelocity = 0;
-    while (!mVelocityQueue.empty()) {
-      mVelocity += mVelocityQueue.front();
-      mVelocityQueue.pop();
+    while (!mVelocityQueue.IsEmpty()) {
+      mVelocity += mVelocityQueue[0];
+      mVelocityQueue.RemoveElementAt(0);
     }
     mVelocity /= count;
   }
@@ -176,8 +186,9 @@ void Axis::EndTouch() {
 void Axis::CancelTouch() {
   mVelocity = 0.0f;
   mAcceleration = 0;
-  while (!mVelocityQueue.empty())
-    mVelocityQueue.pop();
+  while (!mVelocityQueue.IsEmpty()) {
+    mVelocityQueue.RemoveElementAt(0);
+  }
 }
 
 bool Axis::FlingApplyFrictionOrCancel(const TimeDuration& aDelta) {

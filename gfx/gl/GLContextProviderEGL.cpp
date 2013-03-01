@@ -553,7 +553,7 @@ public:
                                  EGL_NO_CONTEXT);
         if (!mSurface) {
 #ifdef MOZ_ANDROID_OMTC
-            mSurface = mozilla::AndroidBridge::Bridge()->ProvideEGLSurface(false);
+            mSurface = mozilla::AndroidBridge::Bridge()->ProvideEGLSurface();
             if (!mSurface) {
                 return false;
             }
@@ -2039,10 +2039,10 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
     bool hasNativeContext = aWidget->HasGLContext();
     EGLContext eglContext = sEGLLibrary.fGetCurrentContext();
     if (hasNativeContext && eglContext) {
-        int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
         void* platformContext = eglContext;
         SurfaceCaps caps = SurfaceCaps::Any();
 #ifdef MOZ_WIDGET_QT
+        int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
         QGLContext* context = const_cast<QGLContext*>(QGLContext::currentContext());
         if (context && context->device()) {
             depth = context->device()->depth();
@@ -2084,7 +2084,7 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
 
 #ifdef MOZ_ANDROID_OMTC
     mozilla::AndroidBridge::Bridge()->RegisterCompositor();
-    EGLSurface surface = mozilla::AndroidBridge::Bridge()->ProvideEGLSurface(true);
+    EGLSurface surface = mozilla::AndroidBridge::Bridge()->ProvideEGLSurface();
 #else
     EGLSurface surface = CreateSurfaceForWindow(aWidget, config);
 #endif

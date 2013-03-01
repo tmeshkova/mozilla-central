@@ -211,7 +211,6 @@
 @BINPATH@/components/dom_xbl.xpt
 @BINPATH@/components/dom_xpath.xpt
 @BINPATH@/components/dom_xul.xpt
-@BINPATH@/components/dom_loadsave.xpt
 @BINPATH@/components/downloads.xpt
 @BINPATH@/components/editor.xpt
 @BINPATH@/components/embed_base.xpt
@@ -349,8 +348,6 @@
 @BINPATH@/browser/components/DownloadsUI.js
 @BINPATH@/browser/components/BrowserPlaces.manifest
 @BINPATH@/components/BrowserPageThumbs.manifest
-@BINPATH@/browser/components/nsPrivateBrowsingServiceObsolete.manifest
-@BINPATH@/browser/components/nsPrivateBrowsingServiceObsolete.js
 @BINPATH@/components/SiteSpecificUserAgent.js
 @BINPATH@/components/SiteSpecificUserAgent.manifest
 @BINPATH@/components/toolkitsearch.manifest

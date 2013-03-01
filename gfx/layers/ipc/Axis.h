@@ -10,7 +10,7 @@
 #include "nsGUIEvent.h"
 #include "mozilla/TimeStamp.h"
 #include "mozilla/gfx/2D.h"
-#include <queue>
+#include "nsTArray.h"
 
 namespace mozilla {
 namespace layers {
@@ -186,7 +186,7 @@ protected:
   int32_t mAcceleration;
   int32_t mLastPos;
   AsyncPanZoomController* mAsyncPanZoomController;
-  std::queue<float> mVelocityQueue;
+  nsTArray<float> mVelocityQueue;
 };
 
 class AxisX : public Axis {

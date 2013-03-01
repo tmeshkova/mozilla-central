@@ -20,6 +20,7 @@ endif
 SHARED_LIBRARY_LIBS = \
     $(MOZ_OTS_LIBS) \
     $(QCMS_LIBS) \
+    $(MOZ_GRAPHITE_LIBS) \
     $(MOZ_HARFBUZZ_LIBS) \
     $(NULL)
 
@@ -29,10 +30,6 @@ endif
 
 ifdef MOZ_TREE_PIXMAN
 SHARED_LIBRARY_LIBS += $(MOZ_PIXMAN_LIBS)
-endif
-
-ifdef MOZ_GRAPHITE
-SHARED_LIBRARY_LIBS += $(MOZ_GRAPHITE_LIBS)
 endif
 
 ifdef MOZ_VORBIS
@@ -161,7 +158,7 @@ endif
 include $(topsrcdir)/config/rules.mk
 
 ifeq (WINNT,$(OS_TARGET))
-symbols.def: symbols.def.in
+symbols.def: symbols.def.in $(GLOBAL_DEPS)
 	$(PYTHON) $(topsrcdir)/config/Preprocessor.py $(ACDEFINES) $< > $@
 
 OS_LIBS += $(call EXPAND_LIBNAME, msimg32)

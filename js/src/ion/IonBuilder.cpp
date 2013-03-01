@@ -3031,9 +3031,7 @@ IonBuilder::addTypeBarrier(uint32_t i, CallInfo &callinfo, types::StackTypeSet *
     }
 
     while (excluded) {
-        if (excluded->target == calleeObs) {
-            JS_ASSERT(callerObs->hasType(excluded->type));
-
+        if (excluded->target == calleeObs && callerObs->hasType(excluded->type)) {
             if (excluded->type == types::Type::DoubleType() &&
                 calleeObs->hasType(types::Type::Int32Type())) {
                 // The double type also implies int32, so this implies that
@@ -3173,7 +3171,7 @@ IonBuilder::jsop_call_inline(HandleFunction callee, CallInfo &callInfo, MBasicBl
     LifoAlloc *alloc = GetIonContext()->temp->lifoAlloc();
     CompileInfo *info = alloc->new_<CompileInfo>(calleeScript.get(), callee,
                                                  (jsbytecode *)NULL, callInfo.constructing(),
-                                                 SequentialExecution);
+                                                 this->info().executionMode());
     if (!info)
         return false;
 
@@ -3237,14 +3235,12 @@ IonBuilder::makeInliningDecision(AutoObjectVector &targets)
     uint32_t totalSize = 0;
     uint32_t maxInlineDepth = js_IonOptions.maxInlineDepth;
     bool allFunctionsAreSmall = true;
-    RootedFunction target(cx);
-    RootedScript targetScript(cx);
     for (size_t i = 0; i < targets.length(); i++) {
-        target = targets[i]->toFunction();
+        JSFunction *target = targets[i]->toFunction();
         if (!target->isInterpreted())
             return false;
 
-        targetScript = target->nonLazyScript();
+        JSScript *targetScript = target->nonLazyScript();
         uint32_t calleeUses = targetScript->getUseCount();
 
         totalSize += targetScript->length;
@@ -3281,6 +3277,7 @@ IonBuilder::makeInliningDecision(AutoObjectVector &targets)
     JSOp op = JSOp(*pc);
     for (size_t i = 0; i < targets.length(); i++) {
         JSFunction *target = targets[i]->toFunction();
+        JSScript *targetScript = target->nonLazyScript();
 
         if (!canInlineTarget(target)) {
             IonSpew(IonSpew_Inlining, "Decided not to inline");
@@ -3870,13 +3867,14 @@ IonBuilder::createThisScripted(MDefinition *callee)
 JSObject *
 IonBuilder::getSingletonPrototype(JSFunction *target)
 {
-    if (!target->hasSingletonType())
+    if (!target || !target->hasSingletonType())
         return NULL;
-    if (target->getType(cx)->unknownProperties())
+    types::TypeObject *targetType = target->getType(cx);
+    if (targetType->unknownProperties())
         return NULL;
 
     jsid protoid = NameToId(cx->names().classPrototype);
-    types::HeapTypeSet *protoTypes = target->getType(cx)->getProperty(cx, protoid, false);
+    types::HeapTypeSet *protoTypes = targetType->getProperty(cx, protoid, false);
     if (!protoTypes)
         return NULL;
 
@@ -3950,8 +3948,11 @@ IonBuilder::anyFunctionIsCloneAtCallsite(types::StackTypeSet *funTypes)
 
     for (uint32_t i = 0; i < count; i++) {
         JSObject *obj = funTypes->getSingleObject(i);
-        if (obj->isFunction() && obj->toFunction()->isCloneAtCallsite())
+        if (obj->isFunction() && obj->toFunction()->isInterpreted() &&
+            obj->toFunction()->nonLazyScript()->shouldCloneAtCallsite)
+        {
             return true;
+        }
     }
     return false;
 }
@@ -4180,7 +4181,7 @@ IonBuilder::jsop_call(uint32_t argc, bool constructing)
     RootedScript scriptRoot(cx, script());
     for (uint32_t i = 0; i < originals.length(); i++) {
         fun = originals[i]->toFunction();
-        if (fun->isCloneAtCallsite()) {
+        if (fun->isInterpreted() && fun->nonLazyScript()->shouldCloneAtCallsite) {
             fun = CloneFunctionAtCallsite(cx, fun, scriptRoot, pc);
             if (!fun)
                 return false;
@@ -4265,6 +4266,8 @@ TestShouldDOMCall(JSContext *cx, types::TypeSet *inTypes, HandleFunction func,
                 continue;
 
             curType = curObj->getType(cx);
+            if (!curType)
+                return false;
         }
 
         JSObject *typeProto = curType->proto;
@@ -4295,6 +4298,8 @@ TestAreKnownDOMTypes(JSContext *cx, types::TypeSet *inTypes)
                 continue;
 
             curType = curObj->getType(cx);
+            if (!curType)
+                return false;
         }
 
         if (curType->unknownProperties())
@@ -4485,15 +4490,14 @@ IonBuilder::jsop_eval(uint32_t argc)
             return abort("Direct eval in global code");
 
         types::StackTypeSet *thisTypes = oracle->thisTypeSet(script());
-        if (!thisTypes) {
-            // The 'this' value for the outer and eval scripts must be the
-            // same. This is not guaranteed if a primitive string/number/etc.
-            // is passed through to the eval invoke as the primitive may be
-            // boxed into different objects if accessed via 'this'.
-            JSValueType type = thisTypes->getKnownTypeTag();
-            if (type != JSVAL_TYPE_OBJECT && type != JSVAL_TYPE_NULL && type != JSVAL_TYPE_UNDEFINED)
-                return abort("Direct eval from script with maybe-primitive 'this'");
-        }
+
+        // The 'this' value for the outer and eval scripts must be the
+        // same. This is not guaranteed if a primitive string/number/etc.
+        // is passed through to the eval invoke as the primitive may be
+        // boxed into different objects if accessed via 'this'.
+        JSValueType type = thisTypes->getKnownTypeTag();
+        if (type != JSVAL_TYPE_OBJECT && type != JSVAL_TYPE_NULL && type != JSVAL_TYPE_UNDEFINED)
+            return abort("Direct eval from script with maybe-primitive 'this'");
 
         CallInfo callInfo(cx, /* constructing = */ false);
         if (!callInfo.init(current, argc))
@@ -4505,6 +4509,37 @@ IonBuilder::jsop_eval(uint32_t argc)
 
         current->pushSlot(info().thisSlot());
         MDefinition *thisValue = current->pop();
+
+        // Try to pattern match 'eval(v + "()")'. In this case v is likely a
+        // name on the scope chain and the eval is performing a call on that
+        // value. Use a dynamic scope chain lookup rather than a full eval.
+        if (string->isConcat() &&
+            string->getOperand(1)->isConstant() &&
+            string->getOperand(1)->toConstant()->value().isString())
+        {
+            JSString *str = string->getOperand(1)->toConstant()->value().toString();
+
+            JSBool match;
+            if (!JS_StringEqualsAscii(cx, str, "()", &match))
+                return false;
+            if (match) {
+                MDefinition *name = string->getOperand(0);
+                MInstruction *dynamicName = MGetDynamicName::New(scopeChain, name);
+                current->add(dynamicName);
+
+                MInstruction *thisv = MPassArg::New(thisValue);
+                current->add(thisv);
+
+                current->push(dynamicName);
+                current->push(thisv);
+
+                CallInfo evalCallInfo(cx, /* constructing = */ false);
+                if (!evalCallInfo.init(current, /* argc = */ 0))
+                    return false;
+
+                return makeCall(NullPtr(), evalCallInfo, NULL, false);
+            }
+        }
 
         MInstruction *ins = MCallDirectEval::New(scopeChain, string, thisValue);
         current->add(ins);
@@ -5136,6 +5171,8 @@ TestSingletonPropertyTypes(JSContext *cx, types::StackTypeSet *types,
                 if (!curObj)
                     continue;
                 object = curObj->getType(cx);
+                if (!object)
+                    return false;
             }
 
             if (object->proto) {
@@ -5314,7 +5351,10 @@ IonBuilder::jsop_getgname(HandlePropertyName name)
         return jsop_getname(name);
 
     types::HeapTypeSet *propertyTypes = oracle->globalPropertyTypeSet(script(), pc, id);
-    if (propertyTypes && propertyTypes->isOwnProperty(cx, globalObj->getType(cx), true)) {
+    types::TypeObject *globalType = globalObj->getType(cx);
+    if (!globalType)
+        return false;
+    if (propertyTypes && propertyTypes->isOwnProperty(cx, globalType, true)) {
         // The property has been reconfigured as non-configurable, non-enumerable
         // or non-writable.
         return jsop_getname(name);
@@ -5390,7 +5430,10 @@ IonBuilder::jsop_setgname(HandlePropertyName name)
     if (!shape || !shape->hasDefaultSetter() || !shape->writable() || !shape->hasSlot())
         return jsop_setprop(name);
 
-    if (propertyTypes && propertyTypes->isOwnProperty(cx, globalObj->getType(cx), true)) {
+    types::TypeObject *globalType = globalObj->getType(cx);
+    if (!globalType)
+        return false;
+    if (propertyTypes && propertyTypes->isOwnProperty(cx, globalType, true)) {
         // The property has been reconfigured as non-configurable, non-enumerable
         // or non-writable.
         return jsop_setprop(name);
@@ -5871,10 +5914,11 @@ IonBuilder::jsop_setelem_dense()
     id = idInt32;
 
     // Ensure the value is a double, if double conversion might be needed.
+    MDefinition *newValue = value;
     if (oracle->elementWriteNeedsDoubleConversion(script(), pc)) {
         MInstruction *valueDouble = MToDouble::New(value);
         current->add(valueDouble);
-        value = valueDouble;
+        newValue = valueDouble;
     }
 
     // Get the elements vector.
@@ -5886,7 +5930,7 @@ IonBuilder::jsop_setelem_dense()
     // the initialized length and bounds check.
     MStoreElementCommon *store;
     if (oracle->setElementHasWrittenHoles(script(), pc) && writeOutOfBounds) {
-        MStoreElementHole *ins = MStoreElementHole::New(obj, elements, id, value);
+        MStoreElementHole *ins = MStoreElementHole::New(obj, elements, id, newValue);
         store = ins;
 
         current->add(ins);
@@ -5902,7 +5946,7 @@ IonBuilder::jsop_setelem_dense()
 
         bool needsHoleCheck = !packed && !writeOutOfBounds;
 
-        MStoreElement *ins = MStoreElement::New(elements, id, value, needsHoleCheck);
+        MStoreElement *ins = MStoreElement::New(elements, id, newValue, needsHoleCheck);
         store = ins;
 
         current->add(ins);
@@ -6228,6 +6272,8 @@ IonBuilder::TestCommonPropFunc(JSContext *cx, types::StackTypeSet *types, Handle
         // chain.
         while (curObj != foundProto) {
             types::TypeObject *typeObj = curObj->getType(cx);
+            if (!typeObj)
+                return false;
 
             if (typeObj->unknownProperties())
                 return true;
@@ -6283,6 +6329,8 @@ IonBuilder::TestCommonPropFunc(JSContext *cx, types::StackTypeSet *types, Handle
                 continue;
 
             curType = obj->getType(cx);
+            if (!curType)
+                return false;
         }
 
         // If we found a Singleton object's own-property, there's nothing to
@@ -6305,6 +6353,8 @@ IonBuilder::TestCommonPropFunc(JSContext *cx, types::StackTypeSet *types, Handle
                 if (curType->proto == foundProto)
                     break;
                 curType = curType->proto->getType(cx);
+                if (!curType)
+                    return false;
             }
         }
     }
@@ -6363,10 +6413,13 @@ IonBuilder::annotateGetPropertyCache(JSContext *cx, MDefinition *obj, MGetProper
         if (!TestSingletonProperty(cx, proto, id, &knownConstant))
             return false;
 
-        if (!knownConstant || proto->getType(cx)->unknownProperties())
+        types::TypeObject *protoType = proto->getType(cx);
+        if (!protoType)
+            return false;
+        if (!knownConstant || protoType->unknownProperties())
             continue;
 
-        types::HeapTypeSet *protoTypes = proto->getType(cx)->getProperty(cx, id, false);
+        types::HeapTypeSet *protoTypes = protoType->getProperty(cx, id, false);
         if (!protoTypes)
             continue;
 
