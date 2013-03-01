@@ -822,6 +822,13 @@ SampleAnimations(Layer* aLayer, TimeStamp aPoint)
   return activeAnimations;
 }
 
+void
+CompositorParent::SetPanUserData(Layer *aLayer, AsyncPanZoomController* aController)
+{
+    PanZoomUserData* data = new PanZoomUserData(aController);
+    aLayer->SetUserData(&sPanZoomUserDataKey, data);
+}
+
 bool
 CompositorParent::ApplyAsyncContentTransformToTree(TimeStamp aCurrentFrame,
                                                    Layer *aLayer,
@@ -843,9 +850,6 @@ CompositorParent::ApplyAsyncContentTransformToTree(TimeStamp aCurrentFrame,
   // Check if an AsyncPanZoomController is attached to this layer.
   if (LayerUserData* data = aLayer->GetUserData(&sPanZoomUserDataKey)) {
     controller = static_cast<PanZoomUserData*>(data)->mController;
-  } else {
-    // Check if a derived implementation provides a default AsyncPanZoomController.
-    controller = GetDefaultPanZoomController();
   }
 
   if (controller) {

@@ -147,7 +147,8 @@ void EmbedLiteCompositorParent::ShadowLayersUpdated(ShadowLayersParent* aLayerTr
   if (ContainerLayer* root = shadowRoot->AsContainerLayer()) {
     AsyncPanZoomController* controller = GetEmbedPanZoomController();
     if (controller) {
-      controller->NotifyLayersUpdated(root->GetFrameMetrics(), isFirstPaint);
+        CompositorParent::SetPanUserData(root, controller);
+        controller->NotifyLayersUpdated(root->GetFrameMetrics(), isFirstPaint);
     }
   }
 }
@@ -174,12 +175,6 @@ EmbedLiteCompositorParent::GetEmbedPanZoomController()
   EmbedLiteViewThreadParent* pview = view ? static_cast<EmbedLiteViewThreadParent*>(view->GetImpl()) : nullptr;
   NS_ASSERTION(pview, "PView is not available");
   return pview ? pview->GetDefaultPanZoomController() : nullptr;
-}
-
-AsyncPanZoomController*
-EmbedLiteCompositorParent::GetDefaultPanZoomController()
-{
-  return GetEmbedPanZoomController();
 }
 
 void

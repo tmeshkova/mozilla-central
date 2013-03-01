@@ -49,7 +49,6 @@ protected:
   virtual void SetPageRect(const gfx::Rect& aCssPageRect);
   virtual void SyncViewportInfo(const nsIntRect& aDisplayPort, float aDisplayResolution, bool aLayersUpdated,
                                 nsIntPoint& aScrollOffset, float& aScaleX, float& aScaleY);
-  virtual mozilla::layers::AsyncPanZoomController* GetDefaultPanZoomController();
   bool IsGLBackend();
 
   RefPtr<EmbedLiteViewThreadParent> mView;
