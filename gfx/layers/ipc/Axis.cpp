@@ -120,10 +120,6 @@ void Axis::UpdateWithTouchAtDevicePoint(int32_t aPos, const TimeDuration& aTimeD
   }
 
   mVelocity = newVelocity;
-  mVelocityQueue.push(mVelocity);
-  if (mVelocityQueue.size() > gMaxVelocityQueueSize) {
-    mVelocityQueue.pop();
-  }
   mLastPos = mPos;
   mPos = aPos;
 
