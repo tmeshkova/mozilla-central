@@ -117,6 +117,15 @@ class EmbedContentController : public GeckoContentController
       mRenderFrame = nullptr;
     }
 
+    /**
+     * Schedules a runnable to run on the controller/UI thread at some time
+     * in the future.
+     */
+    virtual void PostDelayedTask(Task* aTask, int aDelayMs) MOZ_OVERRIDE
+    {
+      MessageLoop::current()->PostDelayedTask(FROM_HERE, aTask, aDelayMs);
+    }
+
   private:
     EmbedLiteViewListener* GetListener() {
       return mRenderFrame && mRenderFrame->mView ?
