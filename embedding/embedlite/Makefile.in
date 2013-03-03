@@ -87,8 +87,6 @@ LOCAL_INCLUDES += \
     -I$(topsrcdir)/js/xpconnect/src \
     $(NULL)
 
-TOOL_DIRS += tests
-
 DEFINES += -DEMBED_LITE_INTERNAL=1
 
 PREF_JS_EXPORTS = $(srcdir)/embedding.js
