@@ -15,3 +15,6 @@ if CONFIG['MAKENSISU']:
 
 if CONFIG['OS_ARCH'] == 'WINNT':
     PARALLEL_DIRS += ['tools/redit']
+
+if CONFIG['MOZ_WEBAPP_RUNTIME']:
+    add_tier_dir('app', 'webapprt')

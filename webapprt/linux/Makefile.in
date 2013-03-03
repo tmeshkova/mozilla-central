@@ -27,7 +27,7 @@ STL_FLAGS=
 
 LIBS = \
   $(XPCOM_STANDALONE_GLUE_LDOPTS) \
-  $(MOZ_GTK2_LIBS) \
+  $(MOZ_TK_LIBS) \
   $(NULL)
 
 NSDISTMODE = copy
@@ -35,7 +35,7 @@ NSDISTMODE = copy
 include $(topsrcdir)/config/rules.mk
 
 CXXFLAGS += \
-	$(MOZ_GTK2_CFLAGS) \
+	$(MOZ_TK_CFLAGS) \
 	$(NULL)
 
 GRE_BUILDID := $(shell cat $(DEPTH)/config/buildid)
