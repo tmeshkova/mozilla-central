@@ -1,7 +1,7 @@
-export HOST_MOC="sb2 -t harmattan moc"
-export HOST_RCC="sb2 -t harmattan rcc"
-export MOC="sb2 -t harmattan moc"
-export RCC="sb2 -t harmattan rcc"
+export HOST_MOC="$SB2_SHELL moc"
+export HOST_RCC="$SB2_SHELL rcc"
+export MOC="$SB2_SHELL moc"
+export RCC="$SB2_SHELL rcc"
 
 export PKG_CONFIG_SYSROOT_DIR=$TARGET_ROOTFS
 export PKG_CONFIG_PATH=$TARGET_ROOTFS/usr/lib/pkgconfig
