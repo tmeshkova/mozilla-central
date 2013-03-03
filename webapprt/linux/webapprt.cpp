@@ -376,6 +376,7 @@ int main(int argc, char *argv[])
     return 255;
   }
 
+#ifndef MOZ_XULRUNNER
   // Set up appIniPath with path to application.ini.
   // This is in the Firefox installation directory.
   char appIniPath[MAXPATHLEN];
@@ -402,6 +403,10 @@ int main(int argc, char *argv[])
   // Else, copy WebAppRT from Firefox installation and re-execute the process
   else
     CopyAndRelaunch(firefoxDir, curExePath);
+#else
+  if (GRELoadAndLaunch(firefoxDir, false))
+    return 0;
+#endif
 
   return 255;
 }
