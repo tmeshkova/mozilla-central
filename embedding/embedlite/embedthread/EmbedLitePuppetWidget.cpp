@@ -195,12 +195,13 @@ EmbedLitePuppetWidget::Destroy()
 
   Base::OnDestroy();
   Base::Destroy();
-  mChild = nullptr;
   if (mLayerManager) {
     mLayerManager->Destroy();
   }
+  mParent = nullptr;
   mLayerManager = nullptr;
   mEmbed = nullptr;
+  mChild = nullptr;
   return NS_OK;
 }
 
