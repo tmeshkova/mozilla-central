@@ -478,6 +478,7 @@ WebBrowserChrome::SendScroll()
   if (mScrollOffset.x == offset.x && mScrollOffset.y == offset.y) {
     return;
   }
+  mScrollOffset = offset;
   mListener->OnScrollChanged(offset.x, offset.y);
 }
 

@@ -360,6 +360,9 @@ EmbedLiteViewThreadParent::RecvOnScrollChanged(const int32_t& offSetX,
   }
 
   NS_ENSURE_TRUE(mView, false);
+  if (mController) {
+    mController->ContentScrollPerformed();
+  }
   mView->GetListener()->OnScrollChanged(offSetX, offSetY);
   return true;
 }
