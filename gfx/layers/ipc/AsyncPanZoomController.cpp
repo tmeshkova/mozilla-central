@@ -171,7 +171,8 @@ AsyncPanZoomController::AsyncPanZoomController(GeckoContentController* aGeckoCon
      mWaitingForContentToPaint(false),
      mDisableNextTouchBatch(false),
      mHandlingTouchQueue(false),
-     mDelayPanning(false)
+     mDelayPanning(false),
+     mContentScrollHappend(false)
 {
   MOZ_ASSERT(NS_IsMainThread());
 
@@ -196,6 +197,11 @@ AsyncPanZoomController::AsyncPanZoomController(GeckoContentController* aGeckoCon
 
 AsyncPanZoomController::~AsyncPanZoomController() {
 
+}
+
+void AsyncPanZoomController::ContentScrollPerformed()
+{
+  mContentScrollHappend = true;
 }
 
 void
@@ -1299,9 +1305,12 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aViewportFr
     case NOTHING:
     case FLING:
     case TOUCHING:
-    case WAITING_LISTENERS:
-      mFrameMetrics.mScrollOffset = aViewportFrame.mScrollOffset;
+    case WAITING_LISTENERS: {
+      if (mContentScrollHappend) {
+        mFrameMetrics.mScrollOffset = aViewportFrame.mScrollOffset;
+      }
       break;
+    }
     // Don't clobber if we're in other states.
     default:
       break;
@@ -1309,6 +1318,7 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aViewportFr
   }
 
   mWaitingForContentToPaint = mPaintThrottler.TaskComplete();
+  mContentScrollHappend = false;
   bool needContentRepaint = false;
   if (aViewportFrame.mCompositionBounds.width == mFrameMetrics.mCompositionBounds.width &&
       aViewportFrame.mCompositionBounds.height == mFrameMetrics.mCompositionBounds.height) {

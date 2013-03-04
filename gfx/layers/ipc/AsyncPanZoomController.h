@@ -267,6 +267,11 @@ public:
    */
   nsEventStatus HandleInputEvent(const InputData& aEvent);
 
+  /**
+   * APZC must be notified here about possible scroll update change initiated by content
+   */
+  void ContentScrollPerformed();
+
 protected:
   /**
    * Helper method for touches beginning. Sets everything up for panning and any
@@ -619,6 +624,8 @@ private:
   // touchmove events to GestureListener until BrowserElementScrolling
   // decides whether it wants to handle panning for this touch series.
   bool mDelayPanning;
+
+  bool mContentScrollHappend;
 
   friend class Axis;
 };
