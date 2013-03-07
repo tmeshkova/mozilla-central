@@ -467,7 +467,7 @@ EmbedLitePuppetWidget::GetLayerManager(PLayersChild* aShadowManager,
 
   mUseLayersAcceleration = ComputeShouldAccelerate(mUseLayersAcceleration);
 
-  bool useCompositor = UseOffMainThreadCompositing();
+  bool useCompositor = ShouldUseOffMainThreadCompositing();
 
   if (useCompositor) {
     CreateCompositor();
