@@ -4701,7 +4701,7 @@ then
         case $QT_VERSION in
         5.*)
             echo "Using qt5: $QT_VERSION"
-            PKG_CHECK_MODULES(MOZ_QT, Qt5Gui Qt5Network Qt5Core Qt5Widgets Qt5Multimedia Qt5PrintSupport)
+            PKG_CHECK_MODULES(MOZ_QT, Qt5Gui Qt5Network Qt5Core Qt5OpenGL Qt5Widgets Qt5Multimedia Qt5PrintSupport)
             QT5INCDIR=`pkg-config --variable=includedir Qt5Gui`
             MOZ_QT_CFLAGS="$MOZ_QT_CFLAGS -I$QT5INCDIR/QtGui/$QT_VERSION/QtGui"
             ;;

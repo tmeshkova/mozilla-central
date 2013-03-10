@@ -43,7 +43,6 @@ WindowCreator::CreateChromeWindow2(nsIWebBrowserChrome* aParent,
   *aCancel = false;
   *_retval = 0;
 
-  LOGNI();
   /*
       See bug 80707
       Desktop FF allow to create popup window if aChromeFlags == 1670, aContextFlags == 0
@@ -57,6 +56,7 @@ WindowCreator::CreateChromeWindow2(nsIWebBrowserChrome* aParent,
 
   nsCString spec;
   aURI->GetSpec(spec);
+  LOGF("parent:%p, chrfl:%u, contfl:%u, spec:%s", aParent, aChromeFlags, aContextFlags, spec.get());
 
   EmbedLiteViewThreadChild* parent = mChild->GetViewByChromeParent(aParent);
   uint32_t createdID = 0;
