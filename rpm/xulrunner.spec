@@ -45,13 +45,6 @@ Tests and misc files for xulrunner
 
 %prep
 %setup -q -n %{name}-%{version}
-%patch0 -p1
-
-%ifarch i586
-%patch1 -p1
-%endif
-
-%patch2 -p1
 
 %build
 export MOZCONFIG=embedding/embedlite/config/mozconfig.merqtxulrunner
