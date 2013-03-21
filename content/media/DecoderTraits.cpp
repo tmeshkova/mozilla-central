@@ -192,12 +192,6 @@ IsGStreamerSupportedType(const nsACString& aMimeType)
 
   return GStreamerDecoder::CanHandleMediaType(aMimeType, nullptr);
 }
-
-static bool
-IsH264Type(const nsACString& aType)
-{
-  return CodecListContains(gH264Types, aType);
-}
 #endif
 
 #ifdef MOZ_WIDGET_GONK
