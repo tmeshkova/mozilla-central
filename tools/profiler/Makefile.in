@@ -32,7 +32,6 @@ ifneq (,$(filter armeabi,$(ANDROID_CPU_ARCH)))
 DEFINES += -DARCH_ARMV6
 endif
 
-MODULE          = profiler
 MODULE_NAME     = nsProfilerModule
 LIBRARY_NAME    = profiler
 EXPORT_LIBRARY  = 1
@@ -52,10 +51,6 @@ CPPSRCS		= \
   local_debug_info_symbolizer.cc \
   JSObjectBuilder.cpp \
   JSCustomObjectBuilder.cpp \
-  $(NULL)
-
-XPIDLSRCS = \
-  nsIProfiler.idl \
   $(NULL)
 
 EXTRA_JS_MODULES = \

@@ -570,7 +570,7 @@ public:
           JS_PropertyStub, JS_PropertyStub, JS_PropertyStub, JS_StrictPropertyStub,
           JS_EnumerateStub, JS_ResolveStub, JS_ConvertStub
       };
-      JSObject *obj = JS_NewGlobalObject(cx, &c, NULL);
+      JSObject *obj = JS_NewGlobalObject(cx, &c, NULL, JS::SystemZone);
 
       std::ofstream stream;
       stream.open(tmpPath.get());
@@ -582,7 +582,7 @@ public:
       if (stream.is_open()) {
         JSAutoCompartment autoComp(cx, obj);
         JSObject* profileObj = mozilla_sampler_get_profile_data1(cx);
-        jsval val = OBJECT_TO_JSVAL(profileObj);
+        JS::Value val = OBJECT_TO_JSVAL(profileObj);
         JS_Stringify(cx, &val, nullptr, JSVAL_NULL, WriteCallback, &stream);
         stream.close();
         LOGF("Saved to %s", tmpPath.get());
@@ -1007,7 +1007,8 @@ bool sps_version2()
        || defined(SPS_PLAT_x86_linux)
     allow2 = true;
 #   elif defined(SPS_PLAT_amd64_darwin) || defined(SPS_PLAT_x86_darwin) \
-         || defined(SPS_PLAT_x86_windows) || defined(SPS_PLAT_x86_android)
+         || defined(SPS_PLAT_x86_windows) || defined(SPS_PLAT_x86_android) \
+         || defined(SPS_PLAT_amd64_windows)
     allow2 = false;
 #   else
 #     error "Unknown platform"
