@@ -48,11 +48,9 @@ endif
 
 ifeq ($(CPU_ARCH), arm)
 # extra ARM libs
-ifdef ANDROID
 WEBRTC_LIBS += \
   $(call EXPAND_LIBNAME_PATH,cpu_features_android,$(DEPTH)/media/webrtc/trunk/webrtc/system_wrappers/source/system_wrappers_cpu_features_android) \
   $(NULL)
-endif
 # neon for ARM
 ifeq ($(HAVE_ARM_NEON),1)
 WEBRTC_LIBS += \
