@@ -13,7 +13,7 @@
 #include "mozilla/TypeTraits.h"
 
 #include <limits.h>
-#include <cmath>
+#include <math.h>
 
 namespace mozilla {
 
@@ -113,7 +113,7 @@ template<>
 inline long double
 Abs<long double>(const long double d)
 {
-  return std::fabs(d);
+  return fabsl(d);
 }
 
 } /* namespace mozilla */
