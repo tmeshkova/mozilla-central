@@ -31,6 +31,7 @@ ac_add_options --with-float-abi=toolchain-default
 ac_add_options --with-branding=mobile/xul/branding/nightly
 ac_add_options --with-system-jpeg
 ac_add_options --enable-skia
+ac_add_options --disable-dbus
 
 # disabling for now, since the build fails...
 ac_add_options --enable-webrtc
