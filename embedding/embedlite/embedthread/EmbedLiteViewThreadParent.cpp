@@ -622,7 +622,7 @@ EmbedLiteViewThreadParent::SetGLViewPortSize(int width, int height)
   if (mCompositor) {
     mCompositor->SetSurfaceSize(width, height);
   }
-  SendSetGLViewSize(mGLViewPortSize);
+  unused << SendSetGLViewSize(mGLViewPortSize);
 }
 
 void
