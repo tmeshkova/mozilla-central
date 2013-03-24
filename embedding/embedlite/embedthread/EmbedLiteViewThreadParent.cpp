@@ -168,8 +168,11 @@ EmbedLiteViewThreadParent::~EmbedLiteViewThreadParent()
     mGeckoController->ClearRenderFrame();
   }
   if (mController) {
+    mController->SetCompositorParent(nullptr);
     mController->Destroy();
+    mController = nullptr;
   }
+
   if (mView) {
     mView->SetImpl(NULL);
   }
