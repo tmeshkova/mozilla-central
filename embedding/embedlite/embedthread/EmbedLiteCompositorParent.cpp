@@ -144,7 +144,6 @@ bool EmbedLiteCompositorParent::RecvStop()
   LOGT("t: childComp:%p, mChildMessageLoop:%p, curLoop:%p", mChildCompositor.get(), MessageLoop::current());
   Destroy();
   // Delegate destroy of Child/Parent compositor in delayed task in order to avoid Child loop having dead objects
-  printf(">>>>>>Func:%s::%d curLoop:%p, parentLoop:%p, childLoop:%p\n", __PRETTY_FUNCTION__, __LINE__, MessageLoop::current(), EmbedLiteAppThreadParent::GetInstance()->GetParentLoop(), mChildMessageLoop);
   mChildMessageLoop->PostTask(FROM_HERE,
                               NewRunnableFunction(DeferredDestroyCompositor, this, mId));
   return true;
