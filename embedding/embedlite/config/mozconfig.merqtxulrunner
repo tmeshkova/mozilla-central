@@ -33,10 +33,10 @@ ac_add_options --with-system-jpeg
 ac_add_options --enable-skia
 ac_add_options --disable-dbus
 ac_add_options --disable-elf-hack
+ac_add_options --disable-updater
 
 # disabling for now, since the build fails...
 ac_add_options --enable-webrtc
-ac_add_options --enable-libjpeg-turbo
 ac_add_options --enable-profiling
 ac_add_options --enable-gstreamer
 ac_add_options --enable-webapp-runtime
