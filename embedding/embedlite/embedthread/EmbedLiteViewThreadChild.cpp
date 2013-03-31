@@ -561,6 +561,8 @@ bool
 EmbedLiteViewThreadChild::RecvHandleSingleTap(const nsIntPoint& aPoint)
 {
   if (mIMEComposing) {
+    // If we are in the middle of compositing we must finish it, before it is too late.
+    // this way we can get focus and actual compositing node working properly in future composition
     nsPoint offset;
     nsCOMPtr<nsIWidget> widget = mHelper->GetWidget(&offset);
     nsCompositionEvent event(true, NS_COMPOSITION_END, widget);
