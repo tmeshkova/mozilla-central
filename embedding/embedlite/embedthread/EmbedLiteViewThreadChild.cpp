@@ -560,6 +560,15 @@ EmbedLiteViewThreadChild::RecvHandleDoubleTap(const nsIntPoint& aPoint)
 bool
 EmbedLiteViewThreadChild::RecvHandleSingleTap(const nsIntPoint& aPoint)
 {
+  if (mIMEComposing) {
+    nsPoint offset;
+    nsCOMPtr<nsIWidget> widget = mHelper->GetWidget(&offset);
+    nsCompositionEvent event(true, NS_COMPOSITION_END, widget);
+    mHelper->InitEvent(event, nullptr);
+    mHelper->DispatchWidgetEvent(event);
+    mIMEComposing = false;
+  }
+
   for (unsigned int i = 0; i < mControllerListeners.Length(); i++) {
     mControllerListeners[i]->HandleSingleTap(aPoint);
   }
