@@ -1344,7 +1344,7 @@ already_AddRefed<ThebesLayer>
 BasicShadowLayerManager::CreateThebesLayer()
 {
   NS_ASSERTION(InConstruction(), "Only allowed in construction phase");
-  if (HasShadowManager() && GetParentBackendType() == LAYERS_OPENGL &&
+  if (HasShadowManager() && GetCompositorBackendType() == LAYERS_OPENGL &&
       ThebesLayer::UseTiledThebes()) {
     // BasicTiledThebesLayer doesn't support main
     // thread compositing so only return this layer
