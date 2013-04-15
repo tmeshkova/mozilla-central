@@ -109,6 +109,20 @@ static float gYSkateSizeMultiplier = 3.5f;
 static float gXStationarySizeMultiplier = 1.5f;
 static float gYStationarySizeMultiplier = 2.5f;
 
+/** Direction scroll lock ratios.
+ * Since touch events are inaccurate it's difficult to scroll directly up/down
+ * or left/right. These ratios help to lock scroll directions.
+ *
+ * Given a velocity vector is in the first quadrant the vertical scroll
+ * lock ratio equal to 2 means that the velocity angle more than 63 degrees
+ * would lock scrolling to strictly vertical (atan(2) == 63.43 deg).
+ * And the horizontal scroll lock ratio equal to 0.5 means that the velocity
+ * angle less than 26 degrees would lock scrolling to strictly horizontal
+ * (atan(0.5) == 26.57 deg).
+ */
+static float gVerticalScrollLockRatio = 2.0f;
+static float gHorizontalScrollLockRatio = 0.5f;
+
 static void ReadAZPCPrefs()
 {
   Preferences::AddIntVarCache(&gPanRepaintInterval, "gfx.azpc.pan_repaint_interval", gPanRepaintInterval);
@@ -122,6 +136,8 @@ static void ReadAZPCPrefs()
   Preferences::AddFloatVarCache(&gXStationarySizeMultiplier, "gfx.azpc.x_stationary_size_multiplier", gXStationarySizeMultiplier);
   Preferences::AddFloatVarCache(&gYStationarySizeMultiplier, "gfx.azpc.y_stationary_size_multiplier", gYStationarySizeMultiplier);
   Preferences::AddBoolVarCache(&gEnableKineticSpeedAmortization, "gfx.azpc.tweak_fling_velocity", gEnableKineticSpeedAmortization);
+  Preferences::AddFloatVarCache(&gVerticalScrollLockRatio, "gfx.azpc.vertical_scroll_lock_ratio", gVerticalScrollLockRatio);
+  Preferences::AddFloatVarCache(&gHorizontalScrollLockRatio, "gfx.azpc.horizontal_scroll_lock_ratio", gHorizontalScrollLockRatio);
 }
 
 class ReadAZPCPref MOZ_FINAL : public nsRunnable {
@@ -454,6 +470,13 @@ nsEventStatus AsyncPanZoomController::OnTouchMove(const MultiTouchInput& aEvent)
 
       if (PanDistance() < panThreshold) {
         return nsEventStatus_eIgnore;
+      }
+
+      float ratio(mY.PanDistance()/mX.PanDistance());
+      if (ratio > gVerticalScrollLockRatio) {
+        mX.Lock();
+      } else if (ratio < gHorizontalScrollLockRatio) {
+        mY.Lock();
       }
 
       StartPanning(aEvent);

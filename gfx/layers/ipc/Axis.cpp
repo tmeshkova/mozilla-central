@@ -97,12 +97,17 @@ Axis::Axis(AsyncPanZoomController* aAsyncPanZoomController)
     mVelocity(0.0f),
     mAcceleration(0),
     mLastPos(0),
-    mAsyncPanZoomController(aAsyncPanZoomController)
+    mAsyncPanZoomController(aAsyncPanZoomController),
+    mLocked(false)
 {
   InitAxisPrefs();
 }
 
 void Axis::UpdateWithTouchAtDevicePoint(int32_t aPos, const TimeDuration& aTimeDelta) {
+  if (mLocked) {
+    return;
+  }
+
   if (mPos == aPos) {
     // Does not make sense to calculate velocity when distance is 0
     mLastPos = aPos;
@@ -135,9 +140,14 @@ void Axis::StartTouch(int32_t aPos) {
   mStartPos = aPos;
   mPos = aPos;
   mLastPos = aPos;
+  mLocked = false;
 }
 
 float Axis::GetDisplacementForDuration(float aScale, const TimeDuration& aDelta) {
+  if (mLocked) {
+    return 0.0f;
+  }
+
   if (fabsf(mVelocity) < gVelocityThreshold) {
     mAcceleration = 0;
   }
@@ -165,7 +175,17 @@ float Axis::PanDistance() {
   return fabsf(mPos - mStartPos);
 }
 
+void Axis::Lock() {
+  mLocked = true;
+  CancelTouch();
+}
+
 void Axis::EndTouch() {
+  if (mLocked) {
+    mLocked = false;
+    return;
+  }
+
   mAcceleration++;
 
   // Calculate the mean velocity and empty the queue.
