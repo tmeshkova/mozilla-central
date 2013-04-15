@@ -472,7 +472,7 @@ nsEventStatus AsyncPanZoomController::OnTouchMove(const MultiTouchInput& aEvent)
         return nsEventStatus_eIgnore;
       }
 
-      float ratio(mY.PanDistance()/mX.PanDistance());
+      float ratio(mY.PanDistance() / mX.PanDistance());
       if (ratio > gVerticalScrollLockRatio) {
         mX.Lock();
       } else if (ratio < gHorizontalScrollLockRatio) {
