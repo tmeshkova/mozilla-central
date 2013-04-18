@@ -451,7 +451,7 @@ public:
   PresShell* mShell;
 };
 
-class NS_STACK_CLASS nsPresShellEventCB : public nsDispatchingCallback
+class MOZ_STACK_CLASS nsPresShellEventCB : public nsDispatchingCallback
 {
 public:
   nsPresShellEventCB(PresShell* aPresShell) : mPresShell(aPresShell) {}
@@ -6930,7 +6930,8 @@ PresShell::DispatchTouchEvent(nsEvent *aEvent,
     tmpStatus = nsEventStatus_eIgnore;
     nsEventDispatcher::Dispatch(targetPtr, context,
                                 &newEvent, nullptr, &tmpStatus, aEventCB);
-    if (nsEventStatus_eConsumeNoDefault == tmpStatus) {
+    if (nsEventStatus_eConsumeNoDefault == tmpStatus ||
+        newEvent.mFlags.mMultipleActionsPrevented) {
       preventDefault = true;
     }
 
@@ -9505,7 +9506,8 @@ nsIPresShell::SetMaxLineBoxWidth(nscoord aMaxLineBoxWidth)
 {
   NS_ASSERTION(aMaxLineBoxWidth >= 0, "attempting to set max line box width to a negative value");
 
-  mMaxLineBoxWidth = aMaxLineBoxWidth;
-
-  FrameNeedsReflow(GetRootFrame(), eResize, NS_FRAME_IS_DIRTY);
+  if (mMaxLineBoxWidth != aMaxLineBoxWidth) {
+    mMaxLineBoxWidth = aMaxLineBoxWidth;
+    FrameNeedsReflow(GetRootFrame(), eResize, NS_FRAME_IS_DIRTY);
+  }
 }
