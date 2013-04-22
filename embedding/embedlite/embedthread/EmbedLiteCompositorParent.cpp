@@ -161,7 +161,7 @@ void EmbedLiteCompositorParent::ShadowLayersUpdated(ShadowLayersParent* aLayerTr
   if (ContainerLayer* root = shadowRoot->AsContainerLayer()) {
     AsyncPanZoomController* controller = GetEmbedPanZoomController();
     if (controller) {
-        CompositorParent::SetPanUserData(root, controller);
+        root->SetAsyncPanZoomController(controller);
         controller->NotifyLayersUpdated(root->GetFrameMetrics(), isFirstPaint);
     }
   }

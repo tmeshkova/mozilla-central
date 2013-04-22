@@ -181,8 +181,6 @@ protected:
                                 nsIntPoint& aScrollOffset, float& aScaleX, float& aScaleY,
                                 gfx::Margin& aFixedLayerMargins);
   void SetEGLSurfaceSize(int width, int height);
-  // Allow to setup AZPC to Layer tree if SetPanZoomControllerForLayerTree is not set.
-  void SetPanUserData(Layer *aLayer, AsyncPanZoomController* aController);
 
 private:
   void PauseComposition();
