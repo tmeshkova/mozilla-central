@@ -1,4 +1,4 @@
-%define greversion 22.0a1
+%define greversion 23.0a1
 
 Name:       xulrunner
 Summary:    XUL runner
@@ -19,10 +19,15 @@ BuildRequires:  pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(gstreamer-0.10)
 BuildRequires:  pkgconfig(gstreamer-app-0.10)
 BuildRequires:  pkgconfig(gstreamer-plugins-base-0.10)
+BuildRequires:  pkgconfig(nspr)
+BuildRequires:  pkgconfig(nss)
 BuildRequires:  autoconf213
 BuildRequires:  python
 BuildRequires:  zip
 BuildRequires:  unzip
+%ifarch i586 i486 i386
+BuildRequires:  yasm
+%endif
 
 %description
 Mozilla XUL runner
@@ -48,14 +53,14 @@ Tests and misc files for xulrunner
 
 %build
 cp -rf embedding/embedlite/config/mozconfig.merqtxulrunner mozconfig
-%ifarch i586
-echo "ac_add_options --disable-libjpeg-turbo" >> mozconfig
-%else
+
+%ifarch %arm
 echo "ac_add_options --with-arm-kuser" >> mozconfig
 echo "ac_add_options --with-float-abi=toolchain-default" >> mozconfig
 # No need for this, this should be managed by toolchain
-echo "ac_add_options --with-thumb=yes" >> mozconfig
+echo "ac_add_options --with-thumb=toolchain-default" >> mozconfig
 %endif
+
 export MOZCONFIG=mozconfig
 %{__make} -f client.mk build_all %{?jobs:MOZ_MAKE_FLAGS="-j%jobs"}
 
