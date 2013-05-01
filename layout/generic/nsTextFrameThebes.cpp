@@ -83,11 +83,9 @@
 #include "GeckoProfiler.h"
 
 #ifdef DEBUG
-#undef NOISY_BLINK
 #undef NOISY_REFLOW
 #undef NOISY_TRIM
 #else
-#undef NOISY_BLINK
 #undef NOISY_REFLOW
 #undef NOISY_TRIM
 #endif
@@ -1708,9 +1706,8 @@ GetReferenceRenderingContext(nsTextFrame* aTextFrame, nsRenderingContext* aRC)
       return nullptr;
   }
 
-  gfxContext* ctx = tmp->ThebesContext();
-  NS_ADDREF(ctx);
-  return ctx;
+  nsRefPtr<gfxContext> ctx = tmp->ThebesContext();
+  return ctx.forget();
 }
 
 /**
@@ -1885,6 +1882,7 @@ BuildTextRunsScanner::BuildTextRunForFrames(void* aTextBuffer)
           frag->Get2b() + contentStart, contentLength, bufStart,
           compression, &mNextRunContextInfo, &builder, &analysisFlags);
       aTextBuffer = bufEnd;
+      currentTransformedTextOffset = bufEnd - static_cast<const PRUnichar*>(textPtr);
     } else {
       if (mDoubleByteText) {
         // Need to expand the text. First transform it into a temporary buffer,
@@ -1900,18 +1898,18 @@ BuildTextRunsScanner::BuildTextRunForFrames(void* aTextBuffer)
             bufStart, compression, &mNextRunContextInfo, &builder, &analysisFlags);
         aTextBuffer = ExpandBuffer(static_cast<PRUnichar*>(aTextBuffer),
                                    tempBuf.Elements(), end - tempBuf.Elements());
+        currentTransformedTextOffset =
+          static_cast<PRUnichar*>(aTextBuffer) - static_cast<const PRUnichar*>(textPtr);
       } else {
         uint8_t* bufStart = static_cast<uint8_t*>(aTextBuffer);
         uint8_t* end = nsTextFrameUtils::TransformText(
             reinterpret_cast<const uint8_t*>(frag->Get1b()) + contentStart, contentLength,
             bufStart, compression, &mNextRunContextInfo, &builder, &analysisFlags);
         aTextBuffer = end;
+        currentTransformedTextOffset = end - static_cast<const uint8_t*>(textPtr);
       }
     }
     textFlags |= analysisFlags;
-
-    currentTransformedTextOffset =
-      (static_cast<const uint8_t*>(aTextBuffer) - static_cast<const uint8_t*>(textPtr)) >> mDoubleByteText;
   }
 
   // Check for out-of-memory in gfxSkipCharsBuilder
@@ -7533,7 +7531,7 @@ nsTextFrame::ReflowText(nsLineLayout& aLineLayout, nscoord aAvailableWidth,
   }
 
   uint32_t flowEndInTextRun;
-  nsIFrame* lineContainer = aLineLayout.GetLineContainerFrame();
+  nsIFrame* lineContainer = aLineLayout.LineContainerFrame();
   gfxContext* ctx = aRenderingContext->ThebesContext();
   const nsTextFragment* frag = mContent->GetText();
 
@@ -7884,7 +7882,7 @@ nsTextFrame::ReflowText(nsLineLayout& aLineLayout, nscoord aAvailableWidth,
   // When we have text decorations, we don't need to compute their overflow now
   // because we're guaranteed to do it later
   // (see nsLineLayout::RelativePositionFrames)
-  UnionAdditionalOverflow(presContext, *aLineLayout.GetLineContainerRS(),
+  UnionAdditionalOverflow(presContext, *aLineLayout.LineContainerRS(),
                           provider, &aMetrics.VisualOverflow(), false);
 
   /////////////////////////////////////////////////////////////////////

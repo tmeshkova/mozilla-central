@@ -21,7 +21,7 @@
 #include "mozilla/ipc/FileDescriptorUtils.h"
 #include "mozilla/layers/AsyncPanZoomController.h"
 #include "mozilla/layers/CompositorChild.h"
-#include "mozilla/layers/PLayersChild.h"
+#include "mozilla/layers/PLayerTransactionChild.h"
 #include "mozilla/layout/RenderFrameChild.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/unused.h"
@@ -49,7 +49,6 @@
 #include "nsIDocShell.h"
 #include "nsIInterfaceRequestorUtils.h"
 #include "nsIInterfaceRequestorUtils.h"
-#include "nsIJSContextStack.h"
 #include "nsIJSRuntimeService.h"
 #include "nsISSLStatusProvider.h"
 #include "nsIScriptContext.h"
@@ -1290,9 +1289,19 @@ TabChild::GetCachedFileDescriptor(const nsAString& aPath,
 
     MOZ_ASSERT(info);
     MOZ_ASSERT(info->mPath == aPath);
-    MOZ_ASSERT(!info->mCallback);
-    MOZ_ASSERT(!info->mCanceled);
 
+    // If we got a previous request for this file descriptor that was then
+    // canceled, insert the new request ahead of the old in the queue so that
+    // it will be serviced first.
+    if (info->mCanceled) {
+        // This insertion will change the array and invalidate |info|, so
+        // be careful not to touch |info| after this.
+        mCachedFileDescriptorInfos.InsertElementAt(index,
+            new CachedFileDescriptorInfo(aPath, aCallback));
+        return false;
+    }
+
+    MOZ_ASSERT(!info->mCallback);
     info->mCallback = aCallback;
 
     nsRefPtr<CachedFileDescriptorCallbackRunnable> runnable =
@@ -2018,14 +2027,6 @@ TabChild::RecvDestroy()
   return Send__delete__(this);
 }
 
-/* virtual */ bool
-TabChild::RecvSetAppType(const nsString& aAppType)
-{
-  MOZ_ASSERT_IF(!aAppType.IsEmpty(), HasOwnApp());
-  mAppType = aAppType;
-  return true;
-}
-
 PRenderFrameChild*
 TabChild::AllocPRenderFrame(ScrollingBehavior* aScrolling,
                             TextureFactoryIdentifier* aTextureFactoryIdentifier,
@@ -2095,7 +2096,7 @@ TabChild::InitRenderingState()
       return false;
     }
 
-    PLayersChild* shadowManager = nullptr;
+    PLayerTransactionChild* shadowManager = nullptr;
     if (id != 0) {
         // Pushing layers transactions directly to a separate
         // compositor context.
@@ -2105,11 +2106,11 @@ TabChild::InitRenderingState()
           return false;
         }
         shadowManager =
-            compositorChild->SendPLayersConstructor(textureFactoryIdentifier.mParentBackend,
-                                                    id, &textureFactoryIdentifier);
+            compositorChild->SendPLayerTransactionConstructor(textureFactoryIdentifier.mParentBackend,
+                                                              id, &textureFactoryIdentifier);
     } else {
         // Pushing transactions to the parent content.
-        shadowManager = remoteFrame->SendPLayersConstructor();
+        shadowManager = remoteFrame->SendPLayerTransactionConstructor();
     }
 
     if (!shadowManager) {

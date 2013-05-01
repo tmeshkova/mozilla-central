@@ -390,7 +390,7 @@ nsScreen::MozLockOrientation(const Sequence<nsString>& aOrientations,
 
   // This is only for compilers that don't understand that the previous switch
   // will always return.
-  MOZ_NOT_REACHED();
+  MOZ_NOT_REACHED("unexpected lock orientation permission value");
   return false;
 }
 
@@ -409,7 +409,7 @@ nsScreen::SlowMozUnlockOrientation()
 
 /* virtual */
 JSObject*
-nsScreen::WrapObject(JSContext* aCx, JSObject* aScope)
+nsScreen::WrapObject(JSContext* aCx, JS::Handle<JSObject*> aScope)
 {
   return ScreenBinding::Wrap(aCx, aScope, this);
 }

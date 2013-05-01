@@ -496,9 +496,7 @@ XPCWrappedNative::GetNewOrUsed(XPCCallContext& ccx,
 
     RootedObject parent(ccx, Scope->GetGlobalJSObject());
 
-    jsval newParentVal = JSVAL_NULL;
-    XPCMarkableJSVal newParentVal_markable(&newParentVal);
-    AutoMarkingJSVal newParentVal_automarker(ccx, &newParentVal_markable);
+    RootedValue newParentVal(ccx, NullValue());
     JSBool needsSOW = false;
     JSBool needsCOW = false;
 
@@ -2434,7 +2432,6 @@ CallMethodHelper::GatherAndConvertResults()
         const nsXPTType& type = paramInfo.GetType();
         nsXPTCVariant* dp = GetDispatchParam(i);
         RootedValue v(mCallContext, NullValue());
-        AUTO_MARK_JSVAL(mCallContext, v.address());
         uint32_t array_count = 0;
         nsXPTType datum_type;
         bool isArray = type.IsArray();
@@ -3616,7 +3613,7 @@ static uint32_t sSlimWrappers;
 JSBool
 ConstructSlimWrapper(XPCCallContext &ccx,
                      xpcObjectHelper &aHelper,
-                     XPCWrappedNativeScope* xpcScope, jsval *rval)
+                     XPCWrappedNativeScope* xpcScope, MutableHandleValue rval)
 {
     nsISupports *identityObj = aHelper.GetCanonical();
     nsXPCClassInfo *classInfoHelper = aHelper.GetXPCClassInfo();
@@ -3672,7 +3669,7 @@ ConstructSlimWrapper(XPCCallContext &ccx,
     nsWrapperCache *cache = aHelper.GetWrapperCache();
     JSObject* wrapper = cache->GetWrapper();
     if (wrapper) {
-        *rval = OBJECT_TO_JSVAL(wrapper);
+        rval.setObject(*wrapper);
 
         return true;
     }
@@ -3709,7 +3706,7 @@ ConstructSlimWrapper(XPCCallContext &ccx,
     SLIM_LOG(("+++++ %i created slim wrapper (%p, %p, %p)\n", ++sSlimWrappers,
               wrapper, p, xpcScope));
 
-    *rval = OBJECT_TO_JSVAL(wrapper);
+    rval.setObject(*wrapper);
 
     return true;
 }

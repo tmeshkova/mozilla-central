@@ -16,6 +16,7 @@
 #include "mozilla/StandardInteger.h"
 #include "mozilla/ThreadLocal.h"
 
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
 
@@ -3113,8 +3114,8 @@ struct JSFunctionSpec {
 extern JS_PUBLIC_API(JSObject *)
 JS_InitClass(JSContext *cx, JSObject *obj, JSObject *parent_proto,
              JSClass *clasp, JSNative constructor, unsigned nargs,
-             JSPropertySpec *ps, JSFunctionSpec *fs,
-             JSPropertySpec *static_ps, JSFunctionSpec *static_fs);
+             const JSPropertySpec *ps, const JSFunctionSpec *fs,
+             const JSPropertySpec *static_ps, const JSFunctionSpec *static_fs);
 
 /*
  * Set up ctor.prototype = proto and proto.constructor = ctor with the
@@ -3361,8 +3362,8 @@ class PropertyDescriptorOperations
         MOZ_ASSERT(hasShortId());
         return desc()->shortid;
     }
-    JSPropertyOp getter() const { MOZ_ASSERT(!hasGetterObject()); return desc()->getter; }
-    JSStrictPropertyOp setter() const { MOZ_ASSERT(!hasSetterObject()); return desc()->setter; }
+    JSPropertyOp getter() const { return desc()->getter; }
+    JSStrictPropertyOp setter() const { return desc()->setter; }
     JS::HandleObject getterObject() const {
         MOZ_ASSERT(hasGetterObject());
         return JS::HandleObject::fromMarkedLocation(reinterpret_cast<JSObject *const *>(&desc()->getter));
@@ -3414,17 +3415,20 @@ template <>
 class HandleBase<JSPropertyDescriptor>
   : public JS::PropertyDescriptorOperations<JS::Handle<JSPropertyDescriptor> >
 {
-    friend class JS::PropertyDescriptorOperations<JS::Rooted<JSPropertyDescriptor> >;
+    friend class JS::PropertyDescriptorOperations<JS::Handle<JSPropertyDescriptor> >;
     const JSPropertyDescriptor *extract() const {
         return static_cast<const JS::Handle<JSPropertyDescriptor>*>(this)->address();
     }
+  public:
+    JS::HandleValue value() const { return JS::HandleValue::fromMarkedLocation(&extract()->value); }
+    JS::HandleObject obj() const { return JS::HandleObject::fromMarkedLocation(&extract()->obj); }
 };
 
 template <>
 class MutableHandleBase<JSPropertyDescriptor>
   : public JS::PropertyDescriptorOperations<JS::MutableHandle<JSPropertyDescriptor> >
 {
-    friend class JS::PropertyDescriptorOperations<JS::Rooted<JSPropertyDescriptor> >;
+    friend class JS::PropertyDescriptorOperations<JS::MutableHandle<JSPropertyDescriptor> >;
     const JSPropertyDescriptor *extract() const {
         return static_cast<const JS::MutableHandle<JSPropertyDescriptor>*>(this)->address();
     }
@@ -3461,14 +3465,6 @@ JS_GetPropertyByIdDefault(JSContext *cx, JSObject *obj, jsid id, jsval def, jsva
 
 extern JS_PUBLIC_API(JSBool)
 JS_ForwardGetPropertyTo(JSContext *cx, JSObject *obj, jsid id, JSObject *onBehalfOf, jsval *vp);
-
-extern JS_PUBLIC_API(JSBool)
-JS_GetMethodById(JSContext *cx, JSObject *obj, jsid id, JSObject **objp,
-                 jsval *vp);
-
-extern JS_PUBLIC_API(JSBool)
-JS_GetMethod(JSContext *cx, JSObject *obj, const char *name, JSObject **objp,
-             jsval *vp);
 
 extern JS_PUBLIC_API(JSBool)
 JS_SetProperty(JSContext *cx, JSObject *obj, const char *name, jsval *vp);

@@ -8,6 +8,8 @@
  * JavaScript API.
  */
 
+#include "jsapi.h"
+
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/GuardObjects.h"
 #include "mozilla/PodOperations.h"
@@ -18,11 +20,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+
 #include "jstypes.h"
 #include "jsutil.h"
 #include "jsclist.h"
 #include "jsprf.h"
-#include "jsapi.h"
 #include "jsarray.h"
 #include "jsatom.h"
 #include "jsbool.h"
@@ -43,28 +45,27 @@
 #include "json.h"
 #include "jsobj.h"
 #include "jsopcode.h"
-#include "jsprobes.h"
 #include "jsproxy.h"
 #include "jsscript.h"
 #include "jsstr.h"
 #include "prmjtime.h"
 #include "jsweakmap.h"
-#include "jsworkers.h"
 #include "jswrapper.h"
 #include "jstypedarray.h"
+#ifdef JS_THREADSAFE
+#include "jsworkers.h"
+#endif
 
 #include "builtin/Eval.h"
 #include "builtin/Intl.h"
 #include "builtin/MapObject.h"
 #include "builtin/RegExp.h"
 #include "builtin/ParallelArray.h"
-#include "ds/LifoAlloc.h"
 #include "frontend/BytecodeCompiler.h"
 #include "gc/Marking.h"
 #include "gc/Memory.h"
 #include "ion/AsmJS.h"
 #include "js/CharacterEncoding.h"
-#include "js/MemoryMetrics.h"
 #include "vm/Debugger.h"
 #include "vm/NumericConversions.h"
 #include "vm/Shape.h"
@@ -82,7 +83,6 @@
 #include "vm/RegExpObject-inl.h"
 #include "vm/RegExpStatics-inl.h"
 #include "vm/Shape-inl.h"
-#include "vm/Stack-inl.h"
 #include "vm/String-inl.h"
 
 #if ENABLE_YARR_JIT
@@ -709,46 +709,20 @@ PerThreadData::PerThreadData(JSRuntime *runtime)
     ionTop(NULL),
     ionJSContext(NULL),
     ionStackLimit(0),
-#ifdef JS_THREADSAFE
-    ionStackLimitLock_(NULL),
-#endif
     ionActivation(NULL),
     asmJSActivationStack_(NULL),
-#ifdef JS_THREADSAFE
-    asmJSActivationStackLock_(NULL),
-#endif
     suppressGC(0)
 {}
-
-bool
-PerThreadData::init()
-{
-#ifdef JS_THREADSAFE
-    ionStackLimitLock_ = PR_NewLock();
-    if (!ionStackLimitLock_)
-        return false;
-
-    asmJSActivationStackLock_ = PR_NewLock();
-    if (!asmJSActivationStackLock_)
-        return false;
-#endif
-    return true;
-}
-
-PerThreadData::~PerThreadData()
-{
-#ifdef JS_THREADSAFE
-    if (ionStackLimitLock_)
-        PR_DestroyLock(ionStackLimitLock_);
-
-    if (asmJSActivationStackLock_)
-        PR_DestroyLock(asmJSActivationStackLock_);
-#endif
-}
 
 JSRuntime::JSRuntime(JSUseHelperThreads useHelperThreads)
   : mainThread(this),
     interrupt(0),
+#ifdef JS_THREADSAFE
+    operationCallbackLock(NULL),
+#ifdef DEBUG
+    operationCallbackOwner(NULL),
+#endif
+#endif
     atomsCompartment(NULL),
     systemZone(NULL),
     numCompartments(0),
@@ -814,7 +788,9 @@ JSRuntime::JSRuntime(JSUseHelperThreads useHelperThreads)
     gcIsFull(false),
     gcTriggerReason(JS::gcreason::NO_REASON),
     gcStrictCompartmentChecking(false),
+#ifdef DEBUG
     gcDisableStrictProxyCheckingCount(0),
+#endif
     gcIncrementalState(gc::NO_INCREMENTAL),
     gcLastMarkSlice(false),
     gcSweepOnBackgroundThread(false),
@@ -939,10 +915,11 @@ JSRuntime::init(uint32_t maxbytes)
 {
 #ifdef JS_THREADSAFE
     ownerThread_ = PR_GetCurrentThread();
-#endif
 
-    if (!mainThread.init())
+    operationCallbackLock = PR_NewLock();
+    if (!operationCallbackLock)
         return false;
+#endif
 
     js::TlsPerThreadData.set(&mainThread);
 
@@ -1017,6 +994,10 @@ JSRuntime::~JSRuntime()
 {
 #ifdef JS_THREADSAFE
     clearOwnerThread();
+
+    JS_ASSERT(!operationCallbackOwner);
+    if (operationCallbackLock)
+        PR_DestroyLock(operationCallbackLock);
 #endif
 
     /*
@@ -1464,7 +1445,7 @@ JS_SetJitHardening(JSRuntime *rt, JSBool enabled)
 JS_PUBLIC_API(const char *)
 JS_GetImplementationVersion(void)
 {
-    return "JavaScript-C 1.8.5+ 2011-04-16";
+    return "JavaScript-C" MOZILLA_VERSION;
 }
 
 JS_PUBLIC_API(void)
@@ -1633,6 +1614,7 @@ JS_TransplantObject(JSContext *cx, JSObject *origobjArg, JSObject *targetArg)
     JS_ASSERT(!IsCrossCompartmentWrapper(target));
 
     AutoMaybeTouchDeadZones agc(cx);
+    AutoDisableProxyCheck adpc(cx->runtime);
 
     JSCompartment *destination = target->compartment();
     RootedValue origv(cx, ObjectValue(*origobj));
@@ -1706,6 +1688,7 @@ js_TransplantObjectWithWrapper(JSContext *cx,
     RootedObject targetwrapper(cx, targetwrapperArg);
 
     AutoMaybeTouchDeadZones agc(cx);
+    AutoDisableProxyCheck adpc(cx->runtime);
 
     AssertHeapIsIdle(cx);
     JS_ASSERT(!IsCrossCompartmentWrapper(origobj));
@@ -3118,7 +3101,7 @@ JS_SetNativeStackQuota(JSRuntime *rt, size_t stackSize)
     // ionStackLimit, then update it so that it reflects the new nativeStacklimit.
 #ifdef JS_ION
     {
-        PerThreadData::IonStackLimitLock lock(rt->mainThread);
+        JSRuntime::AutoLockForOperationCallback lock(rt);
         if (rt->mainThread.ionStackLimit != uintptr_t(-1))
             rt->mainThread.ionStackLimit = rt->mainThread.nativeStackLimit;
     }
@@ -3231,8 +3214,8 @@ JS_ConvertStub(JSContext *cx, JSHandleObject obj, JSType type, JSMutableHandleVa
 JS_PUBLIC_API(JSObject *)
 JS_InitClass(JSContext *cx, JSObject *objArg, JSObject *parent_protoArg,
              JSClass *clasp, JSNative constructor, unsigned nargs,
-             JSPropertySpec *ps, JSFunctionSpec *fs,
-             JSPropertySpec *static_ps, JSFunctionSpec *static_fs)
+             const JSPropertySpec *ps, const JSFunctionSpec *fs,
+             const JSPropertySpec *static_ps, const JSFunctionSpec *static_fs)
 {
     RootedObject obj(cx, objArg);
     RootedObject parent_proto(cx, parent_protoArg);
@@ -4354,34 +4337,6 @@ JS_GetUCProperty(JSContext *cx, JSObject *objArg, const jschar *name, size_t nam
 }
 
 JS_PUBLIC_API(JSBool)
-JS_GetMethodById(JSContext *cx, JSObject *objArg, jsid idArg, JSObject **objp, jsval *vp)
-{
-    RootedObject obj(cx, objArg);
-    RootedId id(cx, idArg);
-
-    AssertHeapIsIdle(cx);
-    CHECK_REQUEST(cx);
-    assertSameCompartment(cx, obj, id);
-
-    RootedValue value(cx);
-    if (!GetMethod(cx, obj, id, 0, &value))
-        return JS_FALSE;
-    *vp = value;
-
-    if (objp)
-        *objp = obj;
-    return JS_TRUE;
-}
-
-JS_PUBLIC_API(JSBool)
-JS_GetMethod(JSContext *cx, JSObject *objArg, const char *name, JSObject **objp, jsval *vp)
-{
-    RootedObject obj(cx, objArg);
-    JSAtom *atom = Atomize(cx, name, strlen(name));
-    return atom && JS_GetMethodById(cx, obj, AtomToId(atom), objp, vp);
-}
-
-JS_PUBLIC_API(JSBool)
 JS_SetPropertyById(JSContext *cx, JSObject *objArg, jsid idArg, jsval *vp)
 {
     RootedObject obj(cx, objArg);
@@ -5019,7 +4974,7 @@ js_generic_native_method_dispatcher(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    JSFunctionSpec *fs = (JSFunctionSpec *)
+    const JSFunctionSpec *fs = (JSFunctionSpec *)
         vp->toObject().toFunction()->getExtendedSlot(0).toPrivate();
     JS_ASSERT((fs->flags & JSFUN_GENERIC_NATIVE) != 0);
 
@@ -5869,7 +5824,7 @@ JS_CallFunctionName(JSContext *cx, JSObject *objArg, const char *name, unsigned 
 
     RootedValue v(cx);
     RootedId id(cx, AtomToId(atom));
-    return GetMethod(cx, obj, id, 0, &v) &&
+    return JSObject::getGeneric(cx, obj, obj, id, &v) &&
            Invoke(cx, ObjectOrNullValue(obj), v, argc, argv, rval);
 }
 

@@ -590,35 +590,6 @@ private:
 };
 
 
-// NamedNodeMap helper
-
-class nsNamedNodeMapSH : public nsNamedArraySH
-{
-protected:
-  nsNamedNodeMapSH(nsDOMClassInfoData* aData) : nsNamedArraySH(aData)
-  {
-  }
-
-  virtual ~nsNamedNodeMapSH()
-  {
-  }
-
-  virtual nsISupports* GetItemAt(nsISupports *aNative, uint32_t aIndex,
-                                 nsWrapperCache **aCache, nsresult *aResult);
-
-  // Override nsNamedArraySH::GetNamedItem()
-  virtual nsISupports* GetNamedItem(nsISupports *aNative,
-                                    const nsAString& aName,
-                                    nsWrapperCache **cache,
-                                    nsresult *aResult);
-
-public:
-  static nsIClassInfo *doCreate(nsDOMClassInfoData* aData)
-  {
-    return new nsNamedNodeMapSH(aData);
-  }
-};
-
 // Document helper, for document.location and document.on*
 
 class nsDocumentSH : public nsNodeSH
@@ -989,37 +960,6 @@ class nsDOMTouchListSH : public nsArraySH
   }
 };
 
-#ifdef MOZ_XUL
-// TreeColumns helper
-
-class nsTreeColumnsSH : public nsNamedArraySH
-{
-protected:
-  nsTreeColumnsSH(nsDOMClassInfoData* aData) : nsNamedArraySH(aData)
-  {
-  }
-
-  virtual ~nsTreeColumnsSH()
-  {
-  }
-
-  virtual nsISupports* GetItemAt(nsISupports *aNative, uint32_t aIndex,
-                                 nsWrapperCache **aCache, nsresult *aResult);
-
-  // Override nsNamedArraySH::GetNamedItem()
-  virtual nsISupports* GetNamedItem(nsISupports *aNative,
-                                    const nsAString& aName,
-                                    nsWrapperCache **cache,
-                                    nsresult *aResult);
-
-public:
-  static nsIClassInfo *doCreate(nsDOMClassInfoData* aData)
-  {
-    return new nsTreeColumnsSH(aData);
-  }
-};
-#endif
-
 // WebApps Storage helpers
 
 class nsStorage2SH : public nsDOMGenericSH
@@ -1172,29 +1112,6 @@ public:
   static nsIClassInfo *doCreate(nsDOMClassInfoData* aData)
   {
     return new nsOfflineResourceListSH(aData);
-  }
-};
-
-// SVGStringList helper
-
-class nsSVGStringListSH : public nsStringArraySH
-{
-protected:
-  nsSVGStringListSH(nsDOMClassInfoData* aData) : nsStringArraySH(aData)
-  {
-  }
-  
-  virtual ~nsSVGStringListSH()
-  {
-  }
-  
-  virtual nsresult GetStringAt(nsISupports *aNative, int32_t aIndex,
-                               nsAString& aResult);
-  
-public:
-  static nsIClassInfo *doCreate(nsDOMClassInfoData* aData)
-  {
-    return new nsSVGStringListSH(aData);
   }
 };
 

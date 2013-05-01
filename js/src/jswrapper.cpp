@@ -4,26 +4,18 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "jswrapper.h"
+
 #include "jsapi.h"
 #include "jscntxt.h"
 #include "jscompartment.h"
 #include "jsexn.h"
 #include "jsgc.h"
 #include "jsiter.h"
-#include "jsnum.h"
-#include "jswrapper.h"
-
-#ifdef JS_METHODJIT
-# include "assembler/jit/ExecutableAllocator.h"
-#endif
-#include "gc/Marking.h"
-#include "methodjit/PolyIC.h"
-#include "methodjit/MonoIC.h"
 
 #include "jsobjinlines.h"
 
 #include "builtin/Iterator-inl.h"
-#include "vm/RegExpObject-inl.h"
 
 using namespace js;
 using namespace js::gc;
@@ -952,6 +944,8 @@ js::RemapWrapper(JSContext *cx, JSObject *wobjArg, JSObject *newTargetArg)
     JS_ASSERT(origTarget);
     Value origv = ObjectValue(*origTarget);
     JSCompartment *wcompartment = wobj->compartment();
+
+    AutoDisableProxyCheck adpc(cx->runtime);
 
     // If we're mapping to a different target (as opposed to just recomputing
     // for the same target), we must not have an existing wrapper for the new
