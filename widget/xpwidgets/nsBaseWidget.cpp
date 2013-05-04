@@ -888,10 +888,14 @@ void nsBaseWidget::CreateCompositor(int aWidth, int aHeight)
   TextureFactoryIdentifier textureFactoryIdentifier;
   PLayerTransactionChild* shadowManager;
   mozilla::layers::LayersBackend backendHint;
-  if (mUseLayersAcceleration) {
-    backendHint = mozilla::layers::LAYERS_OPENGL;
-  } else {
+  // We need a separate preference here (instead of using mUseLayersAcceleration)
+  // because we force enable accelerated layers with e10s. Once the BasicCompositor
+  // is stable enough to be used for Ripc/Cipc, then we can remove that and this
+  // pref.
+  if (Preferences::GetBool("layers.offmainthreadcomposition.prefer-basic", false)) {
     backendHint = mozilla::layers::LAYERS_BASIC;
+  } else {
+    backendHint = mozilla::layers::LAYERS_OPENGL;
   }
   shadowManager = mCompositorChild->SendPLayerTransactionConstructor(
     backendHint, 0, &textureFactoryIdentifier);
