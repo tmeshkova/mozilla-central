@@ -60,6 +60,8 @@ echo "ac_add_options --with-float-abi=toolchain-default" >> mozconfig
 # No need for this, this should be managed by toolchain
 echo "ac_add_options --with-thumb=toolchain-default" >> mozconfig
 %endif
+echo "mk_add_options MOZ_MAKE_FLAGS='-j%jobs'" >> mozconfig
+echo "export LD=ld.gold" >> mozconfig
 
 export MOZCONFIG=mozconfig
 %{__make} -f client.mk build_all %{?jobs:MOZ_MAKE_FLAGS="-j%jobs"}
@@ -67,7 +69,13 @@ export MOZCONFIG=mozconfig
 %install
 export MOZCONFIG=mozconfig
 %{__make} -f client.mk install DESTDIR=%{buildroot}
-%{__chmod} +x %{buildroot}%{_libdir}/xulrunner-%{greversion}/*.so
+for i in $(find %{buildroot}%{_libdir}/xulrunner-devel-%{greversion}/sdk/lib -name "*.so" -mindepth 1 -maxdepth 1 -type f); do
+  BASENAMEF=$(basename $i)
+  rm -f %{buildroot}%{_libdir}/xulrunner-%{greversion}/$BASENAMEF
+  mv %{buildroot}%{_libdir}/xulrunner-devel-%{greversion}/sdk/lib/$BASENAMEF %{buildroot}%{_libdir}/xulrunner-%{greversion}/
+  ln -s %{_libdir}/xulrunner-%{greversion}/$BASENAMEF %{buildroot}%{_libdir}/xulrunner-devel-%{greversion}/sdk/lib/$BASENAMEF
+done
+%{__chmod} -x %{buildroot}%{_libdir}/xulrunner-%{greversion}/*.so
 
 %files
 %defattr(-,root,root,-)
