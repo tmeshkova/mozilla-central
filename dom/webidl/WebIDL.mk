@@ -48,6 +48,7 @@ webidl_files = \
   CSSStyleSheet.webidl \
   CSSValue.webidl \
   CSSValueList.webidl \
+  DataContainerEvent.webidl \
   DelayNode.webidl \
   DesktopNotification.webidl \
   DeviceMotionEvent.webidl \
@@ -153,8 +154,9 @@ webidl_files = \
   IDBFactory.webidl \
   IDBVersionChangeEvent.webidl \
   ImageData.webidl \
+  ImageDocument.webidl \
   InspectorUtils.webidl \
-  KeyEvent.webidl \
+  KeyboardEvent.webidl \
   LinkStyle.webidl \
   LocalMediaStream.webidl \
   Location.webidl \
@@ -205,6 +207,7 @@ webidl_files = \
   SVGAnimatedPathData.webidl \
   SVGAnimatedPoints.webidl \
   SVGAnimatedPreserveAspectRatio.webidl \
+  SVGAnimatedRect.webidl \
   SVGAnimatedTransformList.webidl \
   SVGAnimateElement.webidl \
   SVGAnimateMotionElement.webidl \
@@ -313,6 +316,7 @@ webidl_files = \
   URLUtils.webidl \
   USSDReceivedEvent.webidl \
   VideoStreamTrack.webidl \
+  WaveShaperNode.webidl \
   Window.webidl \
   XMLDocument.webidl \
   XMLHttpRequest.webidl \
@@ -361,6 +365,12 @@ endif
 ifdef MOZ_GAMEPAD
 webidl_files += \
   Gamepad.webidl \
+  $(NULL)
+endif
+
+ifdef MOZ_B2G_RIL
+webidl_files += \
+  MozStkCommandEvent.webidl \
   $(NULL)
 endif
 

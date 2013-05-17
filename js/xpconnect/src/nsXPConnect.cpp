@@ -1836,7 +1836,6 @@ NS_IMETHODIMP
 nsXPConnect::JSToVariant(JSContext* ctx, const jsval &value, nsIVariant** _retval)
 {
     NS_PRECONDITION(ctx, "bad param");
-    NS_PRECONDITION(value != JSVAL_NULL, "bad param");
     NS_PRECONDITION(_retval, "bad param");
 
     XPCCallContext ccx(NATIVE_CALLER, ctx);
@@ -2031,7 +2030,7 @@ xpc_ActivateDebugMode()
 JSContext*
 nsXPConnect::GetCurrentJSContext()
 {
-    JSContext *cx = XPCJSRuntime::Get()->GetJSContextStack()->Peek();
+    JSContext *cx = GetRuntime()->GetJSContextStack()->Peek();
     return xpc_UnmarkGrayContext(cx);
 }
 
@@ -2039,7 +2038,7 @@ nsXPConnect::GetCurrentJSContext()
 JSContext*
 nsXPConnect::GetSafeJSContext()
 {
-    return XPCJSRuntime::Get()->GetJSContextStack()->GetSafeJSContext();
+    return GetRuntime()->GetJSContextStack()->GetSafeJSContext();
 }
 
 namespace xpc {
@@ -2373,14 +2372,14 @@ nsXPConnect::SetDebugModeWhenPossible(bool mode, bool allowSyncDisable)
 NS_IMETHODIMP
 nsXPConnect::GetTelemetryValue(JSContext *cx, jsval *rval)
 {
-    JSObject *obj = JS_NewObject(cx, NULL, NULL, NULL);
+    RootedObject obj(cx, JS_NewObject(cx, NULL, NULL, NULL));
     if (!obj)
         return NS_ERROR_OUT_OF_MEMORY;
 
     unsigned attrs = JSPROP_ENUMERATE | JSPROP_READONLY | JSPROP_PERMANENT;
 
     size_t i = JS_SetProtoCalled(cx);
-    jsval v = DOUBLE_TO_JSVAL(i);
+    RootedValue v(cx, DOUBLE_TO_JSVAL(i));
     if (!JS_DefineProperty(cx, obj, "setProto", v, NULL, NULL, attrs))
         return NS_ERROR_OUT_OF_MEMORY;
 

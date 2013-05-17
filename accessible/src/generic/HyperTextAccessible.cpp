@@ -1070,9 +1070,6 @@ HyperTextAccessible::GetTextAtOffset(int32_t aOffset,
   if (offset < 0)
     return NS_ERROR_INVALID_ARG;
 
-  EWordMovementType wordMovementType = eDefaultBehavior;
-  bool moveForwardThenBack = true;
-
   switch (aBoundaryType) {
     case BOUNDARY_CHAR:
       return GetCharAt(aOffset, eGetAt, aText, aStartOffset, aEndOffset) ?
@@ -1084,8 +1081,11 @@ HyperTextAccessible::GetTextAtOffset(int32_t aOffset,
       return GetText(*aStartOffset, *aEndOffset, aText);
 
     case BOUNDARY_WORD_END:
-      *aStartOffset = FindWordBoundary(offset, eDirPrevious, eEndWord);
-      *aEndOffset = FindWordBoundary(*aStartOffset, eDirNext, eEndWord);
+      // Ignore the spec and follow what WebKitGtk does because Orca expects it,
+      // i.e. return a next word at word end offset of the current word
+      // (WebKitGtk behavior) instead the current word (AKT spec).
+      *aEndOffset = FindWordBoundary(offset, eDirNext, eEndWord);
+      *aStartOffset = FindWordBoundary(*aEndOffset, eDirPrevious, eEndWord);
       return GetText(*aStartOffset, *aEndOffset, aText);
 
     case BOUNDARY_LINE_START:
@@ -1108,13 +1108,47 @@ HyperTextAccessible::GetTextAfterOffset(int32_t aOffset,
   if (IsDefunct())
     return NS_ERROR_FAILURE;
 
-  if (aBoundaryType == BOUNDARY_CHAR) {
-    GetCharAt(aOffset, eGetAfter, aText, aStartOffset, aEndOffset);
-    return NS_OK;
-  }
+  int32_t offset = ConvertMagicOffset(aOffset);
+  if (offset < 0)
+    return NS_ERROR_INVALID_ARG;
 
-  return GetTextHelper(eGetAfter, aBoundaryType, aOffset,
-                       aStartOffset, aEndOffset, aText);
+  switch (aBoundaryType) {
+    case BOUNDARY_CHAR:
+      GetCharAt(aOffset, eGetAfter, aText, aStartOffset, aEndOffset);
+      return NS_OK;
+
+    case BOUNDARY_WORD_START:
+      // Move word forward twice to find start and end offsets.
+      *aStartOffset = FindWordBoundary(offset, eDirNext, eStartWord);
+      *aEndOffset = FindWordBoundary(*aStartOffset, eDirNext, eStartWord);
+      return GetText(*aStartOffset, *aEndOffset, aText);
+
+    case BOUNDARY_WORD_END:
+      // If the offset is a word end (except 0 offset) then move forward to find
+      // end offset (start offset is the given offset). Otherwise move forward
+      // twice to find both start and end offsets.
+      if (offset == 0) {
+        *aStartOffset = FindWordBoundary(offset, eDirNext, eEndWord);
+        *aEndOffset = FindWordBoundary(*aStartOffset, eDirNext, eEndWord);
+      } else {
+        *aEndOffset = FindWordBoundary(offset, eDirNext, eEndWord);
+        *aStartOffset = FindWordBoundary(*aEndOffset, eDirPrevious, eEndWord);
+        if (*aStartOffset != offset) {
+          *aStartOffset = *aEndOffset;
+          *aEndOffset = FindWordBoundary(*aStartOffset, eDirNext, eEndWord);
+        }
+      }
+      return GetText(*aStartOffset, *aEndOffset, aText);
+
+    case BOUNDARY_LINE_START:
+    case BOUNDARY_LINE_END:
+    case BOUNDARY_ATTRIBUTE_RANGE:
+      return GetTextHelper(eGetAfter, aBoundaryType, aOffset,
+                           aStartOffset, aEndOffset, aText);
+
+    default:
+      return NS_ERROR_INVALID_ARG;
+  }
 }
 
 // nsIPersistentProperties

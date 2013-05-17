@@ -139,7 +139,7 @@ var shell = {
       if (Services.prefs.getBoolPref('app.reportCrashes')) {
         this.submitCrash(crashID);
       } else {
-        debugCrashReport('app.reportCrashes is disabled');
+        this.deleteCrash(crashID);
       }
     } catch (e) {
       debugCrashReport('Can\'t fetch app.reportCrashes. Exception: ' + e);
@@ -154,6 +154,13 @@ var shell = {
         crashID: crashID,
         chrome: isChrome
       });
+    }
+  },
+
+  deleteCrash: function shell_deleteCrash(aCrashID) {
+    if (aCrashID) {
+      debugCrashReport('Deleting pending crash: ' + aCrashID);
+      shell.CrashSubmit.delete(aCrashID);
     }
   },
 
@@ -876,6 +883,7 @@ var WebappsHelper = {
   init: function webapps_init() {
     Services.obs.addObserver(this, "webapps-launch", false);
     Services.obs.addObserver(this, "webapps-ask-install", false);
+    Services.obs.addObserver(this, "webapps-close", false);
   },
 
   registerInstaller: function webapps_registerInstaller(data) {
@@ -925,6 +933,12 @@ var WebappsHelper = {
           type: "webapps-ask-install",
           id: id,
           app: json.app
+        });
+        break;
+      case "webapps-close":
+        shell.sendChromeEvent({
+          "type": "webapps-close",
+          "manifestURL": json.manifestURL
         });
         break;
     }
@@ -1089,7 +1103,11 @@ window.addEventListener('ContentStart', function cr_onContentStart() {
   let content = shell.contentBrowser.contentWindow;
   content.addEventListener("mozContentEvent", function cr_onMozContentEvent(e) {
     if (e.detail.type == "submit-crash" && e.detail.crashID) {
+      debugCrashReport("submitting crash at user request ", e.detail.crashID);
       shell.submitCrash(e.detail.crashID);
+    } else if (e.detail.type == "delete-crash" && e.detail.crashID) {
+      debugCrashReport("deleting crash at user request ", e.detail.crashID);
+      shell.deleteCrash(e.detail.crashID);
     }
   });
 });

@@ -880,24 +880,6 @@ WrapURI(JSContext *cx, nsIURI *uri, MutableHandleValue vp)
 }
 
 static JSBool
-documentURIObject_getter(JSContext *cx, HandleObject wrapper, HandleId id, MutableHandleValue vp)
-{
-    nsCOMPtr<nsIDocument> native = do_QueryInterfaceNative(cx, wrapper);
-    if (!native) {
-        JS_ReportError(cx, "Unexpected object");
-        return false;
-    }
-
-    nsCOMPtr<nsIURI> uri = native->GetDocumentURI();
-    if (!uri) {
-        JS_ReportOutOfMemory(cx);
-        return false;
-    }
-
-    return WrapURI(cx, uri, vp);
-}
-
-static JSBool
 baseURIObject_getter(JSContext *cx, HandleObject wrapper, HandleId id, MutableHandleValue vp)
 {
     nsCOMPtr<nsINode> native = do_QueryInterfaceNative(cx, wrapper);
@@ -1002,18 +984,14 @@ XPCWrappedNativeXrayTraits::resolveOwnProperty(JSContext *cx, Wrapper &jsWrapper
     MOZ_ASSERT(js::IsObjectInContextCompartment(wrapper, cx));
     XPCJSRuntime* rt = nsXPConnect::GetRuntimeInstance();
     if (AccessCheck::isChrome(wrapper) &&
-        (((id == rt->GetStringID(XPCJSRuntime::IDX_BASEURIOBJECT) ||
+        ((id == rt->GetStringID(XPCJSRuntime::IDX_BASEURIOBJECT) ||
            id == rt->GetStringID(XPCJSRuntime::IDX_NODEPRINCIPAL)) &&
-          Is<nsINode>(wrapper)) ||
-          (id == rt->GetStringID(XPCJSRuntime::IDX_DOCUMENTURIOBJECT) &&
-          Is<nsIDocument>(wrapper))))
+          Is<nsINode>(wrapper)))
     {
         desc->obj = wrapper;
         desc->attrs = JSPROP_ENUMERATE|JSPROP_SHARED;
         if (id == rt->GetStringID(XPCJSRuntime::IDX_BASEURIOBJECT))
             desc->getter = baseURIObject_getter;
-        else if (id == rt->GetStringID(XPCJSRuntime::IDX_DOCUMENTURIOBJECT))
-            desc->getter = documentURIObject_getter;
         else
             desc->getter = nodePrincipal_getter;
         desc->setter = NULL;
@@ -1330,22 +1308,6 @@ XrayWrapper<Base, Traits>::~XrayWrapper()
 
 namespace XrayUtils {
 
-bool
-NeedsWaive(JSContext *cx, HandleObject wrapper, HandleId id)
-{
-    // We dynamically waive Xray vision for XBL bindings accessing fields
-    // on bound elements, since there's no way to access such things sanely
-    // over Xray.
-    nsCOMPtr<nsIContent> content;
-    if (EnsureCompartmentPrivate(wrapper)->scope->IsXBLScope() &&
-        (content = do_QueryInterfaceNative(cx, wrapper)))
-    {
-        if (nsContentUtils::IsBindingField(cx, content, id))
-            return true;
-    }
-    return false;
-}
-
 JSObject *
 GetNativePropertiesObject(JSContext *cx, JSObject *wrapper)
 {
@@ -1523,13 +1485,6 @@ XrayWrapper<Base, Traits>::getPropertyDescriptor(JSContext *cx, HandleObject wra
 
     typename Traits::ResolvingIdImpl resolving(cx, wrapper, id);
 
-    if (XrayUtils::NeedsWaive(cx, wrapper, id)) {
-        RootedObject waived(cx, WrapperFactory::WaiveXray(cx, wrapper));
-        if (!waived || !JS_WrapObject(cx, waived.address()))
-            return false;
-        return JS_GetPropertyDescriptorById(cx, waived, id, flags, desc);
-    }
-
     if (!holder)
         return false;
 
@@ -1677,17 +1632,6 @@ XrayWrapper<Base, Traits>::getOwnPropertyDescriptor(JSContext *cx, HandleObject 
     // NB: Nothing we do here acts on the wrapped native itself, so we don't
     // enter our policy.
 
-    if (XrayUtils::NeedsWaive(cx, wrapper, id)) {
-        RootedObject waived(cx, WrapperFactory::WaiveXray(cx, wrapper));
-        if (!waived || !JS_WrapObject(cx, waived.address()))
-            return false;
-        if (!JS_GetPropertyDescriptorById(cx, waived, id, flags, desc))
-            return false;
-        if (desc->obj != waived)
-            desc->obj = nullptr;
-        return true;
-    }
-
     if (!Traits::singleton.resolveOwnProperty(cx, *this, wrapper, holder, id, desc, flags))
         return false;
     if (desc->obj)
@@ -1701,13 +1645,6 @@ XrayWrapper<Base, Traits>::defineProperty(JSContext *cx, HandleObject wrapper,
                                           HandleId id, PropertyDescriptor *desc)
 {
     assertEnteredPolicy(cx, wrapper, id);
-    if (XrayUtils::NeedsWaive(cx, wrapper, id)) {
-        RootedObject waived(cx, WrapperFactory::WaiveXray(cx, wrapper));
-        if (!waived || !JS_WrapObject(cx, waived.address()))
-            return false;
-        return JS_DefinePropertyById(cx, waived, id, desc->value, desc->getter, desc->setter,
-                                     desc->attrs);
-    }
 
     // NB: We still need JSRESOLVE_ASSIGNING here for the time being, because it
     // tells things like nodelists whether they should create the property or not.
