@@ -480,6 +480,12 @@ void
 AudioBufferSourceNode::Start(double aWhen, double aOffset,
                              const Optional<double>& aDuration, ErrorResult& aRv)
 {
+  if (!WebAudioUtils::IsTimeValid(aWhen) ||
+      (aDuration.WasPassed() && !WebAudioUtils::IsTimeValid(aDuration.Value()))) {
+    aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
+    return;
+  }
+
   if (mStartCalled) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
@@ -547,10 +553,12 @@ AudioBufferSourceNode::SendOffsetAndDurationParametersToStream(AudioNodeStream* 
 
   if (offset >= endOffset) {
     // The offset falls past the end of the buffer.  In this case, we need to
-    // stop the playback immediately if it's in progress.  No need to check
-    // mStartCalled here, since Stop() does that for us.
-    ErrorResult rv;
-    Stop(0.0, rv);
+    // stop the playback immediately if it's in progress.
+    // Note that we can't call Stop() here since that might be overridden if
+    // web content calls Stop() too, so we just null out the buffer.
+    if (mStartCalled) {
+      aStream->SetBuffer(nullptr);
+    }
     return;
   }
 
@@ -565,6 +573,11 @@ AudioBufferSourceNode::SendOffsetAndDurationParametersToStream(AudioNodeStream* 
 void
 AudioBufferSourceNode::Stop(double aWhen, ErrorResult& aRv, bool aShuttingDown)
 {
+  if (!WebAudioUtils::IsTimeValid(aWhen)) {
+    aRv.Throw(NS_ERROR_DOM_NOT_SUPPORTED_ERR);
+    return;
+  }
+
   if (!mStartCalled) {
     aRv.Throw(NS_ERROR_DOM_INVALID_STATE_ERR);
     return;
