@@ -1,6 +1,6 @@
-%define greversion 23.0a1
+%define greversion 24.0a1
 
-Name:       xulrunner
+Name:       xulrunner-qt5
 Summary:    XUL runner
 Version:    %{greversion}
 Release:    1
@@ -8,19 +8,21 @@ Group:      Applications/Internet
 License:    Mozilla License
 URL:        http://hg.mozilla.org/mozilla-central
 Source0:    %{name}-%{version}.tar.bz2
-BuildRequires:  pkgconfig(QtCore) >= 4.6.0
-BuildRequires:  pkgconfig(QtOpenGL)
-BuildRequires:  pkgconfig(QtGui)
-BuildRequires:  pkgconfig(xt)
+BuildRequires:  pkgconfig(Qt5Core)
+BuildRequires:  pkgconfig(Qt5Gui)
+BuildRequires:  pkgconfig(Qt5Network)
+BuildRequires:  pkgconfig(Qt5OpenGL)
+BuildRequires:  pkgconfig(Qt5Widgets)
+BuildRequires:  pkgconfig(Qt5PrintSupport)
 BuildRequires:  pkgconfig(pango)
 BuildRequires:  pkgconfig(alsa)
-BuildRequires:  pkgconfig(dbus-1)
-BuildRequires:  pkgconfig(dbus-glib-1)
 BuildRequires:  pkgconfig(gstreamer-0.10)
 BuildRequires:  pkgconfig(gstreamer-app-0.10)
 BuildRequires:  pkgconfig(gstreamer-plugins-base-0.10)
 BuildRequires:  pkgconfig(nspr) >= 4.9.6
 BuildRequires:  pkgconfig(nss) >= 3.14.3
+BuildRequires:  qt5-qttools
+BuildRequires:  qt5-default
 BuildRequires:  autoconf213
 BuildRequires:  automake
 BuildRequires:  python
@@ -28,6 +30,7 @@ BuildRequires:  python-devel
 BuildRequires:  zip
 BuildRequires:  unzip
 BuildRequires:  hunspell-devel
+BuildRequires:  libjpeg-turbo-devel
 %ifarch i586 i486 i386
 BuildRequires:  yasm
 %endif
@@ -37,16 +40,16 @@ BuildRequires:  fdupes
 Mozilla XUL runner
 
 %package devel
-Group: Development/Tools/Other
-Requires: xulrunner
+Group: Applications/Internet
+Requires: xulrunner-qt5
 Summary: Headers for xulrunner
 
 %description devel
 Development files for xulrunner.
 
 %package misc
-Group: Development/Tools/Other
-Requires: xulrunner
+Group: Applications/Internet
+Requires: xulrunner-qt5
 Summary: Misc files for xulrunner
 
 %description misc
@@ -61,7 +64,7 @@ export PYTHONPATH=$PWD/python:$PWD/config:$PWD/build:$PWD/xpcom/typelib/xpt/tool
 for i in $(find $PWD/python $PWD/testing/mozbase -mindepth 1 -maxdepth 1 -type d); do
   export PYTHONPATH+=:$i
 done
-SBOX_REDIRECT_FORCE=/usr/bin/python
+export SBOX_REDIRECT_FORCE=/usr/bin/python
 # hack for when not using virtualenv
 ln -sf $PWD/obj-build-mer-qt-xr/config.status $PWD/build/config.status
 
@@ -74,6 +77,8 @@ echo "ac_add_options --with-float-abi=toolchain-default" >> mozconfig
 echo "ac_add_options --with-thumb=toolchain-default" >> mozconfig
 %endif
 echo "mk_add_options MOZ_MAKE_FLAGS='-j%jobs'" >> mozconfig
+echo "export CFLAGS=\"\$CFLAGS -fuse-ld=gold \"" >> mozconfig
+echo "export CXXFLAGS=\"\$CXXFLAGS -fuse-ld=gold \"" >> mozconfig
 echo "export LD=ld.gold" >> mozconfig
 echo "ac_add_options --disable-tests" >> mozconfig
 echo "ac_add_options --enable-system-hunspell" >> mozconfig
@@ -82,6 +87,7 @@ echo "ac_add_options --disable-mochitest" >> mozconfig
 echo "ac_add_options --disable-installer" >> mozconfig
 echo "ac_add_options --disable-javaxpcom" >> mozconfig
 echo "ac_add_options --disable-crashreporter" >> mozconfig
+echo "ac_add_options --without-x" >> mozconfig
 export MOZCONFIG=mozconfig
 %{__make} -f client.mk build STRIP="/bin/true" %{?jobs:MOZ_MAKE_FLAGS="-j%jobs"}
 
@@ -91,7 +97,7 @@ export PYTHONPATH=$PWD/python:$PWD/config:$PWD/build:$PWD/xpcom/typelib/xpt/tool
 for i in $(find $PWD/python $PWD/testing/mozbase -mindepth 1 -maxdepth 1 -type d); do
   export PYTHONPATH+=:$i
 done
-SBOX_REDIRECT_FORCE=/usr/bin/python
+export SBOX_REDIRECT_FORCE=/usr/bin/python
 
 export MOZCONFIG=mozconfig
 %{__make} -f client.mk install DESTDIR=%{buildroot}

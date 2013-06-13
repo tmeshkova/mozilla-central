@@ -1,4 +1,4 @@
-%define greversion 23.0a1
+%define greversion 24.0a1
 
 Name:       xulrunner
 Summary:    XUL runner
@@ -61,7 +61,7 @@ export PYTHONPATH=$PWD/python:$PWD/config:$PWD/build:$PWD/xpcom/typelib/xpt/tool
 for i in $(find $PWD/python $PWD/testing/mozbase -mindepth 1 -maxdepth 1 -type d); do
   export PYTHONPATH+=:$i
 done
-SBOX_REDIRECT_FORCE=/usr/bin/python
+export SBOX_REDIRECT_FORCE=/usr/bin/python
 # hack for when not using virtualenv
 ln -sf $PWD/obj-build-mer-qt-xr/config.status $PWD/build/config.status
 
@@ -74,6 +74,8 @@ echo "ac_add_options --with-float-abi=toolchain-default" >> mozconfig
 echo "ac_add_options --with-thumb=toolchain-default" >> mozconfig
 %endif
 echo "mk_add_options MOZ_MAKE_FLAGS='-j%jobs'" >> mozconfig
+echo "export CFLAGS=\"\$CFLAGS -fuse-ld=gold \"" >> mozconfig
+echo "export CXXFLAGS=\"\$CXXFLAGS -fuse-ld=gold \"" >> mozconfig
 echo "export LD=ld.gold" >> mozconfig
 echo "ac_add_options --disable-tests" >> mozconfig
 echo "ac_add_options --enable-system-hunspell" >> mozconfig
@@ -91,7 +93,7 @@ export PYTHONPATH=$PWD/python:$PWD/config:$PWD/build:$PWD/xpcom/typelib/xpt/tool
 for i in $(find $PWD/python $PWD/testing/mozbase -mindepth 1 -maxdepth 1 -type d); do
   export PYTHONPATH+=:$i
 done
-SBOX_REDIRECT_FORCE=/usr/bin/python
+export SBOX_REDIRECT_FORCE=/usr/bin/python
 
 export MOZCONFIG=mozconfig
 %{__make} -f client.mk install DESTDIR=%{buildroot}
