@@ -63,7 +63,10 @@ sync_stage_modules := \
 sync_testing_modules := \
   fakeservices.js \
   rotaryengine.js \
-  utils.js \
+  $(NULL)
+
+sync_pp_modules := \
+  util.js \
   $(NULL)
 
 EXTRA_COMPONENTS := \
@@ -85,6 +88,10 @@ INSTALL_TARGETS += SYNC_ENGINES
 SYNC_STAGES_FILES := $(addprefix modules/stages/,$(sync_stage_modules))
 SYNC_STAGES_DEST = $(FINAL_TARGET)/modules/services-sync/stages
 INSTALL_TARGETS += SYNC_STAGES
+
+SYNC_PP_JS_MODULES := $(addprefix modules/,$(sync_pp_modules))
+SYNC_PP_JS_MODULES_PATH = $(FINAL_TARGET)/modules/services-sync
+SYNC_PP_TARGETS += SYNC_PP_JS_MODULES
 
 TESTING_JS_MODULES := $(addprefix modules-testing/,$(sync_testing_modules))
 TESTING_JS_MODULE_DIR := services/sync
