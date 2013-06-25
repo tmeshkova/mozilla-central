@@ -86,8 +86,8 @@
 #include <math.h>
 #include "xpcpublic.h"
 #include "jsapi.h"
-#include "jsdhash.h"
 #include "jsprf.h"
+#include "pldhash.h"
 #include "prprf.h"
 #include "jsdbgapi.h"
 #include "jsfriendapi.h"
@@ -97,8 +97,8 @@
 #include "nsXPCOM.h"
 #include "nsAutoPtr.h"
 #include "nsCycleCollectionParticipant.h"
-#include "nsCycleCollectionJSRuntime.h"
 #include "nsCycleCollectorUtils.h"
+#include "mozilla/CycleCollectedJSRuntime.h"
 #include "nsDebug.h"
 #include "nsISupports.h"
 #include "nsIServiceManager.h"
@@ -433,7 +433,6 @@ AddToCCKind(JSGCTraceKind kind)
 class nsXPConnect : public nsIXPConnect,
                     public nsIThreadObserver,
                     public nsSupportsWeakReference,
-                    public nsCycleCollectionJSRuntime,
                     public nsIJSRuntimeService,
                     public nsIJSEngineTelemetryStats
 {
@@ -462,11 +461,6 @@ public:
     static XPCJSRuntime* GetRuntimeInstance();
     XPCJSRuntime* GetRuntime() {return mRuntime;}
 
-#ifdef DEBUG
-    void SetObjectToUnlink(void* aObject);
-    void AssertNoObjectsToTrace(void* aPossibleJSHolder);
-#endif
-
     static JSBool IsISupportsDescendant(nsIInterfaceInfo* info);
 
     nsIXPCSecurityManager* GetDefaultSecurityManager() const
@@ -494,21 +488,6 @@ public:
 
     nsresult GetInfoForIID(const nsIID * aIID, nsIInterfaceInfo** info);
     nsresult GetInfoForName(const char * name, nsIInterfaceInfo** info);
-
-    // nsCycleCollectionJSRuntime
-    virtual bool NotifyLeaveMainThread();
-    virtual void NotifyEnterCycleCollectionThread();
-    virtual void NotifyLeaveCycleCollectionThread();
-    virtual void NotifyEnterMainThread();
-    virtual nsresult BeginCycleCollection(nsCycleCollectionNoteRootCallback &cb);
-    virtual nsCycleCollectionParticipant *GetParticipant();
-    virtual bool UsefulToMergeZones();
-    virtual void FixWeakMappingGrayBits();
-    virtual bool NeedCollect();
-    virtual void Collect(uint32_t reason);
-
-    // This returns the singleton nsCycleCollectionParticipant for JSContexts.
-    static nsCycleCollectionParticipant *JSContextParticipant();
 
     virtual nsIPrincipal* GetPrincipal(JSObject* obj,
                                        bool allowShortCircuit) const;
@@ -614,16 +593,19 @@ public:
 // In the current xpconnect system there can only be one XPCJSRuntime.
 // So, xpconnect can only be used on one JSRuntime within the process.
 
-// no virtuals. no refcounting.
 class XPCJSContextStack;
 class XPCIncrementalReleaseRunnable;
-class XPCJSRuntime
+class XPCJSRuntime : public mozilla::CycleCollectedJSRuntime
 {
 public:
     static XPCJSRuntime* newXPCJSRuntime(nsXPConnect* aXPConnect);
     static XPCJSRuntime* Get() { return nsXPConnect::XPConnect()->GetRuntime(); }
 
-    JSRuntime*     GetJSRuntime() const {return mJSRuntime;}
+    // Make this public for now.  Ideally we'd hide the JSRuntime inside.
+    JSRuntime* Runtime() const
+    {
+      return mozilla::CycleCollectedJSRuntime::Runtime();
+    }
 
     XPCJSContextStack* GetJSContextStack() {return mJSContextStack;}
     void DestroyJSContextStack();
@@ -671,6 +653,13 @@ public:
     XPCLock* GetMapLock() const {return mMapLock;}
 
     JSBool OnJSContextNew(JSContext* cx);
+
+    virtual bool
+    DescribeCustomObjects(JSObject* aObject, js::Class* aClasp,
+                          char (&aName)[72]) const;
+    virtual bool
+    NoteCustomGCThingXPCOMChildren(js::Class* aClasp, JSObject* aObj,
+                                   nsCycleCollectionTraversalCallback& aCb) const;
 
     bool DeferredRelease(nsISupports* obj);
 
@@ -749,11 +738,12 @@ public:
         return mStrings[index];
     }
 
-    static void TraceBlackJS(JSTracer* trc, void* data);
-    static void TraceGrayJS(JSTracer* trc, void* data);
-    void TraceXPConnectRoots(JSTracer *trc);
-    void AddXPConnectRoots(nsCycleCollectionNoteRootCallback& cb);
+    void TraceNativeBlackRoots(JSTracer* trc);
+    void TraceAdditionalNativeGrayRoots(JSTracer* aTracer);
+    void TraverseAdditionalNativeRoots(nsCycleCollectionNoteRootCallback& cb);
     void UnmarkSkippableJSHolders();
+    void PrepareForForgetSkippable() MOZ_OVERRIDE;
+    void PrepareForCollection() MOZ_OVERRIDE;
 
     static void GCCallback(JSRuntime *rt, JSGCStatus status);
     static void GCSliceCallback(JSRuntime *rt,
@@ -764,14 +754,6 @@ public:
     inline void AddVariantRoot(XPCTraceableVariant* variant);
     inline void AddWrappedJSRoot(nsXPCWrappedJS* wrappedJS);
     inline void AddObjectHolderRoot(XPCJSObjectHolder* holder);
-
-    void AddJSHolder(void* aHolder, nsScriptObjectTracer* aTracer);
-    void RemoveJSHolder(void* aHolder);
-    bool TestJSHolder(void* aHolder);
-#ifdef DEBUG
-    void SetObjectToUnlink(void* aObject) { mObjectToUnlink = aObject; }
-    void AssertNoObjectsToTrace(void* aPossibleJSHolder);
-#endif
 
     static void SuspectWrappedNative(XPCWrappedNative *wrapper,
                                      nsCycleCollectionNoteRootCallback &cb);
@@ -834,17 +816,17 @@ public:
 #ifdef XPC_CHECK_WRAPPERS_AT_SHUTDOWN
    void DEBUG_AddWrappedNative(nsIXPConnectWrappedNative* wrapper)
         {XPCAutoLock lock(GetMapLock());
-         JSDHashEntryHdr *entry =
-            JS_DHashTableOperate(DEBUG_WrappedNativeHashtable,
-                                 wrapper, JS_DHASH_ADD);
-         if (entry) ((JSDHashEntryStub *)entry)->key = wrapper;}
+         PLDHashEntryHdr *entry =
+            PL_DHashTableOperate(DEBUG_WrappedNativeHashtable,
+                                 wrapper, PL_DHASH_ADD);
+         if (entry) ((PLDHashEntryStub *)entry)->key = wrapper;}
 
    void DEBUG_RemoveWrappedNative(nsIXPConnectWrappedNative* wrapper)
         {XPCAutoLock lock(GetMapLock());
-         JS_DHashTableOperate(DEBUG_WrappedNativeHashtable,
-                              wrapper, JS_DHASH_REMOVE);}
+         PL_DHashTableOperate(DEBUG_WrappedNativeHashtable,
+                              wrapper, PL_DHASH_REMOVE);}
 private:
-   JSDHashTable* DEBUG_WrappedNativeHashtable;
+   PLDHashTable* DEBUG_WrappedNativeHashtable;
 public:
 #endif
 
@@ -878,7 +860,6 @@ private:
     jsid mStrIDs[IDX_TOTAL_COUNT];
     jsval mStrJSVals[IDX_TOTAL_COUNT];
 
-    JSRuntime*               mJSRuntime;
     XPCJSContextStack*       mJSContextStack;
     XPCCallContext*          mCallContext;
     AutoMarkingPtr*          mAutoRoots;
@@ -901,7 +882,6 @@ private:
     XPCRootSetElem *mVariantRoots;
     XPCRootSetElem *mWrappedJSRoots;
     XPCRootSetElem *mObjectHolderRoots;
-    nsDataHashtable<nsPtrHashKey<void>, nsScriptObjectTracer*> mJSHolders;
     PRLock *mWatchdogLock;
     PRCondVar *mWatchdogWakeup;
     PRThread *mWatchdogThread;
@@ -936,10 +916,6 @@ private:
 
     friend class AutoLockWatchdog;
     friend class XPCIncrementalReleaseRunnable;
-
-#ifdef DEBUG
-    void* mObjectToUnlink;
-#endif
 };
 
 /***************************************************************************/
@@ -1049,6 +1025,17 @@ private:
 //
 // Note that most accessors are inlined.
 
+// This is a dumb little thing to ensure that the XPCCallContext destructor
+// calls JS_DestroyContext after the JSAutoRequest is destroyed (if at all).
+// This will go away in a few days when bug 860085 removes this machinery.
+class AutoJSContextDestroyer
+{
+    JSContext *mCx;
+  public:
+    AutoJSContextDestroyer(JSContext *aCx) : mCx(aCx) {}
+    ~AutoJSContextDestroyer() { JS_DestroyContext(mCx); }
+};
+
 class MOZ_STACK_CLASS XPCCallContext : public nsAXPCNativeCallContext
 {
 public:
@@ -1112,8 +1099,7 @@ public:
     inline uint16_t                     GetMethodIndex() const ;
     inline void                         SetMethodIndex(uint16_t index) ;
 
-    inline JSBool   GetDestroyJSContextInDestructor() const;
-    inline void     SetDestroyJSContextInDestructor(JSBool b);
+    inline void     SetDestroyJSContextInDestructor();
 
     inline jsid GetResolveName() const;
     inline jsid SetResolveName(JS::HandleId name);
@@ -1163,6 +1149,9 @@ inline void CHECK_STATE(int s) const {NS_ASSERTION(mState >= s, "bad state");}
 #endif
 
 private:
+    mozilla::Maybe<AutoJSContextDestroyer>   mCxDestroyer;
+
+    JSAutoRequest                   mAr;
     State                           mState;
 
     nsXPConnect*                    mXPC;
@@ -1170,7 +1159,6 @@ private:
     XPCContext*                     mXPCContext;
     JSContext*                      mJSContext;
     JSBool                          mContextPopRequired;
-    JSBool                          mDestroyJSContextInDestructor;
 
     XPCContext::LangType            mCallerLanguage;
 
@@ -1227,11 +1215,11 @@ extern JSBool
 XPC_WN_GetterSetter(JSContext *cx, unsigned argc, jsval *vp);
 
 extern JSBool
-XPC_WN_JSOp_Enumerate(JSContext *cx, JSHandleObject obj, JSIterateOp enum_op,
-                      JSMutableHandleValue statep, JS::MutableHandleId idp);
+XPC_WN_JSOp_Enumerate(JSContext *cx, JS::HandleObject obj, JSIterateOp enum_op,
+                      JS::MutableHandleValue statep, JS::MutableHandleId idp);
 
 extern JSObject*
-XPC_WN_JSOp_ThisObject(JSContext *cx, JSHandleObject obj);
+XPC_WN_JSOp_ThisObject(JSContext *cx, JS::HandleObject obj);
 
 // Macros to initialize Object or Function like XPC_WN classes
 #define XPC_WN_WithCall_ObjectOps                                             \
@@ -3100,10 +3088,10 @@ public:
                                            const char** name,
                                            const char** format);
 
-    static void* IterateNSResults(nsresult* rv,
-                                  const char** name,
-                                  const char** format,
-                                  void** iterp);
+    static const void* IterateNSResults(nsresult* rv,
+                                        const char** name,
+                                        const char** format,
+                                        const void** iterp);
 
     static uint32_t GetNSResultCount();
 
@@ -3589,7 +3577,7 @@ extern char* xpc_CloneAllAccess();
 /***************************************************************************/
 // Returns access if wideName is in list
 
-extern char * xpc_CheckAccessList(const PRUnichar* wideName, const char* list[]);
+extern char * xpc_CheckAccessList(const PRUnichar* wideName, const char* const list[]);
 
 /***************************************************************************/
 // in xpcvariant.cpp...

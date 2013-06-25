@@ -4,8 +4,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef ObjectImpl_inl_h___
-#define ObjectImpl_inl_h___
+#ifndef vm_ObjectImpl_inl_h
+#define vm_ObjectImpl_inl_h
 
 #include "mozilla/Assertions.h"
 
@@ -16,9 +16,10 @@
 #include "gc/Heap.h"
 #include "gc/Marking.h"
 #include "js/TemplateLib.h"
+#include "vm/Interpreter.h"
+#include "vm/ObjectImpl.h"
 
-#include "Interpreter.h"
-#include "ObjectImpl.h"
+#include "gc/Barrier-inl.h"
 
 namespace js {
 
@@ -355,16 +356,8 @@ js::ObjectImpl::tenuredSizeOfThis() const
 JS_ALWAYS_INLINE JS::Zone *
 js::ObjectImpl::zone() const
 {
+    JS_ASSERT(InSequentialOrExclusiveParallelSection());
     return shape_->zone();
-}
-
-JS_ALWAYS_INLINE JS::Zone *
-ZoneOfValue(const JS::Value &value)
-{
-    JS_ASSERT(value.isMarkable());
-    if (value.isObject())
-        return value.toObject().zone();
-    return static_cast<js::gc::Cell *>(value.toGCThing())->tenuredZone();
 }
 
 /* static */ inline void
@@ -373,7 +366,7 @@ js::ObjectImpl::readBarrier(ObjectImpl *obj)
 #ifdef JSGC_INCREMENTAL
     Zone *zone = obj->zone();
     if (zone->needsBarrier()) {
-        MOZ_ASSERT(!zone->rt->isHeapBusy());
+        MOZ_ASSERT(!zone->rt->isHeapMajorCollecting());
         JSObject *tmp = obj->asObjectPtr();
         MarkObjectUnbarriered(zone->barrierTracer(), &tmp, "read barrier");
         MOZ_ASSERT(tmp == obj->asObjectPtr());
@@ -414,7 +407,7 @@ js::ObjectImpl::writeBarrierPre(ObjectImpl *obj)
 
     Zone *zone = obj->zone();
     if (zone->needsBarrier()) {
-        MOZ_ASSERT(!zone->rt->isHeapBusy());
+        MOZ_ASSERT(!zone->rt->isHeapMajorCollecting());
         JSObject *tmp = obj->asObjectPtr();
         MarkObjectUnbarriered(zone->barrierTracer(), &tmp, "write barrier");
         MOZ_ASSERT(tmp == obj->asObjectPtr());
@@ -462,4 +455,4 @@ js::ObjectImpl::initPrivate(void *data)
     privateRef(numFixedSlots()) = data;
 }
 
-#endif /* ObjectImpl_inl_h__ */
+#endif /* vm_ObjectImpl_inl_h */
