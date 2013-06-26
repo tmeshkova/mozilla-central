@@ -18,6 +18,7 @@
 
 /* a presentation of a document, part 2 */
 
+#include "mozilla/MemoryReporting.h"
 #include "mozilla/dom/PBrowserChild.h"
 #include "mozilla/dom/TabChild.h"
 #include "mozilla/Likely.h"
@@ -9447,7 +9448,7 @@ PresShell::GetRootPresShell()
 }
 
 void
-PresShell::SizeOfIncludingThis(nsMallocSizeOfFun aMallocSizeOf,
+PresShell::SizeOfIncludingThis(MallocSizeOf aMallocSizeOf,
                                nsArenaMemoryStats *aArenaObjectsSize,
                                size_t *aPresShellSize,
                                size_t *aStyleSetsSize,
@@ -9466,7 +9467,7 @@ PresShell::SizeOfIncludingThis(nsMallocSizeOfFun aMallocSizeOf,
 }
 
 size_t
-PresShell::SizeOfTextRuns(nsMallocSizeOfFun aMallocSizeOf) const
+PresShell::SizeOfTextRuns(MallocSizeOf aMallocSizeOf) const
 {
   nsIFrame* rootFrame = mFrameConstructor->GetRootFrame();
   if (!rootFrame) {
