@@ -62,7 +62,7 @@ TabChildHelper::TabChildHelper(EmbedLiteViewThreadChild* aView)
                                  DETECT_SCROLLABLE_SUBFRAME,
                                  false);
   }
-  if (!mCx && !InitTabChildGlobal()) {
+  if (!InitTabChildGlobal()) {
     NS_WARNING("Failed to register child global ontext");
   }
 }
@@ -146,7 +146,7 @@ NS_IMPL_ISUPPORTS1(TabChildHelper, nsIObserver)
 bool
 TabChildHelper::InitTabChildGlobal()
 {
-  if (mCx && mTabChildGlobal) {
+  if (mTabChildGlobal) {
     return true;
   }
 
@@ -254,8 +254,6 @@ TabChildHelper::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
     }
   }
 
-  mLastMetrics = aFrameMetrics;
-
   return true;
 }
 
@@ -268,7 +266,7 @@ TabChildHelper::WebNavigation()
 bool
 TabChildHelper::DoLoadFrameScript(const nsAString& aURL)
 {
-  if (!mCx && !InitTabChildGlobal())
+  if (!InitTabChildGlobal())
     // This can happen if we're half-destroyed.  It's not a fatal
     // error.
   {
@@ -299,18 +297,18 @@ TabChildHelper::DoSendSyncMessage(const nsAString& aMessage,
   }
 
   NS_ENSURE_TRUE(InitTabChildGlobal(), false);
-  JSAutoRequest ar(mCx);
+  JSAutoRequest ar(GetJSContext());
 
   // FIXME: Need callback interface for simple JSON to avoid useless conversion here
   jsval jv = JSVAL_NULL;
   if (aData.mDataLength &&
-      !ReadStructuredClone(mCx, aData, &jv)) {
-    JS_ClearPendingException(mCx);
+      !ReadStructuredClone(GetJSContext(), aData, &jv)) {
+    JS_ClearPendingException(GetJSContext());
     return false;
   }
 
   nsAutoString json;
-  NS_ENSURE_TRUE(JS_Stringify(mCx, &jv, nullptr, JSVAL_NULL, JSONCreator, &json), false);
+  NS_ENSURE_TRUE(JS_Stringify(GetJSContext(), &jv, nullptr, JSVAL_NULL, JSONCreator, &json), false);
   NS_ENSURE_TRUE(!json.IsEmpty(), false);
 
   return mView->DoSendSyncMessage(nsString(aMessage).get(), json.get(), aJSONRetVal);
@@ -326,18 +324,18 @@ TabChildHelper::DoSendAsyncMessage(const nsAString& aMessage,
   }
 
   NS_ENSURE_TRUE(InitTabChildGlobal(), false);
-  JSAutoRequest ar(mCx);
+  JSAutoRequest ar(GetJSContext());
 
   // FIXME: Need callback interface for simple JSON to avoid useless conversion here
   jsval jv = JSVAL_NULL;
   if (aData.mDataLength &&
-      !ReadStructuredClone(mCx, aData, &jv)) {
-    JS_ClearPendingException(mCx);
+      !ReadStructuredClone(GetJSContext(), aData, &jv)) {
+    JS_ClearPendingException(GetJSContext());
     return false;
   }
 
   nsAutoString json;
-  NS_ENSURE_TRUE(JS_Stringify(mCx, &jv, nullptr, JSVAL_NULL, JSONCreator, &json), false);
+  NS_ENSURE_TRUE(JS_Stringify(GetJSContext(), &jv, nullptr, JSVAL_NULL, JSONCreator, &json), false);
   NS_ENSURE_TRUE(!json.IsEmpty(), false);
 
   return mView->DoSendAsyncMessage(nsString(aMessage).get(), json.get());
@@ -355,15 +353,15 @@ TabChildHelper::RecvAsyncMessage(const nsAString& aMessageName,
                                  const nsAString& aJSONData)
 {
   NS_ENSURE_TRUE(InitTabChildGlobal(), false);
-  JSAutoRequest ar(mCx);
-  JS::Rooted<JS::Value> json(mCx, JS::NullValue());
+  JSAutoRequest ar(GetJSContext());
+  JS::Rooted<JS::Value> json(GetJSContext(), JS::NullValue());
   StructuredCloneData cloneData;
   JSAutoStructuredCloneBuffer buffer;
-  if (JS_ParseJSON(mCx,
+  if (JS_ParseJSON(GetJSContext(),
                    static_cast<const jschar*>(aJSONData.BeginReading()),
                    aJSONData.Length(),
                    &json)) {
-    WriteStructuredClone(mCx, json, buffer, cloneData.mClosure);
+    WriteStructuredClone(GetJSContext(), json, buffer, cloneData.mClosure);
     cloneData.mData = buffer.data();
     cloneData.mDataLength = buffer.nbytes();
   }
@@ -534,7 +532,7 @@ TabChildHelper::DispatchSynthesizedMouseEvent(const nsTouchEvent& aEvent)
       msg = NS_MOUSE_BUTTON_UP;
       break;
     default:
-      MOZ_NOT_REACHED("Unknown touch event message");
+      NS_ERROR("Unknown touch event message");
   }
 
   // get the widget to send the event to
@@ -590,4 +588,10 @@ TabChildHelper::DispatchSynthesizedMouseEvent(uint32_t aMsg, uint64_t aTime,
   }
 
   DispatchWidgetEvent(event);
+}
+
+JSContext*
+TabChildHelper::GetJSContext()
+{
+  return mCx;
 }

@@ -580,7 +580,6 @@ EmbedLiteViewThreadChild::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
 
   bool ret = true;
   if (sHandleDefaultAZPC.viewport) {
-    const mozilla::layers::FrameMetrics& prevMetrics = mHelper->LastFrameMetrics();
     mLastAPZCTo = nsIntPoint(aFrameMetrics.mScrollOffset.x, aFrameMetrics.mScrollOffset.y);
     ret = mHelper->RecvUpdateFrame(aFrameMetrics);
   }
