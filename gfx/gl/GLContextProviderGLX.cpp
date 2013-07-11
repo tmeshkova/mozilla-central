@@ -1452,7 +1452,7 @@ DONE_CREATING_PIXMAP:
                                                   display,
                                                   glxpixmap,
                                                   cfgs[chosenIndex],
-                                                  false,
+                                                  true,
                                                   libToUse,
                                                   xsurface);
     }
