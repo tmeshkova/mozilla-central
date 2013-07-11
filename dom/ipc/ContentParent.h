@@ -44,6 +44,10 @@ class URIParams;
 class TestShellParent;
 } // namespace ipc
 
+namespace jsipc {
+class JavaScriptParent;
+}
+
 namespace layers {
 class PCompositorParent;
 } // namespace layers
@@ -115,6 +119,7 @@ public:
     virtual bool CheckPermission(const nsAString& aPermission) MOZ_OVERRIDE;
     virtual bool CheckManifestURL(const nsAString& aManifestURL) MOZ_OVERRIDE;
     virtual bool CheckAppHasPermission(const nsAString& aPermission) MOZ_OVERRIDE;
+    virtual bool CheckAppHasStatus(unsigned short aStatus) MOZ_OVERRIDE;
 
     /** Notify that a tab is beginning its destruction sequence. */
     void NotifyTabDestroying(PBrowserParent* aTab);
@@ -125,6 +130,7 @@ public:
     TestShellParent* CreateTestShell();
     bool DestroyTestShell(TestShellParent* aTestShell);
     TestShellParent* GetTestShellSingleton();
+    jsipc::JavaScriptParent *GetCPOWManager();
 
     void ReportChildAlreadyBlocked();
     bool RequestRunToCompletion();
@@ -193,6 +199,7 @@ private:
     // using them.
     using PContentParent::SendPBrowserConstructor;
     using PContentParent::SendPTestShellConstructor;
+    using PContentParent::SendPJavaScriptConstructor;
 
     // No more than one of !!aApp, aIsForBrowser, and aIsForPreallocated may be
     // true.
@@ -249,6 +256,9 @@ private:
                                           bool* aIsForApp,
                                           bool* aIsForBrowser) MOZ_OVERRIDE;
     virtual bool RecvGetXPCOMProcessAttributes(bool* aIsOffline) MOZ_OVERRIDE;
+
+    virtual mozilla::jsipc::PJavaScriptParent* AllocPJavaScript();
+    virtual bool DeallocPJavaScript(mozilla::jsipc::PJavaScriptParent*);
 
     virtual PBrowserParent* AllocPBrowser(const IPCTabContext& aContext,
                                           const uint32_t& aChromeFlags);
@@ -413,8 +423,6 @@ private:
 
     uint64_t mChildID;
     int32_t mGeolocationWatchID;
-    int mRunToCompletionDepth;
-    bool mShouldCallUnblockChild;
 
     // This is a cache of all of the memory reporters
     // registered in the child process.  To update this, one

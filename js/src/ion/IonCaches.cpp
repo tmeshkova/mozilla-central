@@ -6,17 +6,17 @@
 
 #include "mozilla/DebugOnly.h"
 
-#include "PerfSpewer.h"
-#include "CodeGenerator.h"
-#include "Ion.h"
-#include "IonCaches.h"
-#include "IonLinker.h"
-#include "IonSpewer.h"
-#include "VMFunctions.h"
+#include "ion/PerfSpewer.h"
+#include "ion/CodeGenerator.h"
+#include "ion/Ion.h"
+#include "ion/IonCaches.h"
+#include "ion/IonLinker.h"
+#include "ion/IonSpewer.h"
+#include "ion/VMFunctions.h"
 
 #include "vm/Shape.h"
 
-#include "IonFrames-inl.h"
+#include "ion/IonFrames-inl.h"
 
 #include "vm/Interpreter-inl.h"
 
@@ -1213,7 +1213,7 @@ GetPropertyIC::attachArrayLength(JSContext *cx, IonScript *ion, JSObject *obj)
 bool
 GetPropertyIC::attachTypedArrayLength(JSContext *cx, IonScript *ion, JSObject *obj)
 {
-    JS_ASSERT(obj->isTypedArray());
+    JS_ASSERT(obj->is<TypedArrayObject>());
     JS_ASSERT(!idempotent());
 
     Label failures;
@@ -1231,11 +1231,11 @@ GetPropertyIC::attachTypedArrayLength(JSContext *cx, IonScript *ion, JSObject *o
 
     // Implement the negated version of JSObject::isTypedArray predicate.
     masm.loadObjClass(object(), tmpReg);
-    masm.branchPtr(Assembler::Below, tmpReg, ImmWord(&TypedArray::classes[0]), &failures);
-    masm.branchPtr(Assembler::AboveOrEqual, tmpReg, ImmWord(&TypedArray::classes[TypedArray::TYPE_MAX]), &failures);
+    masm.branchPtr(Assembler::Below, tmpReg, ImmWord(&TypedArrayObject::classes[0]), &failures);
+    masm.branchPtr(Assembler::AboveOrEqual, tmpReg, ImmWord(&TypedArrayObject::classes[TypedArrayObject::TYPE_MAX]), &failures);
 
     // Load length.
-    masm.loadTypedOrValue(Address(object(), TypedArray::lengthOffset()), output());
+    masm.loadTypedOrValue(Address(object(), TypedArrayObject::lengthOffset()), output());
 
     /* Success. */
     attacher.jumpRejoin(masm);
@@ -1481,7 +1481,7 @@ GetPropertyIC::update(JSContext *cx, size_t cacheIndex,
                 // The next execution should cause an invalidation because the type
                 // does not fit.
                 isCacheable = false;
-            } else if (obj->isTypedArray() && !cache.hasTypedArrayLengthStub()) {
+            } else if (obj->is<TypedArrayObject>() && !cache.hasTypedArrayLengthStub()) {
                 isCacheable = true;
                 if (!cache.attachTypedArrayLength(cx, ion, obj))
                     return false;
@@ -1580,15 +1580,8 @@ bool
 ParallelGetPropertyIC::canAttachReadSlot(LockedJSContext &cx, JSObject *obj,
                                          MutableHandleObject holder, MutableHandleShape shape)
 {
-    // Parallel execution should only cache native objects.
-    if (!obj->isNative())
-        return false;
-
-    if (IsIdempotentAndMaybeHasHooks(*this, obj))
-        return false;
-
-    // Bail if we have hooks.
-    if (obj->getOps()->lookupProperty || obj->getOps()->lookupGeneric)
+    // Bail if we have hooks or are not native.
+    if (!obj->hasIdempotentProtoChain())
         return false;
 
     if (!js::LookupPropertyPure(obj, NameToId(name()), holder.address(), shape.address()))
@@ -1603,9 +1596,6 @@ ParallelGetPropertyIC::canAttachReadSlot(LockedJSContext &cx, JSObject *obj,
     {
         return false;
     }
-
-    if (IsIdempotentAndHasSingletonHolder(*this, holder, shape))
-        return false;
 
     return true;
 }
@@ -1626,11 +1616,7 @@ ParallelGetPropertyIC::attachReadSlot(LockedJSContext &cx, IonScript *ion,
     MacroAssembler masm(cx);
     GenerateReadSlot(cx, ion, masm, attacher, obj, name(), holder, shape, object(), output());
 
-    const char *attachKind = "parallel non-idempotent reading";
-    if (idempotent())
-        attachKind = "parallel idempotent reading";
-
-    if (!linkAndAttachStub(cx, masm, attacher, ion, attachKind))
+    if (!linkAndAttachStub(cx, masm, attacher, ion, "parallel reading"))
         return false;
 
     *attachedStub = true;
@@ -1651,17 +1637,13 @@ ParallelGetPropertyIC::update(ForkJoinSlice *slice, size_t cacheIndex,
 
     ParallelGetPropertyIC &cache = ion->getCache(cacheIndex).toParallelGetProperty();
 
-    RootedScript script(pt);
-    jsbytecode *pc;
-    cache.getScriptedLocation(&script, &pc);
-
     // Grab the property early, as the pure path is fast anyways and doesn't
     // need a lock. If we can't do it purely, bail out of parallel execution.
     if (!GetPropertyPure(obj, NameToId(cache.name()), vp.address()))
         return TP_RETRY_SEQUENTIALLY;
 
-    // Avoid unnecessary locking if cannot attach stubs and idempotent.
-    if (cache.idempotent() && !cache.canAttachStub())
+    // Avoid unnecessary locking if cannot attach stubs.
+    if (!cache.canAttachStub())
         return TP_SUCCESS;
 
     {
@@ -1687,24 +1669,10 @@ ParallelGetPropertyIC::update(ForkJoinSlice *slice, size_t cacheIndex,
                 return TP_FATAL;
 
             if (!attachedStub) {
-                if (cache.idempotent())
-                    topScript->invalidatedIdempotentCache = true;
-
                 // ParallelDo will take care of invalidating all bailed out
                 // scripts, so just bail out now.
                 return TP_RETRY_SEQUENTIALLY;
             }
-        }
-
-        if (!cache.idempotent()) {
-#if JS_HAS_NO_SUCH_METHOD
-            // Straight up bail if there's this __noSuchMethod__ hook.
-            if (JSOp(*pc) == JSOP_CALLPROP && JS_UNLIKELY(vp.isPrimitive()))
-                return TP_RETRY_SEQUENTIALLY;
-#endif
-
-            // Monitor changes to cache entry.
-            types::TypeScript::Monitor(cx, script, pc, vp);
         }
     }
 
@@ -2065,7 +2033,7 @@ IsPropertyAddInlineable(JSContext *cx, HandleObject obj, HandleId id, uint32_t o
     if (obj->getClass()->addProperty != JS_PropertyStub)
         return false;
 
-    if (!obj->isExtensible() || !shape->writable())
+    if (!obj->nonProxyIsExtensible() || !shape->writable())
         return false;
 
     // walk up the object prototype chain and ensure that all prototypes
@@ -2257,22 +2225,20 @@ GetElementIC::attachDenseElement(JSContext *cx, IonScript *ion, JSObject *obj, c
 }
 
 bool
-GetElementIC::attachTypedArrayElement(JSContext *cx, IonScript *ion, JSObject *obj,
+GetElementIC::attachTypedArrayElement(JSContext *cx, IonScript *ion, TypedArrayObject *tarr,
                                       const Value &idval)
 {
-    JS_ASSERT(obj->isTypedArray());
-
     Label failures;
     MacroAssembler masm(cx);
     RepatchStubAppender attacher(*this);
 
     // The array type is the object within the table of typed array classes.
-    int arrayType = TypedArray::type(obj);
+    int arrayType = tarr->type();
 
     // The output register is not yet specialized as a float register, the only
     // way to accept float typed arrays for now is to return a Value type.
-    DebugOnly<bool> floatOutput = arrayType == TypedArray::TYPE_FLOAT32 ||
-                                  arrayType == TypedArray::TYPE_FLOAT64;
+    DebugOnly<bool> floatOutput = arrayType == TypedArrayObject::TYPE_FLOAT32 ||
+                                  arrayType == TypedArrayObject::TYPE_FLOAT64;
     JS_ASSERT_IF(!output().hasValue(), !floatOutput);
 
     Register tmpReg = output().scratchReg().gpr();
@@ -2280,7 +2246,7 @@ GetElementIC::attachTypedArrayElement(JSContext *cx, IonScript *ion, JSObject *o
 
     // Check that the typed array is of the same type as the current object
     // because load size differ in function of the typed array data width.
-    masm.branchTestObjClass(Assembler::NotEqual, object(), tmpReg, obj->getClass(), &failures);
+    masm.branchTestObjClass(Assembler::NotEqual, object(), tmpReg, tarr->getClass(), &failures);
 
     // Decide to what type index the stub should be optimized
     Register indexReg = tmpReg;
@@ -2334,7 +2300,7 @@ GetElementIC::attachTypedArrayElement(JSContext *cx, IonScript *ion, JSObject *o
     }
 
     // Guard on the initialized length.
-    Address length(object(), TypedArray::lengthOffset());
+    Address length(object(), TypedArrayObject::lengthOffset());
     masm.branch32(Assembler::BelowOrEqual, length, indexReg, &failures);
 
     // Save the object register on the stack in case of failure.
@@ -2343,11 +2309,11 @@ GetElementIC::attachTypedArrayElement(JSContext *cx, IonScript *ion, JSObject *o
     masm.push(object());
 
     // Load elements vector.
-    masm.loadPtr(Address(object(), TypedArray::dataOffset()), elementReg);
+    masm.loadPtr(Address(object(), TypedArrayObject::dataOffset()), elementReg);
 
     // Load the value. We use an invalid register because the destination
     // register is necessary a non double register.
-    int width = TypedArray::slotWidth(arrayType);
+    int width = TypedArrayObject::slotWidth(arrayType);
     BaseIndex source(elementReg, indexReg, ScaleFromElemWidth(width));
     if (output().hasValue())
         masm.loadFromTypedArray(arrayType, source, output().valueReg(), true,
@@ -2531,15 +2497,16 @@ GetElementIC::update(JSContext *cx, size_t cacheIndex, HandleObject obj,
                 return false;
             attachedStub = true;
         }
-        if (!attachedStub && obj->isTypedArray()) {
+        if (!attachedStub && obj->is<TypedArrayObject>()) {
             if ((idval.isInt32()) ||
                 (idval.isString() && GetIndexFromString(idval.toString()) != UINT32_MAX))
             {
-                int arrayType = TypedArray::type(obj);
-                bool floatOutput = arrayType == TypedArray::TYPE_FLOAT32 ||
-                                   arrayType == TypedArray::TYPE_FLOAT64;
+                Rooted<TypedArrayObject*> tarr(cx, &obj->as<TypedArrayObject>());
+                int arrayType = tarr->type();
+                bool floatOutput = arrayType == TypedArrayObject::TYPE_FLOAT32 ||
+                                   arrayType == TypedArrayObject::TYPE_FLOAT64;
                 if (!floatOutput || cache.output().hasValue()) {
-                    if (!cache.attachTypedArrayElement(cx, ion, obj, idval))
+                    if (!cache.attachTypedArrayElement(cx, ion, tarr, idval))
                         return false;
                     attachedStub = true;
                 }
@@ -2834,8 +2801,7 @@ IsCacheableScopeChain(JSObject *scopeChain, JSObject *holder)
         }
     }
 
-    JS_NOT_REACHED("Shouldn't get here");
-    return false;
+    MOZ_ASSUME_UNREACHABLE();
 }
 
 JSObject *

@@ -218,6 +218,9 @@ pref("media.navigator.enabled", true);
 // TextTrack support
 pref("media.webvtt.enabled", false);
 
+// Whether to enable MediaSource support
+pref("media.mediasource.enabled", false);
+
 #ifdef MOZ_WEBSPEECH
 pref("media.webspeech.recognition.enable", false);
 #endif
@@ -777,6 +780,9 @@ pref("dom.forms.color", false);
 
 // Enables system messages and activities
 pref("dom.sysmsg.enabled", false);
+
+// Enable pre-installed applications.
+pref("dom.webapps.useCurrentProfile", false);
 
 // Parsing perf prefs. For now just mimic what the old code did.
 #ifndef XP_WIN
@@ -1927,7 +1933,7 @@ pref("svg.paint-order.enabled", true);
 #endif
 
 // Is support for the new SVG text implementation enabled?
-pref("svg.text.css-frames.enabled", false);
+pref("svg.text.css-frames.enabled", true);
 
 pref("font.minimum-size.ar", 0);
 pref("font.minimum-size.x-armn", 0);
@@ -3912,14 +3918,6 @@ pref("browser.zoom.reflowZoom.reflowTimeout", 500);
  */
 pref("browser.zoom.reflowZoom.reflowTextOnPageLoad", true);
 
-
-/**
- * The minimum font size to maintain when double-tap zooming into an element, in
- * twips. The browser will attempt to make the frame large enough to enlarge the
- * font size to this value.
- */
-pref("browser.zoom.reflowZoom.minFontSizeTwips", 120);
-
 // Image-related prefs
 // The maximum size, in bytes, of the decoded images we cache
 pref("image.cache.size", 5242880);
@@ -4041,6 +4039,7 @@ pref("layers.acceleration.force-enabled", false);
 pref("layers.acceleration.draw-fps", false);
 
 pref("layers.draw-borders", false);
+pref("layers.frame-counter", false);
 
 #ifdef XP_MACOSX
 pref("layers.offmainthreadcomposition.enabled", true);
@@ -4211,6 +4210,18 @@ pref("memory.ghost_window_timeout_seconds", 60);
 pref("memory.free_dirty_pages", false);
 
 pref("social.enabled", false);
+// comma separated list of domain origins (e.g. https://domain.com) for
+// providers that can install from their own website without user warnings.
+// entries are
+pref("social.whitelist", "https://mozsocial.cliqz.com,https://now.msn.com,https://mixi.jp");
+// omma separated list of domain origins (e.g. https://domain.com) for directory
+// websites (e.g. AMO) that can install providers for other sites
+pref("social.directories", "https://addons.mozilla.org");
+// remote-install allows any website to activate a provider, with extended UI
+// notifying user of installation. we can later pref off remote install if
+// necessary. This does not affect whitelisted and directory installs.
+pref("social.remote-install.enabled", true);
+pref("social.toast-notifications.enabled", true);
 
 // Disable idle observer fuzz, because only privileged content can access idle
 // observers (bug 780507).
@@ -4269,6 +4280,9 @@ pref("dom.mms.retrievalRetryIntervals", "60000,300000,600000,1800000");
 
 // Debug enabler for MMS.
 pref("mms.debugging.enabled", false);
+
+// Number of RadioInterface instances to create.
+pref("ril.numRadioInterfaces", 1);
 
 // If the user puts a finger down on an element and we think the user
 // might be executing a pan gesture, how long do we wait before

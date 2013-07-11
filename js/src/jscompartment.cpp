@@ -23,6 +23,7 @@
 #include "js/RootingAPI.h"
 #include "vm/StopIterationObject.h"
 
+#include "jsfuninlines.h"
 #include "jsgcinlines.h"
 #include "jsobjinlines.h"
 
@@ -33,8 +34,9 @@ using namespace js::gc;
 
 using mozilla::DebugOnly;
 
-JSCompartment::JSCompartment(Zone *zone)
+JSCompartment::JSCompartment(Zone *zone, const JS::CompartmentOptions &options = JS::CompartmentOptions())
   : zone_(zone),
+    options_(options),
     rt(zone->rt),
     principals(NULL),
     isSystem(false),
@@ -489,6 +491,8 @@ JSCompartment::markAllCrossCompartmentWrappers(JSTracer *trc)
 void
 JSCompartment::mark(JSTracer *trc)
 {
+    JS_ASSERT(!trc->runtime->isHeapMinorCollecting());
+
 #ifdef JS_ION
     if (ionCompartment_)
         ionCompartment_->mark(trc, this);

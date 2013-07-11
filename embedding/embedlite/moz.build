@@ -48,3 +48,8 @@ CPP_SOURCES += [
     'EmbedLiteModulesService.cpp',
     'EmbedLiteXulAppInfo.cpp',
 ]
+
+IPDL_SOURCES += [
+    'PEmbedLiteApp.ipdl',
+    'PEmbedLiteView.ipdl'
+]

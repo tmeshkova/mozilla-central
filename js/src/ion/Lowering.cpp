@@ -4,17 +4,19 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "LIR.h"
-#include "Lowering.h"
-#include "MIR.h"
-#include "MIRGraph.h"
-#include "IonSpewer.h"
-#include "RangeAnalysis.h"
+#include "ion/LIR.h"
+#include "ion/Lowering.h"
+#include "ion/MIR.h"
+#include "ion/MIRGraph.h"
+#include "ion/IonSpewer.h"
+#include "ion/RangeAnalysis.h"
 #include "jsanalyze.h"
 #include "jsbool.h"
 #include "jsnum.h"
-#include "shared/Lowering-shared-inl.h"
+#include "ion/shared/Lowering-shared-inl.h"
 #include "mozilla/DebugOnly.h"
+
+#include "jsinferinlines.h"
 
 using namespace js;
 using namespace ion;
@@ -843,8 +845,7 @@ LIRGenerator::visitCompare(MCompare *comp)
         return define(lir, comp);
     }
 
-    JS_NOT_REACHED("Unrecognized compare type.");
-    return false;
+    MOZ_ASSUME_UNREACHABLE("Unrecognized compare type.");
 }
 
 static void
@@ -1324,6 +1325,28 @@ LIRGenerator::visitConcat(MConcat *ins)
 }
 
 bool
+LIRGenerator::visitParConcat(MParConcat *ins)
+{
+    MDefinition *parSlice = ins->parSlice();
+    MDefinition *lhs = ins->lhs();
+    MDefinition *rhs = ins->rhs();
+
+    JS_ASSERT(lhs->type() == MIRType_String);
+    JS_ASSERT(rhs->type() == MIRType_String);
+    JS_ASSERT(ins->type() == MIRType_String);
+
+    LParConcat *lir = new LParConcat(useFixed(parSlice, CallTempReg5),
+                                     useFixed(lhs, CallTempReg0),
+                                     useFixed(rhs, CallTempReg1),
+                                     tempFixed(CallTempReg2),
+                                     tempFixed(CallTempReg3),
+                                     tempFixed(CallTempReg4));
+    if (!defineFixed(lir, ins, LAllocation(AnyRegister(CallTempReg6))))
+        return false;
+    return assignSafepoint(lir, ins);
+}
+
+bool
 LIRGenerator::visitCharCodeAt(MCharCodeAt *ins)
 {
     MDefinition *str = ins->getOperand(0);
@@ -1430,8 +1453,7 @@ LIRGenerator::visitToDouble(MToDouble *convert)
       default:
         // Objects might be effectful.
         // Strings are complicated - we don't handle them yet.
-        JS_NOT_REACHED("unexpected type");
-        return false;
+        MOZ_ASSUME_UNREACHABLE("unexpected type");
     }
 }
 
@@ -1477,8 +1499,7 @@ LIRGenerator::visitToInt32(MToInt32 *convert)
         return false;
 
       default:
-        JS_NOT_REACHED("unexpected type");
-        return false;
+        MOZ_ASSUME_UNREACHABLE("unexpected type");
     }
 }
 
@@ -1510,8 +1531,7 @@ LIRGenerator::visitTruncateToInt32(MTruncateToInt32 *truncate)
       default:
         // Objects might be effectful.
         // Strings are complicated - we don't handle them yet.
-        JS_NOT_REACHED("unexpected type");
-        return false;
+        MOZ_ASSUME_UNREACHABLE("unexpected type");
     }
 }
 
@@ -1521,12 +1541,18 @@ LIRGenerator::visitToString(MToString *ins)
     MDefinition *opd = ins->input();
 
     switch (opd->type()) {
-      case MIRType_Double:
       case MIRType_Null:
       case MIRType_Undefined:
       case MIRType_Boolean:
-        JS_NOT_REACHED("NYI: Lower MToString");
-        return false;
+        MOZ_ASSUME_UNREACHABLE("NYI: Lower MToString");
+
+      case MIRType_Double: {
+        LDoubleToString *lir = new LDoubleToString(useRegister(opd), temp());
+
+        if (!define(lir, ins))
+            return false;
+        return assignSafepoint(lir, ins);
+      }
 
       case MIRType_Int32: {
         LIntToString *lir = new LIntToString(useRegister(opd));
@@ -1538,8 +1564,7 @@ LIRGenerator::visitToString(MToString *ins)
 
       default:
         // Objects might be effectful. (see ToPrimitive)
-        JS_NOT_REACHED("unexpected type");
-        return false;
+        MOZ_ASSUME_UNREACHABLE("unexpected type");
     }
 }
 
@@ -1632,8 +1657,7 @@ LIRGenerator::visitLoadSlot(MLoadSlot *ins)
 
       case MIRType_Undefined:
       case MIRType_Null:
-        JS_NOT_REACHED("typed load must have a payload");
-        return false;
+        MOZ_ASSUME_UNREACHABLE("typed load must have a payload");
 
       default:
         return define(new LLoadSlotT(useRegister(ins->slots())), ins);
@@ -1878,8 +1902,7 @@ LIRGenerator::visitNot(MNot *ins)
       }
 
       default:
-        JS_NOT_REACHED("Unexpected MIRType.");
-        return false;
+        MOZ_ASSUME_UNREACHABLE("Unexpected MIRType.");
     }
 }
 
@@ -1947,8 +1970,7 @@ LIRGenerator::visitLoadElement(MLoadElement *ins)
       }
       case MIRType_Undefined:
       case MIRType_Null:
-        JS_NOT_REACHED("typed load must have a payload");
-        return false;
+        MOZ_ASSUME_UNREACHABLE("typed load must have a payload");
 
       default:
       {
@@ -2054,8 +2076,7 @@ LIRGenerator::visitArrayPopShift(MArrayPopShift *ins)
       }
       case MIRType_Undefined:
       case MIRType_Null:
-        JS_NOT_REACHED("typed load must have a payload");
-        return false;
+        MOZ_ASSUME_UNREACHABLE("typed load must have a payload");
 
       default:
       {
@@ -2117,7 +2138,7 @@ LIRGenerator::visitLoadTypedArrayElement(MLoadTypedArrayElement *ins)
 
     // We need a temp register for Uint32Array with known double result.
     LDefinition tempDef = LDefinition::BogusTemp();
-    if (ins->arrayType() == TypedArray::TYPE_UINT32 && ins->type() == MIRType_Double)
+    if (ins->arrayType() == TypedArrayObject::TYPE_UINT32 && ins->type() == MIRType_Double)
         tempDef = temp();
 
     LLoadTypedArrayElement *lir = new LLoadTypedArrayElement(elements, index, tempDef);
@@ -2150,8 +2171,7 @@ LIRGenerator::visitClampToUint8(MClampToUint8 *ins)
       }
 
       default:
-        JS_NOT_REACHED("unexpected type");
-        return false;
+        MOZ_ASSUME_UNREACHABLE("unexpected type");
     }
 }
 
@@ -2697,7 +2717,7 @@ LIRGenerator::visitAsmJSReturn(MAsmJSReturn *ins)
     else if (rval->type() == MIRType_Int32)
         lir->setOperand(0, useFixed(rval, ReturnReg));
     else
-        JS_NOT_REACHED("Unexpected asm.js return type");
+        MOZ_ASSUME_UNREACHABLE("Unexpected asm.js return type");
     return add(lir);
 }
 

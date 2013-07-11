@@ -219,7 +219,7 @@ NS_IMETHODIMP EmbedLiteAppService::EnterSecureJSContext()
     MOZ_CRASH();
   }
 
-  if (!xpc::PushJSContext(nullptr)) {
+  if (!xpc::PushJSContextNoScriptContext(nullptr)) {
     MOZ_CRASH();
   }
 
@@ -235,7 +235,7 @@ NS_IMETHODIMP EmbedLiteAppService::LeaveSecureJSContext()
   }
 
   DebugOnly<JSContext*> stackTop;
-  xpc::PopJSContext();
+  xpc::PopJSContextNoScriptContext();
   mPushedSomething--;
   return NS_OK;
 }

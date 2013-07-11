@@ -35,6 +35,7 @@ namespace js {
 
 class ArgumentsObject;
 class ArrayBufferObject;
+class ArrayBufferViewObject;
 class BaseShape;
 class DebugScopeObject;
 class GCHelperThread;
@@ -133,6 +134,7 @@ template <> struct MapTypeToTraceKind<JSObject>         { const static JSGCTrace
 template <> struct MapTypeToTraceKind<JSFunction>       { const static JSGCTraceKind kind = JSTRACE_OBJECT; };
 template <> struct MapTypeToTraceKind<ArgumentsObject>  { const static JSGCTraceKind kind = JSTRACE_OBJECT; };
 template <> struct MapTypeToTraceKind<ArrayBufferObject>{ const static JSGCTraceKind kind = JSTRACE_OBJECT; };
+template <> struct MapTypeToTraceKind<ArrayBufferViewObject>{ const static JSGCTraceKind kind = JSTRACE_OBJECT; };
 template <> struct MapTypeToTraceKind<DebugScopeObject> { const static JSGCTraceKind kind = JSTRACE_OBJECT; };
 template <> struct MapTypeToTraceKind<GlobalObject>     { const static JSGCTraceKind kind = JSTRACE_OBJECT; };
 template <> struct MapTypeToTraceKind<ScopeObject>      { const static JSGCTraceKind kind = JSTRACE_OBJECT; };
@@ -1203,7 +1205,8 @@ js_FinalizeStringRT(JSRuntime *rt, JSString *str);
 namespace js {
 
 JSCompartment *
-NewCompartment(JSContext *cx, JS::Zone *zone, JSPrincipals *principals);
+NewCompartment(JSContext *cx, JS::Zone *zone, JSPrincipals *principals,
+               const JS::CompartmentOptions &options);
 
 namespace gc {
 
@@ -1315,6 +1318,10 @@ struct AutoDisableProxyCheck
 
 void
 PurgeJITCaches(JS::Zone *zone);
+
+// This is the same as IsInsideNursery, but not inlined.
+bool
+UninlinedIsInsideNursery(JSRuntime *rt, const void *thing);
 
 } /* namespace js */
 

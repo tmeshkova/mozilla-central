@@ -70,9 +70,7 @@ TabChildHelper::TabChildHelper(EmbedLiteViewThreadChild* aView)
 TabChildHelper::~TabChildHelper()
 {
   LOGT();
-  if (mCx) {
-    DestroyCx();
-  }
+  mGlobal = nullptr;
 
   if (mTabChildGlobal) {
     nsEventListenerManager* elm = mTabChildGlobal->GetListenerManager(false);
@@ -365,8 +363,6 @@ TabChildHelper::RecvAsyncMessage(const nsAString& aMessageName,
     cloneData.mDataLength = buffer.nbytes();
   }
 
-  nsFrameScriptCx cx(static_cast<nsIWebBrowserChrome*>(mView->mChrome), this);
-
   nsRefPtr<nsFrameMessageManager> mm =
     static_cast<nsFrameMessageManager*>(mTabChildGlobal->mMessageManager.get());
   mm->ReceiveMessage(static_cast<EventTarget*>(mTabChildGlobal),
@@ -592,5 +588,5 @@ TabChildHelper::DispatchSynthesizedMouseEvent(uint32_t aMsg, uint64_t aTime,
 JSContext*
 TabChildHelper::GetJSContext()
 {
-  return mCx;
+  return nsContentUtils::GetSafeJSContext();
 }
