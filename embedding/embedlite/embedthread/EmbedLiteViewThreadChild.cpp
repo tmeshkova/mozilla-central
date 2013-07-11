@@ -543,7 +543,7 @@ EmbedLiteViewThreadChild::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
 
   if (sPostAZPCAsJson.viewport) {
     nsString data;
-    mozilla::CSSToScreenScale resolution = AsyncPanZoomController::CalculateResolution(aFrameMetrics);
+    mozilla::CSSToScreenScale resolution = aFrameMetrics.CalculateResolution();
     data.AppendPrintf("{ \"x\" : %d", NS_lround(aFrameMetrics.mScrollOffset.x));
     data.AppendPrintf(", \"y\" : %d", NS_lround(aFrameMetrics.mScrollOffset.y));
     data.AppendPrintf(", \"viewport\" : ");

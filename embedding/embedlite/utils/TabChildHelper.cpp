@@ -227,8 +227,7 @@ bool
 TabChildHelper::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
 {
   LOGF();
-  mozilla::CSSRect cssCompositedRect =
-    AsyncPanZoomController::CalculateCompositedRectInCssPixels(aFrameMetrics);
+  mozilla::CSSRect cssCompositedRect = aFrameMetrics.CalculateCompositedRectInCssPixels();
   // The BrowserElementScrolling helper must know about these updated metrics
   // for other functions it performs, such as double tap handling.
 
@@ -238,7 +237,7 @@ TabChildHelper::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
   utils->SetScrollPositionClampingScrollPortSize(
     cssCompositedRect.width, cssCompositedRect.height);
   ScrollWindowTo(window, aFrameMetrics.mScrollOffset);
-  CSSToScreenScale resolution = AsyncPanZoomController::CalculateResolution(aFrameMetrics);
+  CSSToScreenScale resolution = aFrameMetrics.CalculateResolution();
   utils->SetResolution(resolution.scale, resolution.scale);
 
   nsCOMPtr<nsIDOMDocument> domDoc;
