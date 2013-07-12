@@ -1580,7 +1580,7 @@ void
 nsGfxScrollFrameInner::ScrollToCSSPixels(const CSSIntPoint& aScrollPosition)
 {
   nsPoint current = GetScrollPosition();
-  nsIntPoint currentCSSPixels = GetScrollPositionCSSPixels();
+  CSSIntPoint currentCSSPixels = GetScrollPositionCSSPixels();
   nsPoint pt = CSSPoint::ToAppUnits(aScrollPosition);
   nscoord halfPixel = nsPresContext::CSSPixelsToAppUnits(0.5f);
   nsRect range(pt.x - halfPixel, pt.y - halfPixel, 2*halfPixel - 1, 2*halfPixel - 1);
@@ -1609,12 +1609,10 @@ nsGfxScrollFrameInner::ScrollToCSSPixelsApproximate(const CSSPoint& aScrollPosit
   ScrollTo(pt, nsIScrollableFrame::INSTANT, &range);
 }
 
-nsIntPoint
+CSSIntPoint
 nsGfxScrollFrameInner::GetScrollPositionCSSPixels()
 {
-  nsPoint pt = GetScrollPosition();
-  return nsIntPoint(nsPresContext::AppUnitsToIntCSSPixels(pt.x),
-                    nsPresContext::AppUnitsToIntCSSPixels(pt.y));
+  return CSSIntPoint::FromAppUnitsRounded(GetScrollPosition());
 }
 
 /*
@@ -2238,15 +2236,19 @@ nsGfxScrollFrameInner::BuildDisplayList(nsDisplayListBuilder*   aBuilder,
   } else {
     nsRect scrollRange = GetScrollRange();
     ScrollbarStyles styles = GetScrollbarStylesFromFrame();
-    // Allow to build scrollable layer for Chrome process if pref enabled (OMTC embedding)
+    bool hasScrollableOverflow =
+      (scrollRange.width > 0 || scrollRange.height > 0) &&
+      ((styles.mHorizontal != NS_STYLE_OVERFLOW_HIDDEN && mHScrollbarBox) ||
+       (styles.mVertical   != NS_STYLE_OVERFLOW_HIDDEN && mVScrollbarBox));
+    // TODO Turn this on for inprocess OMTC
+    bool wantSubAPZC = (XRE_GetProcessType() == GeckoProcessType_Content);
     static bool wrapScrollableViewIntoLayers =
-        Preferences::GetBool("layout.build_layers_for_scrollable_views", false);
+        Preferences::GetBool("layout.build_sub_apzc_layers", wantSubAPZC);
+    wantSubAPZC = wrapScrollableViewIntoLayers;
     mShouldBuildLayer =
-       ((styles.mHorizontal != NS_STYLE_OVERFLOW_HIDDEN && mHScrollbarBox) ||
-        (styles.mVertical   != NS_STYLE_OVERFLOW_HIDDEN && mVScrollbarBox)) &&
-       ((XRE_GetProcessType() == GeckoProcessType_Content || wrapScrollableViewIntoLayers) &&
-        (scrollRange.width > 0 || scrollRange.height > 0) &&
-        (!mIsRoot || !mOuter->PresContext()->IsRootContentDocument()));
+      wantSubAPZC &&
+      hasScrollableOverflow &&
+      (!mIsRoot || !mOuter->PresContext()->IsRootContentDocument());
   }
 
   if (ShouldBuildLayer()) {
