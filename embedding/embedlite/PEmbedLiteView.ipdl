@@ -4,8 +4,8 @@
 
 include protocol PEmbedLiteApp;
 
-include "IPC/nsGUIEventIPC.h";
-include "IPC/InputDataIPC.h";
+include "ipc/nsGUIEventIPC.h";
+include "ipc/InputDataIPC.h";
 
 using gfxSize;
 using gfxRect;
