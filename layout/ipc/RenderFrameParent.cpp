@@ -968,7 +968,7 @@ RenderFrameParent::BuildDisplayList(nsDisplayListBuilder* aBuilder,
 }
 
 void
-RenderFrameParent::ZoomToRect(const gfxRect& aRect)
+RenderFrameParent::ZoomToRect(const CSSRect& aRect)
 {
   if (mPanZoomController) {
     mPanZoomController->ZoomToRect(aRect);

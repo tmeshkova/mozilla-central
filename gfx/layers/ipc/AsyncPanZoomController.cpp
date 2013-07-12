@@ -1314,9 +1314,7 @@ void AsyncPanZoomController::DetectScrollableSubframe() {
   mDelayPanning = true;
 }
 
-void AsyncPanZoomController::ZoomToRect(const gfxRect& aRect) {
-  CSSRect zoomToRect(aRect.x, aRect.y, aRect.width, aRect.height);
-
+void AsyncPanZoomController::ZoomToRect(CSSRect aRect) {
   SetState(ANIMATING_ZOOM);
 
   {
@@ -1340,19 +1338,19 @@ void AsyncPanZoomController::ZoomToRect(const gfxRect& aRect) {
                          / intrinsicScale;
     float localMaxZoom = mMaxZoom / intrinsicScale;
 
-    if (!zoomToRect.IsEmpty()) {
+    if (!aRect.IsEmpty()) {
       // Intersect the zoom-to-rect to the CSS rect to make sure it fits.
-      zoomToRect = zoomToRect.Intersect(cssPageRect);
+      aRect = aRect.Intersect(cssPageRect);
       float targetResolution =
-        std::min(compositionBounds.width / zoomToRect.width,
-                 compositionBounds.height / zoomToRect.height);
+        std::min(compositionBounds.width / aRect.width,
+                 compositionBounds.height / aRect.height);
       targetZoom = targetResolution / intrinsicScale;
     }
     // 1. If the rect is empty, request received from browserElementScrolling.js
     // 2. currentZoom is equal to mMaxZoom and user still double-tapping it
     // 3. currentZoom is equal to localMinZoom and user still double-tapping it
     // Treat these three cases as a request to zoom out as much as possible.
-    if (zoomToRect.IsEmpty() ||
+    if (aRect.IsEmpty() ||
         (currentZoom == localMaxZoom && targetZoom >= localMaxZoom) ||
         (currentZoom == localMinZoom && targetZoom <= localMinZoom)) {
       CSSRect compositedRect = mFrameMetrics.CalculateCompositedRectInCssPixels();
@@ -1361,14 +1359,14 @@ void AsyncPanZoomController::ZoomToRect(const gfxRect& aRect) {
         cssPageRect.width * (compositedRect.height / compositedRect.width);
       float dh = compositedRect.height - newHeight;
 
-      zoomToRect = CSSRect(0.0f,
+      aRect = CSSRect(0.0f,
                            y + dh/2,
                            cssPageRect.width,
                            newHeight);
-      zoomToRect = zoomToRect.Intersect(cssPageRect);
+      aRect = aRect.Intersect(cssPageRect);
       float targetResolution =
-        std::min(compositionBounds.width / zoomToRect.width,
-                 compositionBounds.height / zoomToRect.height);
+        std::min(compositionBounds.width / aRect.width,
+                 compositionBounds.height / aRect.height);
       targetZoom = targetResolution / intrinsicScale;
     }
 
@@ -1382,17 +1380,17 @@ void AsyncPanZoomController::ZoomToRect(const gfxRect& aRect) {
 
     // If either of these conditions are met, the page will be
     // overscrolled after zoomed
-    if (zoomToRect.y + rectAfterZoom.height > cssPageRect.height) {
-      zoomToRect.y = cssPageRect.height - rectAfterZoom.height;
-      zoomToRect.y = zoomToRect.y > 0 ? zoomToRect.y : 0;
+    if (aRect.y + rectAfterZoom.height > cssPageRect.height) {
+      aRect.y = cssPageRect.height - rectAfterZoom.height;
+      aRect.y = aRect.y > 0 ? aRect.y : 0;
     }
-    if (zoomToRect.x + rectAfterZoom.width > cssPageRect.width) {
-      zoomToRect.x = cssPageRect.width - rectAfterZoom.width;
-      zoomToRect.x = zoomToRect.x > 0 ? zoomToRect.x : 0;
+    if (aRect.x + rectAfterZoom.width > cssPageRect.width) {
+      aRect.x = cssPageRect.width - rectAfterZoom.width;
+      aRect.x = aRect.x > 0 ? aRect.x : 0;
     }
 
     mStartZoomToMetrics = mFrameMetrics;
-    mEndZoomToMetrics.mScrollOffset = zoomToRect.TopLeft();
+    mEndZoomToMetrics.mScrollOffset = aRect.TopLeft();
 
     mAnimationStartTime = GetFrameTime();
 
