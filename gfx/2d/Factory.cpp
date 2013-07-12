@@ -358,6 +358,21 @@ Factory::GetScaledFontForFontWithCairoSkia(DrawTarget* aTarget, gfxFont *aFont)
      return nullptr;
 }
 
+TemporaryRef<DrawTarget>
+Factory::CreateDualDrawTarget(DrawTarget *targetA, DrawTarget *targetB)
+{
+  RefPtr<DrawTarget> newTarget =
+    new DrawTargetDual(targetA, targetB);
+
+  RefPtr<DrawTarget> retVal = newTarget;
+
+  if (mRecorder) {
+    retVal = new DrawTargetRecording(mRecorder, retVal);
+  }
+
+  return retVal;
+}
+
 #ifdef WIN32
 TemporaryRef<DrawTarget>
 Factory::CreateDrawTargetForD3D10Texture(ID3D10Texture2D *aTexture, SurfaceFormat aFormat)
@@ -500,6 +515,26 @@ Factory::CreateDrawTargetForCairoSurface(cairo_surface_t* aSurface, const IntSiz
 #endif
   return retVal;
 }
+
+#ifdef XP_MACOSX
+TemporaryRef<DrawTarget>
+Factory::CreateDrawTargetForCairoCGContext(CGContextRef cg, const IntSize& aSize)
+{
+  RefPtr<DrawTarget> retVal;
+
+  RefPtr<DrawTargetCG> newTarget = new DrawTargetCG();
+
+  if (newTarget->Init(cg, aSize)) {
+    retVal = newTarget;
+  }
+
+  if (mRecorder && retVal) {
+    RefPtr<DrawTarget> recordDT = new DrawTargetRecording(mRecorder, retVal);
+    return recordDT;
+  }
+  return retVal;
+}
+#endif
 
 TemporaryRef<DataSourceSurface>
 Factory::CreateWrappingDataSourceSurface(uint8_t *aData, int32_t aStride,

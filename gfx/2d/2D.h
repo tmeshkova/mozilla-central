@@ -972,6 +972,12 @@ public:
   static TemporaryRef<GlyphRenderingOptions>
     CreateCairoGlyphRenderingOptions(FontHinting aHinting, bool aAutoHinting);
 #endif
+  static TemporaryRef<DrawTarget>
+    CreateDualDrawTarget(DrawTarget *targetA, DrawTarget *targetB);
+
+#ifdef XP_MACOSX
+  static TemporaryRef<DrawTarget> CreateDrawTargetForCairoCGContext(CGContextRef cg, const IntSize& aSize);
+#endif
 
  static TemporaryRef<ScaledFont>
    GetScaledFontForFontWithCairoSkia(DrawTarget* aTarget, gfxFont *aFont);
