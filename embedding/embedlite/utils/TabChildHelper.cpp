@@ -183,7 +183,7 @@ TabChildHelper::Observe(nsISupports* aSubject,
     mView->SendCancelDefaultPanZoom();
   } else if (!strcmp(aTopic, BROWSER_ZOOM_TO_RECT)) {
     nsCOMPtr<nsIDocShell> docShell(do_QueryInterface(aSubject));
-    gfxRect rect;
+    CSSRect rect;
     sscanf(NS_ConvertUTF16toUTF8(aData).get(),
            "{\"x\":%lf,\"y\":%lf,\"w\":%lf,\"h\":%lf}",
            &rect.x, &rect.y, &rect.width, &rect.height);
