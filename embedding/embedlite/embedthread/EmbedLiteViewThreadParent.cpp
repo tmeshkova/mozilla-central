@@ -402,7 +402,7 @@ EmbedLiteViewThreadParent::RecvUpdateZoomConstraints(const bool& val, const floa
 }
 
 bool
-EmbedLiteViewThreadParent::RecvZoomToRect(const gfxRect& aRect)
+EmbedLiteViewThreadParent::RecvZoomToRect(const CSSRect& aRect)
 {
   if (mController) {
     mController->ZoomToRect(aRect);
