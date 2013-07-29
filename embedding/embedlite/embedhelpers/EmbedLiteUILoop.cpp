@@ -7,12 +7,19 @@
 #include "EmbedLog.h"
 
 #include "EmbedLiteUILoop.h"
+#include "EmbedLiteMessageLoop.h"
 
 namespace mozilla {
 namespace embedlite {
 
 EmbedLiteUILoop::EmbedLiteUILoop()
   : MessageLoopForUI(MessageLoop::TYPE_UI)
+{
+  LOGT();
+}
+
+EmbedLiteUILoop::EmbedLiteUILoop(EmbedLiteMessageLoop* aCustomLoop)
+  : MessageLoopForUI(aCustomLoop->GetPump())
 {
   LOGT();
 }
