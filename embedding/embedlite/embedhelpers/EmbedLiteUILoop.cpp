@@ -8,6 +8,7 @@
 
 #include "EmbedLiteUILoop.h"
 #include "EmbedLiteMessagePump.h"
+#include "base/message_loop.h"
 
 namespace mozilla {
 namespace embedlite {
@@ -34,7 +35,13 @@ void EmbedLiteUILoop::StartLoop()
   LOGT();
   // Run the UI event loop on the main thread.
   MessageLoop::Run();
-  LOGF("Loop Stopped, exit");
+  if (type() == MessageLoop::TYPE_EMBED) {
+    state_ = new MessageLoop::RunState();
+    state_->quit_received = false;
+    state_->run_depth = 1;
+  } else {
+    LOGF("Loop Stopped, exit");
+  }
 }
 
 void EmbedLiteUILoop::DoQuit()
@@ -42,9 +49,10 @@ void EmbedLiteUILoop::DoQuit()
   LOGT();
   pump_->Quit();
   DeletePendingTasks();
-  if (state_) {
-    Quit();
-    DoIdleWork();
+  Quit();
+  DoIdleWork();
+  if (type() == MessageLoop::TYPE_EMBED) {
+    delete state_;
   }
 }
 
