@@ -11,13 +11,13 @@
 namespace mozilla {
 namespace embedlite {
 
-class EmbedLiteMessageLoop;
+class EmbedLiteMessagePump;
 
 class EmbedLiteUILoop : public MessageLoopForUI
 {
 public:
     explicit EmbedLiteUILoop();
-    explicit EmbedLiteUILoop(EmbedLiteMessageLoop* aCustomLoop);
+    explicit EmbedLiteUILoop(EmbedLiteMessagePump* aCustomLoop);
     ~EmbedLiteUILoop();
 
     void StartLoop();

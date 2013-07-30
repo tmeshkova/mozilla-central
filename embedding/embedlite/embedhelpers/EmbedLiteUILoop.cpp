@@ -7,7 +7,7 @@
 #include "EmbedLog.h"
 
 #include "EmbedLiteUILoop.h"
-#include "EmbedLiteMessageLoop.h"
+#include "EmbedLiteMessagePump.h"
 
 namespace mozilla {
 namespace embedlite {
@@ -18,7 +18,7 @@ EmbedLiteUILoop::EmbedLiteUILoop()
   LOGT();
 }
 
-EmbedLiteUILoop::EmbedLiteUILoop(EmbedLiteMessageLoop* aCustomLoop)
+EmbedLiteUILoop::EmbedLiteUILoop(EmbedLiteMessagePump* aCustomLoop)
   : MessageLoopForUI(aCustomLoop->GetPump())
 {
   LOGT();
@@ -40,9 +40,12 @@ void EmbedLiteUILoop::StartLoop()
 void EmbedLiteUILoop::DoQuit()
 {
   LOGT();
+  pump_->Quit();
   DeletePendingTasks();
-  Quit();
-  DoIdleWork();
+  if (state_) {
+    Quit();
+    DoIdleWork();
+  }
 }
 
 } // namespace embedlite

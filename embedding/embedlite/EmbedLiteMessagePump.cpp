@@ -3,10 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#define LOG_COMPONENT "EmbedLiteMessageLoop"
+#define LOG_COMPONENT "EmbedLiteMessagePump"
 #include "EmbedLog.h"
 
-#include "EmbedLiteMessageLoop.h"
+#include "EmbedLiteMessagePump.h"
 #include "EmbedLiteApp.h"
 
 #include "base/message_pump_default.h"
@@ -23,7 +23,7 @@ namespace embedlite {
 class MessagePumpEmbed : public MessagePump
 {
 public:
-  MessagePumpEmbed(EmbedLiteMessageLoopListener* aListener)
+  MessagePumpEmbed(EmbedLiteMessagePumpListener* aListener)
     : mListener(aListener)
   {
   }
@@ -56,7 +56,7 @@ public:
   }
 
 protected:
-  EmbedLiteMessageLoopListener* mListener;
+  EmbedLiteMessagePumpListener* mListener;
 
 private:
   TimeTicks delayed_work_time_;
@@ -64,33 +64,33 @@ private:
   DISALLOW_COPY_AND_ASSIGN(MessagePumpEmbed);
 };
 
-EmbedLiteMessageLoop::EmbedLiteMessageLoop(EmbedLiteMessageLoopListener* aListener)
+EmbedLiteMessagePump::EmbedLiteMessagePump(EmbedLiteMessagePumpListener* aListener)
   : mListener(aListener)
   , mEmbedPump(new MessagePumpEmbed(aListener))
 {
 }
 
-EmbedLiteMessageLoop::~EmbedLiteMessageLoop()
+EmbedLiteMessagePump::~EmbedLiteMessagePump()
 {
 }
 
 base::MessagePump*
-EmbedLiteMessageLoop::GetPump()
+EmbedLiteMessagePump::GetPump()
 {
   return mEmbedPump;
 }
 
-bool EmbedLiteMessageLoop::DoWork(void* aDelegate)
+bool EmbedLiteMessagePump::DoWork(void* aDelegate)
 {
   return static_cast<base::MessagePump::Delegate*>(aDelegate)->DoWork();
 }
 
-bool EmbedLiteMessageLoop::DoDelayedWork(void* aDelegate)
+bool EmbedLiteMessagePump::DoDelayedWork(void* aDelegate)
 {
   return static_cast<base::MessagePump::Delegate*>(aDelegate)->DoDelayedWork(&mEmbedPump->DelayedWorkTime());
 }
 
-bool EmbedLiteMessageLoop::DoIdleWork(void* aDelegate)
+bool EmbedLiteMessagePump::DoIdleWork(void* aDelegate)
 {
   return static_cast<base::MessagePump::Delegate*>(aDelegate)->DoIdleWork();
 }

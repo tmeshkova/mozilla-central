@@ -15,7 +15,7 @@ namespace embedlite {
 
 class EmbedLiteApp;
 class MessagePumpEmbed;
-class EmbedLiteMessageLoopListener
+class EmbedLiteMessagePumpListener
 {
 public:
   virtual void Run(void* aDelegate) = 0;
@@ -24,11 +24,11 @@ public:
   virtual void ScheduleDelayedWork(const int aDelay) = 0;
 };
 
-class EmbedLiteMessageLoop
+class EmbedLiteMessagePump
 {
 public:
-  EmbedLiteMessageLoop(EmbedLiteMessageLoopListener* aListener);
-  virtual ~EmbedLiteMessageLoop();
+  EmbedLiteMessagePump(EmbedLiteMessagePumpListener* aListener);
+  virtual ~EmbedLiteMessagePump();
   virtual base::MessagePump* GetPump();
 
   virtual bool DoWork(void* aDelegate);
@@ -36,7 +36,7 @@ public:
   virtual bool DoIdleWork(void* aDelegate);
 
 private:
-  EmbedLiteMessageLoopListener* mListener;
+  EmbedLiteMessagePumpListener* mListener;
   MessagePumpEmbed* mEmbedPump;
 };
 

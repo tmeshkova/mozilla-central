@@ -16,6 +16,8 @@ namespace embedlite {
 
 typedef void (*EMBEDTaskCallback)(void* userData);
 
+class EmbedLiteMessagePump;
+class EmbedLiteMessagePumpListener;
 class EmbedLiteUILoop;
 class EmbedLiteSubThread;
 class EmbedLiteAppThread;
@@ -80,6 +82,12 @@ public:
   virtual bool Start(EmbedType aEmbedType);
   // Exit from UI embedding loop started with Start()
   virtual void Stop();
+
+  // Create custom Event Message pump, alloc new object which must be destroyed in EmbedLiteAppListener::Destroyed, or later
+  virtual EmbedLiteMessagePump* CreateEmbedLiteMessagePump(EmbedLiteMessagePumpListener* aListener);
+
+  // Start UI embedding loop merged with Gecko GFX
+  virtual bool StartWithCustomPump(EmbedType aEmbedType, EmbedLiteMessagePump* aMessageLoop);
 
   // Specify path to Gecko components manifest location
   virtual void AddManifestLocation(const char* manifest);
@@ -147,6 +155,7 @@ private:
   bool mDestroying;
   RenderType mRenderType;
   char* mProfilePath;
+  bool mIsAsyncLoop;
 };
 
 } // namespace embedlite
