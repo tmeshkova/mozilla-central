@@ -45,7 +45,16 @@ public:
   virtual void ScheduleDelayedWork(const TimeTicks& delayed_work_time)
   {
     delayed_work_time_ = delayed_work_time;
-    TimeDelta delay = delayed_work_time_ - TimeTicks::Now();
+    ScheduleDelayedWorkIfNeeded(delayed_work_time_);
+  }
+  virtual void ScheduleDelayedWorkIfNeeded(const TimeTicks& delayed_work_time)
+  {
+    if (delayed_work_time.is_null()) {
+      mListener->ScheduleDelayedWork(-1);
+      return;
+    }
+
+    TimeDelta delay = delayed_work_time - TimeTicks::Now();
     int laterMsecs = delay.InMilliseconds() > std::numeric_limits<int>::max() ?
       std::numeric_limits<int>::max() : delay.InMilliseconds();
     mListener->ScheduleDelayedWork(laterMsecs);
@@ -87,7 +96,9 @@ bool EmbedLiteMessagePump::DoWork(void* aDelegate)
 
 bool EmbedLiteMessagePump::DoDelayedWork(void* aDelegate)
 {
-  return static_cast<base::MessagePump::Delegate*>(aDelegate)->DoDelayedWork(&mEmbedPump->DelayedWorkTime());
+  bool retval = static_cast<base::MessagePump::Delegate*>(aDelegate)->DoDelayedWork(&mEmbedPump->DelayedWorkTime());
+  mEmbedPump->ScheduleDelayedWorkIfNeeded(mEmbedPump->DelayedWorkTime());
+  return retval;
 }
 
 bool EmbedLiteMessagePump::DoIdleWork(void* aDelegate)
