@@ -89,6 +89,9 @@ public:
   // Start UI embedding loop merged with Gecko GFX
   virtual bool StartWithCustomPump(EmbedType aEmbedType, EmbedLiteMessagePump* aMessageLoop);
 
+  // Start UI embedding loop merged with Gecko GFX
+  virtual bool StartRenderLoopWithCustomPump(EmbedLiteMessagePump* aMessageLoop);
+
   // Specify path to Gecko components manifest location
   virtual void AddManifestLocation(const char* manifest);
 
@@ -134,6 +137,7 @@ private:
   EmbedLiteApp();
 
   static void StartChild(EmbedLiteApp* aApp);
+  static void StartChildRender(EmbedLiteApp* aApp);
 
   friend class EmbedLiteAppThreadParent;
   friend class EmbedLiteViewThreadParent;
@@ -147,6 +151,7 @@ private:
   static EmbedLiteApp* sSingleton;
   EmbedLiteAppListener* mListener;
   EmbedLiteUILoop* mUILoop;
+  EmbedLiteUILoop* mUIRLoop;
   RefPtr<EmbedLiteSubThread> mSubThread;
   EmbedType mEmbedType;
   RefPtr<EmbedLiteAppThread> mAppThread;

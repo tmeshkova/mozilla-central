@@ -23,6 +23,8 @@
 #include "nsXULAppAPI.h"
 #include "EmbedLiteMessagePump.h"
 
+#include "EmbedLiteCompositorParent.h"
+
 #define STHREADAPP EmbedLiteAppThreadParent::GetInstance
 
 namespace mozilla {
@@ -45,6 +47,7 @@ class FakeListener : public EmbedLiteAppListener {};
 EmbedLiteApp::EmbedLiteApp()
   : mListener(new FakeListener())
   , mUILoop(NULL)
+  , mUIRLoop(NULL)
   , mSubThread(NULL)
   , mEmbedType(EMBED_INVALID)
   , mAppThread(NULL)
@@ -114,6 +117,15 @@ EmbedLiteApp::StartChild(EmbedLiteApp* aApp)
 }
 
 void
+EmbedLiteApp::StartChildRender(EmbedLiteApp* aApp)
+{
+  LOGT();
+  if (aApp->mEmbedType == EMBED_THREAD) {
+    mozilla::layers::CompositorParent::StartUpWithExistingThread(MessageLoop::current(), PlatformThread::CurrentId());
+  }
+}
+
+void
 EmbedLiteApp::SetProfilePath(const char* aPath)
 {
   NS_ASSERTION(mEmbedType == EMBED_INVALID, "SetProfilePath must be called before Start");
@@ -140,6 +152,16 @@ EmbedLiteApp::StartWithCustomPump(EmbedType aEmbedType, EmbedLiteMessagePump* aE
                     NewRunnableFunction(&EmbedLiteApp::StartChild, this));
   mUILoop->StartLoop();
   mIsAsyncLoop = true;
+  return true;
+}
+
+bool
+EmbedLiteApp::StartRenderLoopWithCustomPump(EmbedLiteMessagePump* aEventLoop)
+{
+  mUIRLoop = new EmbedLiteUILoop(aEventLoop);
+  mUIRLoop->PostTask(FROM_HERE,
+                    NewRunnableFunction(&EmbedLiteApp::StartChildRender, this));
+  mUIRLoop->StartLoop();
   return true;
 }
 
