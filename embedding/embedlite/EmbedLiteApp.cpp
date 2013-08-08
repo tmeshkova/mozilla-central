@@ -147,7 +147,7 @@ EmbedLiteApp::StartWithCustomPump(EmbedType aEmbedType, EmbedLiteMessagePump* aE
   LOGT("Type: %s", aEmbedType == EMBED_THREAD ? "Thread" : "Process");
   NS_ASSERTION(!mUILoop, "Start called twice");
   mEmbedType = aEmbedType;
-  mUILoop = new EmbedLiteUILoop(aEventLoop);
+  mUILoop = aEventLoop->GetMessageLoop();
   mUILoop->PostTask(FROM_HERE,
                     NewRunnableFunction(&EmbedLiteApp::StartChild, this));
   mUILoop->StartLoop();
@@ -158,7 +158,7 @@ EmbedLiteApp::StartWithCustomPump(EmbedType aEmbedType, EmbedLiteMessagePump* aE
 bool
 EmbedLiteApp::StartRenderLoopWithCustomPump(EmbedLiteMessagePump* aEventLoop)
 {
-  mUIRLoop = new EmbedLiteUILoop(aEventLoop);
+  mUIRLoop = aEventLoop->GetMessageLoop();
   mUIRLoop->PostTask(FROM_HERE,
                     NewRunnableFunction(&EmbedLiteApp::StartChildRender, this));
   mUIRLoop->StartLoop();

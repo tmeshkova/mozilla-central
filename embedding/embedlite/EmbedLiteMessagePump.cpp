@@ -14,6 +14,7 @@
 #include "base/scoped_nsautorelease_pool.h"
 #include "base/message_pump.h"
 #include "base/time.h"
+#include "EmbedLiteUILoop.h"
 
 using namespace base;
 
@@ -25,6 +26,7 @@ class MessagePumpEmbed : public MessagePump
 public:
   MessagePumpEmbed(EmbedLiteMessagePumpListener* aListener)
     : mListener(aListener)
+    , mLoop(NULL)
   {
   }
   ~MessagePumpEmbed()
@@ -32,15 +34,19 @@ public:
   }
   virtual void Run(Delegate* delegate)
   {
-    mListener->Run(delegate);
+    mLoop = MessageLoop::current();
+    if (mListener)
+      mListener->Run(delegate);
   }
   virtual void Quit()
   {
-    mListener->Quit();
+    if (mListener)
+      mListener->Quit();
   }
   virtual void ScheduleWork()
   {
-    mListener->ScheduleWork();
+    if (mListener)
+      mListener->ScheduleWork();
   }
   virtual void ScheduleDelayedWork(const TimeTicks& delayed_work_time)
   {
@@ -49,6 +55,9 @@ public:
   }
   virtual void ScheduleDelayedWorkIfNeeded(const TimeTicks& delayed_work_time)
   {
+    if (!mListener)
+      return;
+
     if (delayed_work_time.is_null()) {
       mListener->ScheduleDelayedWork(-1);
       return;
@@ -64,11 +73,14 @@ public:
     return delayed_work_time_;
   }
 
+  MessageLoop* GetLoop() { return mLoop; }
+
 protected:
   EmbedLiteMessagePumpListener* mListener;
 
 private:
   TimeTicks delayed_work_time_;
+  MessageLoop* mLoop;
 
   DISALLOW_COPY_AND_ASSIGN(MessagePumpEmbed);
 };
@@ -77,6 +89,11 @@ EmbedLiteMessagePump::EmbedLiteMessagePump(EmbedLiteMessagePumpListener* aListen
   : mListener(aListener)
   , mEmbedPump(new MessagePumpEmbed(aListener))
 {
+  if (aListener) {
+    mOwnerLoop = new EmbedLiteUILoop(this);
+  } else {
+    mEmbedPump->Run(NULL);
+  }
 }
 
 EmbedLiteMessagePump::~EmbedLiteMessagePump()
@@ -104,6 +121,30 @@ bool EmbedLiteMessagePump::DoDelayedWork(void* aDelegate)
 bool EmbedLiteMessagePump::DoIdleWork(void* aDelegate)
 {
   return static_cast<base::MessagePump::Delegate*>(aDelegate)->DoIdleWork();
+}
+
+void*
+EmbedLiteMessagePump::PostTask(EMBEDTaskCallback callback, void* userData, int timeout)
+{
+  if (!mEmbedPump->GetLoop()) {
+    return nullptr;
+  }
+  CancelableTask* newTask = NewRunnableFunction(callback, userData);
+  if (timeout) {
+    mEmbedPump->GetLoop()->PostDelayedTask(FROM_HERE, newTask, timeout);
+  } else {
+    mEmbedPump->GetLoop()->PostTask(FROM_HERE, newTask);
+  }
+
+  return (void*)newTask;
+}
+
+void
+EmbedLiteMessagePump::CancelTask(void* aTask)
+{
+  if (aTask) {
+    static_cast<CancelableTask*>(aTask)->Cancel();
+  }
 }
 
 } // namespace embedlite

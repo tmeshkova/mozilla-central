@@ -6,13 +6,17 @@
 #ifndef EMBED_LITE_MESSAGE_LOOP_H
 #define EMBED_LITE_MESSAGE_LOOP_H
 
+#include "mozilla/embedlite/EmbedLiteApp.h"
+
 namespace base {
 class MessagePump;
 }
 
+class MessageLoop;
+
 namespace mozilla {
 namespace embedlite {
-
+class EmbedLiteUILoop;
 class EmbedLiteApp;
 class MessagePumpEmbed;
 class EmbedLiteMessagePumpListener
@@ -27,17 +31,23 @@ public:
 class EmbedLiteMessagePump
 {
 public:
-  EmbedLiteMessagePump(EmbedLiteMessagePumpListener* aListener);
+  EmbedLiteMessagePump(EmbedLiteMessagePumpListener* aListener = 0);
   virtual ~EmbedLiteMessagePump();
   virtual base::MessagePump* GetPump();
 
   virtual bool DoWork(void* aDelegate);
   virtual bool DoDelayedWork(void* aDelegate);
   virtual bool DoIdleWork(void* aDelegate);
+  // Delayed post task helper for delayed functions call in main thread
+  virtual void* PostTask(EMBEDTaskCallback callback, void* userData, int timeout = 0);
+  virtual void CancelTask(void* aTask);
 
 private:
+  EmbedLiteUILoop* GetMessageLoop() { return mOwnerLoop; }
+  friend class EmbedLiteApp;
   EmbedLiteMessagePumpListener* mListener;
   MessagePumpEmbed* mEmbedPump;
+  EmbedLiteUILoop* mOwnerLoop;
 };
 
 } // namespace embedlite

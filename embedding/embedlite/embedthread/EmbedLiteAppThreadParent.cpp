@@ -34,6 +34,7 @@ EmbedLiteAppThreadParent::EmbedLiteAppThreadParent(MessageLoop* aParentLoop)
   LOGT();
   MOZ_COUNT_CTOR(EmbedLiteAppThreadParent);
   sAppThreadParent = this;
+  printf(">>>>>>Func:%s::%d curThreadID:%d\n", __PRETTY_FUNCTION__, __LINE__, PlatformThread::CurrentId());
 }
 
 EmbedLiteAppThreadParent::~EmbedLiteAppThreadParent()
