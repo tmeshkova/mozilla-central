@@ -34,7 +34,6 @@ EmbedLiteAppThreadParent::EmbedLiteAppThreadParent(MessageLoop* aParentLoop)
   LOGT();
   MOZ_COUNT_CTOR(EmbedLiteAppThreadParent);
   sAppThreadParent = this;
-  printf(">>>>>>Func:%s::%d curThreadID:%d\n", __PRETTY_FUNCTION__, __LINE__, PlatformThread::CurrentId());
 }
 
 EmbedLiteAppThreadParent::~EmbedLiteAppThreadParent()
@@ -49,8 +48,7 @@ EmbedLiteAppThreadParent::RecvInitialized()
 {
   LOGT();
   PR_SetEnv("MOZ_USE_OMTC=1");
-//  mozilla::layers::CompositorParent::StartUpWithExistingThread(MessageLoop::current(), PlatformThread::CurrentId());
-  mApp->GetListener()->Initialized();
+  mApp->Initialized();
   bool accel = mApp->IsAccelerated();
   SetBoolPref("layers.acceleration.disabled", !accel);
   SetBoolPref("layers.acceleration.force-enabled", accel);

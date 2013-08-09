@@ -83,14 +83,14 @@ public:
   // Exit from UI embedding loop started with Start()
   virtual void Stop();
 
+  // if true then compositor will be started in separate own thread, and view->CompositorCreated notification will be called in non-main thread
+  virtual void SetCompositorInSeparateThread(bool aOwnThread) { mIsCompositeInMainThread = !aOwnThread; }
+
   // Create custom Event Message pump, alloc new object which must be destroyed in EmbedLiteAppListener::Destroyed, or later
   virtual EmbedLiteMessagePump* CreateEmbedLiteMessagePump(EmbedLiteMessagePumpListener* aListener);
 
   // Start UI embedding loop merged with Gecko GFX
   virtual bool StartWithCustomPump(EmbedType aEmbedType, EmbedLiteMessagePump* aMessageLoop);
-
-  // Start UI embedding loop merged with Gecko GFX
-  virtual bool StartRenderLoopWithCustomPump(EmbedLiteMessagePump* aMessageLoop);
 
   // Specify path to Gecko components manifest location
   virtual void AddManifestLocation(const char* manifest);
@@ -137,7 +137,7 @@ private:
   EmbedLiteApp();
 
   static void StartChild(EmbedLiteApp* aApp);
-  static void StartChildRender(EmbedLiteApp* aApp);
+  void Initialized();
 
   friend class EmbedLiteAppThreadParent;
   friend class EmbedLiteViewThreadParent;
@@ -151,7 +151,6 @@ private:
   static EmbedLiteApp* sSingleton;
   EmbedLiteAppListener* mListener;
   EmbedLiteUILoop* mUILoop;
-  EmbedLiteUILoop* mUIRLoop;
   RefPtr<EmbedLiteSubThread> mSubThread;
   EmbedType mEmbedType;
   RefPtr<EmbedLiteAppThread> mAppThread;
@@ -161,6 +160,7 @@ private:
   RenderType mRenderType;
   char* mProfilePath;
   bool mIsAsyncLoop;
+  bool mIsCompositeInMainThread;
 };
 
 } // namespace embedlite

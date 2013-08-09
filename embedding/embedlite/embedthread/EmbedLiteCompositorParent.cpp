@@ -32,7 +32,6 @@ EmbedLiteCompositorParent::EmbedLiteCompositorParent(nsIWidget* aWidget,
   : CompositorParent(aWidget, aRenderToEGLSurface, aSurfaceWidth, aSurfaceHeight)
   , mId(id)
 {
-  printf(">>>>>>Func:%s::%d curThreadID:%d\n", __PRETTY_FUNCTION__, __LINE__, PlatformThread::CurrentId());
   AddRef();
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
   LOGT("this:%p, view:%p", this, view);
@@ -57,7 +56,6 @@ EmbedLiteCompositorParent::AllocPLayerTransactionParent(const LayersBackend& aBa
   if (list) {
     list->CompositorCreated();
   }
-  printf(">>>>>>Func:%s::%d curThreadID:%d\n", __PRETTY_FUNCTION__, __LINE__, PlatformThread::CurrentId());
   return CompositorParent::AllocPLayerTransactionParent(aBackendHint,
                                                         aId,
                                                         aTextureFactoryIdentifier);
