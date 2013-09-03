@@ -361,7 +361,7 @@ bool Axis::ScaleWillOverscrollBothSides(float aScale) {
   CSSToScreenScale scale(metrics.mZoom.scale * aScale);
   CSSIntRect cssCompositionBounds = RoundedIn(metrics.mCompositionBounds / scale);
 
-  return GetRectLength(cssContentRect) < GetRectLength(CSSRect(cssCompositionBounds));
+  return GetRectLength(cssContentRect) < (GetRectLength(CSSRect(cssCompositionBounds)) / metrics.mDevPixelsPerCSSPixel.scale);
 }
 
 AxisX::AxisX(AsyncPanZoomController* aAsyncPanZoomController)
