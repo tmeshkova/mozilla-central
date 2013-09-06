@@ -66,10 +66,7 @@ EmbedLiteCompositorParent::AllocPLayerTransactionParent(const LayersBackend& aBa
 bool
 EmbedLiteCompositorParent::IsGLBackend()
 {
-  LayerManagerComposite* mgr = GetLayerManager();
-  NS_ENSURE_TRUE(mgr, false);
-
-  return mgr->GetCompositor()->GetBackend() == mozilla::layers::LAYERS_OPENGL;
+  return EmbedLiteApp::GetInstance()->IsAccelerated();
 }
 
 bool EmbedLiteCompositorParent::RenderToContext(gfxContext* aContext)
