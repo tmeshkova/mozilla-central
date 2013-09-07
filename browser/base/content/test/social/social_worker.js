@@ -119,13 +119,7 @@ onconnect = function(e) {
         });
         break;
       case "test-ambient-notification":
-        let icon = {
-          name: "testIcon",
-          iconURL: "chrome://browser/skin/Info.png",
-          contentPanel: "https://example.com/browser/browser/base/content/test/social/social_panel.html",
-          counter: 1
-        };
-        apiPort.postMessage({topic: "social.ambient-notification", data: icon});
+        apiPort.postMessage({topic: "social.ambient-notification", data: event.data.data});
         break;
       case "test-isVisible":
         sidebarPort.postMessage({topic: "test-isVisible"});
@@ -136,6 +130,13 @@ onconnect = function(e) {
       case "share-data-message":
         if (testPort)
           testPort.postMessage({topic:"got-share-data-message", result: event.data.result});
+        break;
+      case "worker.update":
+        apiPort.postMessage({topic: 'social.manifest-get'});
+        break;
+      case "social.manifest":
+        event.data.data.version = 2;
+        apiPort.postMessage({topic: 'social.manifest-set', data: event.data.data});
         break;
     }
   }

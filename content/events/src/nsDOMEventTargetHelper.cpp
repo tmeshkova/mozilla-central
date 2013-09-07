@@ -6,16 +6,15 @@
 #include "nsDOMEventTargetHelper.h"
 #include "nsContentUtils.h"
 #include "nsEventDispatcher.h"
-#include "nsGUIEvent.h"
 #include "nsIDocument.h"
-#include "nsDOMJSUtils.h"
 #include "prprf.h"
 #include "nsGlobalWindow.h"
-#include "nsDOMEvent.h"
 #include "mozilla/Likely.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
+
+NS_IMPL_CYCLE_COLLECTION_CLASS(nsDOMEventTargetHelper)
 
 NS_IMPL_CYCLE_COLLECTION_TRACE_BEGIN(nsDOMEventTargetHelper)
   NS_IMPL_CYCLE_COLLECTION_TRACE_PRESERVED_WRAPPER
@@ -83,7 +82,7 @@ nsDOMEventTargetHelper::~nsDOMEventTargetHelper()
   if (mListenerManager) {
     mListenerManager->Disconnect();
   }
-  nsContentUtils::ReleaseWrapper(this, this);
+  ReleaseWrapper(this);
 }
 
 void
@@ -290,7 +289,7 @@ nsDOMEventTargetHelper::SetEventHandler(nsIAtom* aType,
     handler = new EventHandlerNonNull(callable);
   }
   ErrorResult rv;
-  SetEventHandler(aType, handler, rv);
+  SetEventHandler(aType, EmptyString(), handler, rv);
   return rv.ErrorCode();
 }
 
@@ -299,7 +298,7 @@ nsDOMEventTargetHelper::GetEventHandler(nsIAtom* aType,
                                         JSContext* aCx,
                                         JS::Value* aValue)
 {
-  EventHandlerNonNull* handler = GetEventHandler(aType);
+  EventHandlerNonNull* handler = GetEventHandler(aType, EmptyString());
   if (handler) {
     *aValue = JS::ObjectValue(*handler->Callable());
   } else {

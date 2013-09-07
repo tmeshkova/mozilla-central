@@ -126,8 +126,6 @@ Classifier::Open(nsIFile& aCacheDirectory)
   mCryptoHash = do_CreateInstance(NS_CRYPTO_HASH_CONTRACTID, &rv);
   NS_ENSURE_SUCCESS(rv, rv);
 
-  mTableFreshness.Init();
-
   // Build the list of know urlclassifier lists
   // XXX: Disk IO potentially on the main thread during startup
   RegenActiveTables();
@@ -301,7 +299,9 @@ Classifier::ApplyUpdates(nsTArray<TableUpdate*>* aUpdates)
       nsCString updateTable(aUpdates->ElementAt(i)->TableName());
       rv = ApplyTableUpdates(aUpdates, updateTable);
       if (NS_FAILED(rv)) {
-        Reset();
+        if (rv != NS_ERROR_OUT_OF_MEMORY) {
+          Reset();
+        }
         return rv;
       }
     }

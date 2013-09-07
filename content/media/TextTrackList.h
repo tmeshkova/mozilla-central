@@ -20,8 +20,7 @@ class TextTrackList MOZ_FINAL : public nsDOMEventTargetHelper
 {
 public:
   NS_DECL_ISUPPORTS_INHERITED
-  NS_DECL_CYCLE_COLLECTION_SCRIPT_HOLDER_CLASS_INHERITED(TextTrackList,
-                                                         nsDOMEventTargetHelper)
+  NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(TextTrackList, nsDOMEventTargetHelper)
 
   TextTrackList(nsISupports* aGlobal);
 
@@ -46,6 +45,8 @@ public:
   already_AddRefed<TextTrack> AddTextTrack(TextTrackKind aKind,
                                            const nsAString& aLabel,
                                            const nsAString& aLanguage);
+  TextTrack* GetTrackById(const nsAString& aId);
+
   void AddTextTrack(TextTrack* aTextTrack) {
     mTextTracks.AppendElement(aTextTrack);
   }
