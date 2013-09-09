@@ -14,6 +14,8 @@
 #include "nsJSUtils.h"
 #include "nsDOMJSUtils.h"
 
+using namespace mozilla;
+
 EmbedLiteJSON::EmbedLiteJSON()
 {
 }
@@ -151,12 +153,9 @@ ParseObject(JSContext* cx, JSObject* object, nsIWritablePropertyBag2* aBag)
 NS_IMETHODIMP
 EmbedLiteJSON::ParseJSON(nsAString const& aJson, nsIPropertyBag2** aRoot)
 {
-  XPCJSContextStack* stack = XPCJSRuntime::Get()->GetJSContextStack();
-  JSContext* cx = stack->GetSafeJSContext();
-  NS_ENSURE_TRUE(cx, NS_ERROR_FAILURE);
-
-  JSAutoRequest ar(cx);
-  JS::Rooted<JS::Value> json(cx, JS::NullValue());
+  MOZ_ASSERT(NS_IsMainThread());
+  AutoSafeJSContext cx;
+  JS::Rooted<JS::Value> json(cx, JSVAL_NULL);
   if (!JS_ParseJSON(cx,
                     static_cast<const jschar*>(aJson.BeginReading()),
                     aJson.Length(),

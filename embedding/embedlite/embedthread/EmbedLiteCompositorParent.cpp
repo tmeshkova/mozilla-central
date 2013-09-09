@@ -92,23 +92,23 @@ bool EmbedLiteCompositorParent::RenderGL(mozilla::embedlite::EmbedLiteRenderTarg
 
   LayerManagerComposite* mgr = GetLayerManager();
 
-  if (IsGLBackend() && aTarget) {
+  if (mgr && IsGLBackend() && aTarget) {
     static_cast<CompositorOGL*>(mgr->GetCompositor())->SetUserRenderTarget(aTarget->GetRenderSurface());
   }
 
-  if (!mgr->GetRoot()) {
+  if (mgr && !mgr->GetRoot()) {
     retval = false;
   }
 
-  if (IsGLBackend()) {
+  if (mgr && IsGLBackend()) {
     mgr->SetWorldTransform(mWorldTransform);
   }
-  if (!mActiveClipping.IsEmpty() && mgr->GetRoot()) {
+  if (mgr && !mActiveClipping.IsEmpty() && mgr->GetRoot()) {
     mgr->GetRoot()->SetClipRect(&mActiveClipping);
   }
   CompositorParent::Composite();
 
-  if (IsGLBackend() && aTarget) {
+  if (mgr && IsGLBackend() && aTarget) {
     static_cast<CompositorOGL*>(mgr->GetCompositor())->SetUserRenderTarget(nullptr);
   }
 
