@@ -52,10 +52,9 @@ public:
    * Store the last used directory for this location using the
    * content pref service, if it is available
    * @param aURI URI of the current page
-   * @param aDomFile file chosen by the user - the path to the parent of this
-   *        file will be stored
+   * @param aDir Parent directory of the file(s)/directory chosen by the user
    */
-  nsresult StoreLastUsedDirectory(nsIDocument* aDoc, nsIDOMFile* aDomFile);
+  nsresult StoreLastUsedDirectory(nsIDocument* aDoc, nsIFile* aDir);
 
   class ContentPrefCallback MOZ_FINAL : public nsIContentPrefCallback2
   {
@@ -196,12 +195,12 @@ public:
 
   void GetDisplayFileName(nsAString& aFileName) const;
 
-  const nsCOMArray<nsIDOMFile>& GetFilesInternal() const
+  const nsTArray<nsCOMPtr<nsIDOMFile> >& GetFilesInternal() const
   {
     return mFiles;
   }
 
-  void SetFiles(const nsCOMArray<nsIDOMFile>& aFiles, bool aSetValueChanged);
+  void SetFiles(const nsTArray<nsCOMPtr<nsIDOMFile> >& aFiles, bool aSetValueChanged);
   void SetFiles(nsIDOMFileList* aFiles, bool aSetValueChanged);
 
   void SetCheckedChangedInternal(bool aCheckedChanged);
@@ -221,9 +220,6 @@ public:
   already_AddRefed<nsIDOMHTMLInputElement> GetSelectedRadioButton();
 
   virtual nsresult Clone(nsINodeInfo *aNodeInfo, nsINode **aResult) const MOZ_OVERRIDE;
-
-  void MaybeFireAsyncClickHandler(nsEventChainPostVisitor& aVisitor);
-  NS_IMETHOD FireAsyncClickHandler();
 
   NS_DECL_CYCLE_COLLECTION_CLASS_INHERITED(HTMLInputElement,
                                            nsGenericHTMLFormElement)
@@ -402,6 +398,8 @@ public:
   // XPCOM GetForm() is OK
 
   nsDOMFileList* GetFiles();
+
+  void OpenDirectoryPicker(ErrorResult& aRv);
 
   // XPCOM GetFormAction() is OK
   void SetFormAction(const nsAString& aValue, ErrorResult& aRv)
@@ -744,7 +742,7 @@ protected:
   bool IsValueEmpty() const;
 
   void ClearFiles(bool aSetValueChanged) {
-    nsCOMArray<nsIDOMFile> files;
+    nsTArray<nsCOMPtr<nsIDOMFile> > files;
     SetFiles(files, aSetValueChanged);
   }
 
@@ -1083,6 +1081,29 @@ protected:
    */
   bool ShouldPreventDOMActivateDispatch(EventTarget* aOriginalTarget);
 
+  /**
+   * Some input type (color and file) let user choose a value using a picker:
+   * this function checks if it is needed, and if so, open the corresponding
+   * picker (color picker or file picker).
+   */
+  nsresult MaybeInitPickers(nsEventChainPostVisitor& aVisitor);
+
+  enum FilePickerType {
+    FILE_PICKER_FILE,
+    FILE_PICKER_DIRECTORY
+  };
+  nsresult InitFilePicker(FilePickerType aType);
+  nsresult InitColorPicker();
+
+  /**
+   * Use this function before trying to open a picker.
+   * It checks if the page is allowed to open a new pop-up.
+   * If it returns true, you should not create the picker.
+   *
+   * @return true if popup should be blocked, false otherwise
+   */
+  bool IsPopupBlocked() const;
+
   nsCOMPtr<nsIControllers> mControllers;
 
   /*
@@ -1113,7 +1134,7 @@ protected:
    * the frame. Whenever the frame wants to change the filename it has to call
    * SetFileNames to update this member.
    */
-  nsCOMArray<nsIDOMFile>   mFiles;
+  nsTArray<nsCOMPtr<nsIDOMFile> >   mFiles;
 
   nsRefPtr<nsDOMFileList>  mFileList;
 
@@ -1230,28 +1251,12 @@ private:
     bool mIsTrusted; 
   };
 
-  class AsyncClickHandler
-    : public nsRunnable
-  {
-  public:
-    AsyncClickHandler(HTMLInputElement* aInput);
-    NS_IMETHOD Run() MOZ_OVERRIDE;
-
-  protected:
-    nsresult InitFilePicker();
-    nsresult InitColorPicker();
-
-    nsRefPtr<HTMLInputElement> mInput;
-    PopupControlState mPopupControlState;
-  };
-
   class nsFilePickerShownCallback
     : public nsIFilePickerShownCallback
   {
   public:
     nsFilePickerShownCallback(HTMLInputElement* aInput,
-                              nsIFilePicker* aFilePicker,
-                              bool aMulti);
+                              nsIFilePicker* aFilePicker);
     virtual ~nsFilePickerShownCallback()
     { }
 
@@ -1262,7 +1267,6 @@ private:
   private:
     nsCOMPtr<nsIFilePicker> mFilePicker;
     nsRefPtr<HTMLInputElement> mInput;
-    bool mMulti;
   };
 };
 
