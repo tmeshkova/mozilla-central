@@ -721,7 +721,6 @@ CompositorOGL::SetRenderTarget(CompositingRenderTarget *aSurface)
 void
 CompositorOGL::SetUserRenderTarget(CompositingRenderTarget *aSurface)
 {
-  MOZ_ASSERT(aSurface);
   CompositingRenderTargetOGL* surface
     = static_cast<CompositingRenderTargetOGL*>(aSurface);
   if (mUserRenderTarget != surface) {
