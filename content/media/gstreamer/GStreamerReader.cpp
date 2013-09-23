@@ -127,11 +127,9 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
     return NS_ERROR_FAILURE;
   }
 #ifdef HAS_NEMO_INTERFACE
-  if (getenv("USE_GST_DIRECT")) {
-    mPlaySink = gst_element_factory_make("droideglsink", nullptr);
-    if (!mPlaySink) {
-      LOG(PR_LOG_DEBUG, ("could not create egl sink: %p", mPlaySink));
-    }
+  mPlaySink = gst_element_factory_make("droideglsink", nullptr);
+  if (!mPlaySink) {
+    LOG(PR_LOG_DEBUG, ("could not create egl sink: %p", mPlaySink));
   }
 #endif
   g_object_set(mPlayBin, "buffer-size", 0, nullptr);
