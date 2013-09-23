@@ -72,7 +72,8 @@ GStreamerReader::GStreamerReader(AbstractMediaDecoder* aDecoder)
   mByteOffset(0),
   mLastReportedByteOffset(0),
   fpsNum(0),
-  fpsDen(0)
+  fpsDen(0),
+  mPlaySink(nullptr)
 {
   MOZ_COUNT_CTOR(GStreamerReader);
 
@@ -101,6 +102,7 @@ GStreamerReader::~GStreamerReader()
     gst_element_set_state(mPlayBin, GST_STATE_NULL);
     gst_object_unref(mPlayBin);
     mPlayBin = nullptr;
+    mPlaySink = nullptr;
     mVideoSink = nullptr;
     mVideoAppSink = nullptr;
     mAudioSink = nullptr;
@@ -124,6 +126,14 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
     LOG(PR_LOG_ERROR, ("couldn't create playbin2"));
     return NS_ERROR_FAILURE;
   }
+#ifdef HAS_NEMO_INTERFACE
+  if (getenv("USE_GST_DIRECT")) {
+    mPlaySink = gst_element_factory_make("droideglsink", nullptr);
+    if (!mPlaySink) {
+      LOG(PR_LOG_DEBUG, ("could not create egl sink: %p", mPlaySink));
+    }
+  }
+#endif
   g_object_set(mPlayBin, "buffer-size", 0, nullptr);
   mBus = gst_pipeline_get_bus(GST_PIPELINE(mPlayBin));
 
@@ -168,12 +178,17 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
   gst_object_unref(sinkpad);
 
   g_object_set(mPlayBin, "uri", "appsrc://",
-               "video-sink", mVideoSink,
+               "video-sink", mPlaySink ? mPlaySink : mVideoSink,
                "audio-sink", mAudioSink,
                nullptr);
 
   g_signal_connect(G_OBJECT(mPlayBin), "notify::source",
                    G_CALLBACK(GStreamerReader::PlayBinSourceSetupCb), this);
+
+  if (mPlaySink) {
+    g_signal_connect(G_OBJECT(mPlaySink), "frame-ready",
+                     G_CALLBACK(GStreamerReader::PlaySinkFrameSetupCb), this);
+  }
 
   return NS_OK;
 }
@@ -561,6 +576,35 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
     mVideoSinkBufferCount--;
   }
 
+  if (mPlaySink)
+  {
+    NS_ASSERTION(mDecoder->OnDecodeThread(),
+               "Should be on decode thread.");
+
+    // Record number of frames decoded and parsed. Automatically update the
+    // stats counters using the AutoNotifyDecoded stack-based class.
+    uint32_t parsed = 0, decoded = 0;
+    AbstractMediaDecoder::AutoNotifyDecoded autoNotify(mDecoder, parsed, decoded);
+
+    MediaResource* resource = mDecoder->GetResource();
+    NS_ASSERTION(resource, "Decoder has no media resource");
+
+    VideoData *v = VideoData::Create(mInfo,
+                                     mDecoder->GetImageContainer(),
+                                     -1,
+                                     0,
+                                     160,
+                                     (void*)mPlaySink,
+                                     1, // In raw video every frame is a keyframe
+                                     -1,
+                                     mPicture);
+    if (!v)
+      return false;
+
+    mVideoQueue.Push(v);
+    return true;
+  }
+
   bool isKeyframe = !GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DISCONT);
   if ((aKeyFrameSkip && !isKeyframe)) {
     gst_buffer_unref(buffer);
@@ -640,7 +684,8 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
   /* XXX ? */
   int64_t offset = 0;
   VideoData* video = VideoData::Create(mInfo, image, offset,
-                                       timestamp, nextTimestamp, b,
+                                       timestamp, nextTimestamp,
+                                       b,
                                        isKeyframe, -1, mPicture);
   mVideoQueue.Push(video);
   gst_buffer_unref(buffer);
@@ -984,6 +1029,20 @@ void GStreamerReader::VideoPreroll()
   mInfo.mHasVideo = true;
   gst_caps_unref(caps);
   gst_object_unref(sinkpad);
+}
+
+void GStreamerReader::PlaySinkFrameSetupCb(GstElement* aPlaySink,
+                                           gint aFrame,
+                                           gpointer aUserData)
+{
+  GStreamerReader* reader = reinterpret_cast<GStreamerReader*>(aUserData);
+  reader->PlaySinkFrameSetup(aFrame);
+}
+
+void GStreamerReader::PlaySinkFrameSetup(gint aFrame)
+{
+    printf("Notify Frame is Ready: %i\n", aFrame);
+    NewVideoBuffer();
 }
 
 GstFlowReturn GStreamerReader::NewBufferCb(GstAppSink* aSink,

@@ -372,6 +372,7 @@ static void UpdateImageClientNow(ImageClient* aClient, ImageContainer* aContaine
   MOZ_ASSERT(aClient);
   MOZ_ASSERT(aContainer);
   sImageBridgeChildSingleton->BeginTransaction();
+  printf(">>>>>>Func:%s::%d Befor UpdateImage call\n", __PRETTY_FUNCTION__, __LINE__);
   aClient->UpdateImage(aContainer, Layer::CONTENT_OPAQUE);
   aClient->OnTransaction();
   sImageBridgeChildSingleton->EndTransaction();
@@ -381,10 +382,12 @@ static void UpdateImageClientNow(ImageClient* aClient, ImageContainer* aContaine
 void ImageBridgeChild::DispatchImageClientUpdate(ImageClient* aClient,
                                                  ImageContainer* aContainer)
 {
-  if (InImageBridgeChildThread()) {
+  if (InImageBridgeChildThread()) { 
+    printf(">>>>>>Func:%s::%d\n", __PRETTY_FUNCTION__, __LINE__);
     UpdateImageClientNow(aClient, aContainer);
     return;
   }
+  printf(">>>>>>Func:%s::%d Post Task\n", __PRETTY_FUNCTION__, __LINE__);
   sImageBridgeChildSingleton->GetMessageLoop()->PostTask(
     FROM_HERE,
     NewRunnableFunction<

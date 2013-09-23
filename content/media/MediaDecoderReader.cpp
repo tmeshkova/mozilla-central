@@ -11,6 +11,7 @@
 #include "AbstractMediaDecoder.h"
 #include "VideoUtils.h"
 #include "ImageContainer.h"
+#include "SharedTextureImage.h"
 
 #include "mozilla/mozalloc.h"
 #include <stdint.h>
@@ -20,6 +21,7 @@ namespace mozilla {
 
 using layers::ImageContainer;
 using layers::PlanarYCbCrImage;
+using layers::SharedTextureImage;
 
 // Verify these values are sane. Once we've checked the frame sizes, we then
 // can do less integer overflow checking.
@@ -279,6 +281,48 @@ VideoData* VideoData::Create(VideoInfo& aInfo,
 {
   return Create(aInfo, nullptr, aImage, aOffset, aTime, aEndTime, aBuffer,
                 aKeyframe, aTimecode, aPicture);
+}
+
+VideoData* VideoData::Create(VideoInfo& aInfo,
+                             ImageContainer* aContainer,
+                             int64_t aOffset,
+                             int64_t aTime,
+                             int64_t aEndTime,
+                             void* aMagicHandle,
+                             bool aKeyframe,
+                             int64_t aTimecode,
+                             nsIntRect aPicture)
+{
+  nsAutoPtr<VideoData> v(new VideoData(aOffset,
+                                       aTime,
+                                       aEndTime,
+                                       aKeyframe,
+                                       aTimecode,
+                                       aInfo.mDisplay));
+
+  ImageFormat format = SHARED_TEXTURE;
+  nsRefPtr<Image> image = aContainer->CreateImage(&format, 1);
+  if (!image) {
+    return nullptr;
+  }
+
+  NS_ASSERTION(image->GetFormat() == SHARED_TEXTURE, "Wrong format?");
+
+  SharedTextureImage::Data data;
+  data.mShareType = gl::SameProcessGst;
+  data.mHandle = (mozilla::gl::SharedTextureHandle)aMagicHandle;
+  data.mInverted = false;
+  // Use the device pixel size of the IOSurface, since layers handles resolution scaling
+  // already.
+  data.mSize = gfxIntSize(800, 600);
+
+  SharedTextureImage* sharedImage = static_cast<SharedTextureImage*>(image.get());
+  sharedImage->SetData(data);
+
+  aContainer->SetCurrentImageInTransaction(sharedImage);
+
+  v->mImage = image;
+  return v.forget();
 }
 
 VideoData* VideoData::CreateFromImage(VideoInfo& aInfo,

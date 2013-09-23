@@ -59,6 +59,7 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
   switch (aEdit.type()) {
     case CompositableOperation::TOpCreatedTexture: {
       MOZ_LAYERS_LOG(("[ParentSide] Created texture"));
+      printf(">>>>>>Func:%s::%d CompositableOperation::TOpCreatedTexture \n", __FUNCTION__, __LINE__);
       const OpCreatedTexture& op = aEdit.get_OpCreatedTexture();
       CompositableParent* compositableParent =
         static_cast<CompositableParent*>(op.compositableParent());
@@ -210,9 +211,11 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
       break;
     }
     case CompositableOperation::TOpUseTexture: {
+      printf(">>>>>>Func:%s::%d CompositableOperation::TOpUseTexture:\n", __FUNCTION__, __LINE__);
       const OpUseTexture& op = aEdit.get_OpUseTexture();
       if (op.textureID() == 0) {
         NS_WARNING("Invalid texture ID");
+        printf(">>>>>>Func:%s::%d BAD CompositableOperation::TOpUseTexture:\n", __FUNCTION__, __LINE__);
         break;
       }
       CompositableHost* compositable = AsCompositable(op);
@@ -227,9 +230,11 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
       break;
     }
     case CompositableOperation::TOpAddTexture: {
+      printf(">>>>>>Func:%s::%d CompositableOperation::TOpAddTexture:\n", __FUNCTION__, __LINE__);
       const OpAddTexture& op = aEdit.get_OpAddTexture();
       if (op.textureID() == 0) {
         NS_WARNING("Invalid texture ID");
+        printf(">>>>>>Func:%s::%d BAD CompositableOperation::TOpAddTexture:\n", __FUNCTION__, __LINE__);
         break;
       }
       CompositableHost* compositable = AsCompositable(op);
@@ -244,9 +249,11 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
       break;
     }
     case CompositableOperation::TOpRemoveTexture: {
+      printf(">>>>>>Func:%s::%d CompositableOperation::TOpRemoveTexture:\n", __FUNCTION__, __LINE__);
       const OpRemoveTexture& op = aEdit.get_OpRemoveTexture();
       if (op.textureID() == 0) {
         NS_WARNING("Invalid texture ID");
+        printf(">>>>>>Func:%s::%d BAD CompositableOperation::TOpRemoveTexture:\n", __FUNCTION__, __LINE__);
         break;
       }
       CompositableHost* compositable = AsCompositable(op);
@@ -273,9 +280,11 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
       break;
     }
     case CompositableOperation::TOpUpdateTexture: {
+      printf(">>>>>>Func:%s::%d CompositableOperation::TOpUpdateTexture:\n", __FUNCTION__, __LINE__);
       const OpUpdateTexture& op = aEdit.get_OpUpdateTexture();
       if (op.textureID() == 0) {
         NS_WARNING("Invalid texture ID");
+        printf(">>>>>>Func:%s::%d BAD CompositableOperation::TOpUpdateTexture:\n", __FUNCTION__, __LINE__);
         break;
       }
       CompositableHost* compositable = AsCompositable(op);

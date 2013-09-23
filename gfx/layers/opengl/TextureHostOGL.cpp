@@ -77,11 +77,13 @@ CreateTextureHostOGL(uint64_t aID,
   switch (aDesc.type()) {
     case SurfaceDescriptor::TSurfaceDescriptorShmem:
     case SurfaceDescriptor::TSurfaceDescriptorMemory: {
+      printf(">>>>>>Func:%s::%d SurfaceDescriptor::TSurfaceDescriptorShmem\n", __PRETTY_FUNCTION__, __LINE__);
       result = CreateBackendIndependentTextureHost(aID, aDesc,
                                                    aDeallocator, aFlags);
       break;
     }
     case SurfaceDescriptor::TSharedTextureDescriptor: {
+      printf(">>>>>>Func:%s::%d SurfaceDescriptor::TSharedTextureDescriptor:\n", __PRETTY_FUNCTION__, __LINE__);
       const SharedTextureDescriptor& desc = aDesc.get_SharedTextureDescriptor();
       result = new SharedTextureHostOGL(aID, aFlags,
                                         desc.shareType(),
@@ -158,6 +160,7 @@ TextureImageTextureSourceOGL::Update(gfx::DataSourceSurface* aSurface,
                                      nsIntRegion* aDestRegion,
                                      gfx::IntPoint* aSrcOffset)
 {
+  printf(">>>>>>Func:%s::%d \n", __PRETTY_FUNCTION__, __LINE__);
   MOZ_ASSERT(mGL);
   if (!mGL) {
     NS_WARNING("trying to update TextureImageTextureSourceOGL without a GLContext");
@@ -223,6 +226,7 @@ nsIntRect TextureImageTextureSourceOGL::GetTileRect()
 void
 TextureImageTextureSourceOGL::BindTexture(GLenum aTextureUnit)
 {
+  printf(">>>>>>Func:%s::%d \n", __PRETTY_FUNCTION__, __LINE__);
   MOZ_ASSERT(mTexImage,
     "Trying to bind a TextureSource that does not have an underlying GL texture.");
   mTexImage->BindTexture(aTextureUnit);
@@ -249,6 +253,7 @@ SharedTextureSourceOGL::SharedTextureSourceOGL(CompositorOGL* aCompositor,
 void
 SharedTextureSourceOGL::BindTexture(GLenum aTextureUnit)
 {
+  printf(">>>>>>Func:%s::%d \n", __PRETTY_FUNCTION__, __LINE__);
   if (!gl()) {
     NS_WARNING("Trying to bind a texture without a GLContext");
     return;
@@ -267,6 +272,7 @@ SharedTextureSourceOGL::BindTexture(GLenum aTextureUnit)
 void
 SharedTextureSourceOGL::DetachSharedHandle()
 {
+  printf(">>>>>>Func:%s::%d \n", __PRETTY_FUNCTION__, __LINE__);
   if (!gl()) {
     return;
   }
@@ -320,6 +326,7 @@ SharedTextureHostOGL::gl() const
 bool
 SharedTextureHostOGL::Lock()
 {
+  printf(">>>>>>Func:%s::%d \n", __PRETTY_FUNCTION__, __LINE__);
   if (!mCompositor) {
     return false;
   }
@@ -328,9 +335,14 @@ SharedTextureHostOGL::Lock()
     // XXX on android GetSharedHandleDetails can call into Java which we'd
     // rather not do from the compositor
     GLContext::SharedHandleDetails handleDetails;
-    if (!gl()->GetSharedHandleDetails(mShareType, mSharedHandle, handleDetails)) {
-      NS_WARNING("Could not get shared handle details");
-      return false;
+    if (mShareType == gl::SameProcessGst) {
+      handleDetails.mTarget = LOCAL_GL_TEXTURE_2D;
+      handleDetails.mTextureFormat = FORMAT_R8G8B8A8;
+    } else {
+      if (!gl()->GetSharedHandleDetails(mShareType, mSharedHandle, handleDetails)) {
+        NS_WARNING("Could not get shared handle details");
+        return false;
+      }
     }
 
     GLenum wrapMode = LOCAL_GL_CLAMP_TO_EDGE;
@@ -349,6 +361,7 @@ SharedTextureHostOGL::Lock()
 void
 SharedTextureHostOGL::Unlock()
 {
+  printf(">>>>>>Func:%s::%d \n", __PRETTY_FUNCTION__, __LINE__);
   if (!mTextureSource) {
     return;
   }

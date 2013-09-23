@@ -658,6 +658,8 @@ public:
                                         SharedHandleDetails& details);
     virtual bool AttachSharedHandle(SharedTextureShareType shareType,
                                     SharedTextureHandle sharedHandle);
+    virtual void DetachSharedHandle(SharedTextureShareType shareType,
+                                    SharedTextureHandle sharedHandle);
 
 protected:
     friend class GLContextProviderEGL;
@@ -872,6 +874,12 @@ void
 GLContextEGL::UpdateSharedHandle(SharedTextureShareType shareType,
                                  SharedTextureHandle sharedHandle)
 {
+    if (shareType == SameProcessGst)
+    {
+        printf(">>>>>> GLContextEGL::%s::%d GST Need to Handle\n", __FUNCTION__, __LINE__);
+        return;
+    }
+
     if (shareType != SameProcess) {
         NS_ERROR("Implementation not available for this sharing type");
         return;
@@ -944,6 +952,12 @@ GLContextEGL::CreateSharedHandle(SharedTextureShareType shareType,
 void GLContextEGL::ReleaseSharedHandle(SharedTextureShareType shareType,
                                        SharedTextureHandle sharedHandle)
 {
+    if (shareType == SameProcessGst)
+    {
+        printf(">>>>>> GLContextEGL::%s::%d GST Need to Handle\n", __FUNCTION__, __LINE__);
+        return;
+    }
+
     if (shareType != SameProcess) {
         NS_ERROR("Implementation not available for this sharing type");
         return;
@@ -976,6 +990,14 @@ bool GLContextEGL::GetSharedHandleDetails(SharedTextureShareType shareType,
                                           SharedTextureHandle sharedHandle,
                                           SharedHandleDetails& details)
 {
+    if (shareType == SameProcessGst)
+    {
+        printf(">>>>>> GLContextEGL::%s::%d return plain texture type for GST\n", __FUNCTION__, __LINE__);
+        details.mTarget = LOCAL_GL_TEXTURE_2D;
+        details.mTextureFormat = FORMAT_R8G8B8A8;
+        return true;
+    }
+
     if (shareType != SameProcess)
         return false;
 
@@ -1006,9 +1028,26 @@ bool GLContextEGL::GetSharedHandleDetails(SharedTextureShareType shareType,
     return true;
 }
 
+void GLContextEGL::DetachSharedHandle(SharedTextureShareType shareType,
+                                      SharedTextureHandle sharedHandle)
+{
+    if (shareType == SameProcessGst)
+    {
+        printf(">>>>>> GLContextEGL::%s::%d GST Need to Handle\n", __FUNCTION__, __LINE__);
+        return;
+    }
+    return;
+}
+
 bool GLContextEGL::AttachSharedHandle(SharedTextureShareType shareType,
                                       SharedTextureHandle sharedHandle)
 {
+    if (shareType == SameProcessGst)
+    {
+        printf(">>>>>> GLContextEGL::%s::%d GST Need to Handle\n", __FUNCTION__, __LINE__);
+        return true;
+    }
+
     if (shareType != SameProcess)
         return false;
 

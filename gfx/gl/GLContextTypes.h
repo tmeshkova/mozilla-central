@@ -17,7 +17,8 @@ typedef uintptr_t SharedTextureHandle;
 
 enum SharedTextureShareType {
     SameProcess = 0,
-    CrossProcess
+    CrossProcess,
+    SameProcessGst
 };
 
 enum SharedTextureBufferType {
