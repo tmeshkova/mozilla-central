@@ -143,7 +143,7 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
         "videosink"));
   gst_app_sink_set_callbacks(mVideoAppSink, &mSinkCallbacks,
       (gpointer) this, nullptr);
-  GstPad* sinkpad = gst_element_get_pad(GST_ELEMENT(mVideoAppSink), "sink");
+  GstPad* sinkpad = gst_element_get_pad(mPlaySink ? mPlaySink : GST_ELEMENT(mVideoAppSink), "sink");
   gst_pad_add_event_probe(sinkpad,
       G_CALLBACK(&GStreamerReader::EventProbeCb), this);
   gst_object_unref(sinkpad);
@@ -923,7 +923,7 @@ gboolean GStreamerReader::EventProbe(GstPad* aPad, GstEvent* aEvent)
       ReentrantMonitorAutoEnter mon(mGstThreadsMonitor);
       gst_event_parse_new_segment(aEvent, &update, &rate, &format,
           &start, &stop, &position);
-      if (parent == GST_ELEMENT(mVideoAppSink))
+      if (parent == mPlaySink ? mPlaySink : GST_ELEMENT(mVideoAppSink))
         segment = &mVideoSegment;
       else
         segment = &mAudioSegment;
@@ -1033,7 +1033,7 @@ void GStreamerReader::VideoPreroll()
 {
   /* The first video buffer has reached the video sink. Get width and height */
   LOG(PR_LOG_DEBUG, ("Video preroll"));
-  GstPad* sinkpad = gst_element_get_pad(GST_ELEMENT(mVideoAppSink), "sink");
+  GstPad* sinkpad = gst_element_get_pad(mPlaySink ? mPlaySink : GST_ELEMENT(mVideoAppSink), "sink");
   GstCaps* caps = gst_pad_get_negotiated_caps(sinkpad);
   gst_video_format_parse_caps(caps, &mFormat, &mPicture.width, &mPicture.height);
   GstStructure* structure = gst_caps_get_structure(caps, 0);
@@ -1057,6 +1057,7 @@ void GStreamerReader::PlaySinkFrameSetupCb(GstElement* aPlaySink,
 void GStreamerReader::PlaySinkFrameSetup(gint aFrame)
 {
     printf("Notify Frame is Ready: %i\n", aFrame);
+    VideoPreroll();
     NewVideoBuffer();
 }
 
