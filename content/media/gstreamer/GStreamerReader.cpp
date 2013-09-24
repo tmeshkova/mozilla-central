@@ -131,6 +131,7 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
   if (!mPlaySink) {
     LOG(PR_LOG_DEBUG, ("could not create egl sink: %p", mPlaySink));
   }
+  printf(">>>>>>Func GStreamerReader::%s::%d Created droideglsink:%p\n", __FUNCTION__, __LINE__, mPlaySink);
 #endif
   g_object_set(mPlayBin, "buffer-size", 0, nullptr);
   mBus = gst_pipeline_get_bus(GST_PIPELINE(mPlayBin));

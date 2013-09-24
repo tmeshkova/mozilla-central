@@ -21,6 +21,10 @@
 #include "libdisplay/GonkDisplay.h"
 #endif
 
+#ifdef HAS_NEMO_INTERFACE
+#include <gst/interfaces/nemovideotexture.h>
+#endif
+
 #include "GLContext.h"
 #include "mozilla/Util.h"
 
@@ -1033,8 +1037,17 @@ void GLContextEGL::DetachSharedHandle(SharedTextureShareType shareType,
 {
     if (shareType == SameProcessGst)
     {
-        printf(">>>>>> GLContextEGL::%s::%d GST Need to Handle\n", __FUNCTION__, __LINE__);
+
+#ifdef HAS_NEMO_INTERFACE
+        NemoGstVideoTexture *sink = NEMO_GST_VIDEO_TEXTURE((gpointer)sharedHandle);
+        nemo_gst_video_texture_unbind_frame(sink);
+        EGLSync sync = sEGLLibrary.fCreateSync(EGL_DISPLAY(), LOCAL_EGL_SYNC_FENCE, nullptr);
+        nemo_gst_video_texture_release_frame(sink, sync);
+        printf(">>>>>> GLContextEGL::%s::%d Released nemo GST frame: %p\n", __FUNCTION__, __LINE__, (void*)sharedHandle);
         return;
+#else
+        printf(">>>>>> GLContextEGL::%s::%d Need handle on non nemo: %p\n", __FUNCTION__, __LINE__, (void*)sharedHandle);
+#endif
     }
     return;
 }
@@ -1044,8 +1057,27 @@ bool GLContextEGL::AttachSharedHandle(SharedTextureShareType shareType,
 {
     if (shareType == SameProcessGst)
     {
-        printf(">>>>>> GLContextEGL::%s::%d GST Need to Handle\n", __FUNCTION__, __LINE__);
+#ifdef HAS_NEMO_INTERFACE
+        g_object_set(G_OBJECT(sharedHandle), "egl-display", EGL_DISPLAY(), NULL);
+
+        NemoGstVideoTexture *sink = NEMO_GST_VIDEO_TEXTURE((gpointer)sharedHandle);
+        if (!nemo_gst_video_texture_acquire_frame(sink)) {
+            printf(">>>>>>Func GLContextEGL::%s::%d Failed to acquire frame\n", __FUNCTION__, __LINE__);
+            return false;
+        }
+
+        EGLImage img;
+        if (!nemo_gst_video_texture_bind_frame (sink, &img)) {
+            printf(">>>>>>Func GLContextEGL::%s::%d Failed to bind frame\n", __FUNCTION__, __LINE__);
+            nemo_gst_video_texture_release_frame (sink, NULL);
+            return false;
+        }
+
+        printf(">>>>>> GLContextEGL::%s::%d Nemo GST EGL Image Created%p\n", __FUNCTION__, __LINE__, img);
         return true;
+#else
+        printf(">>>>>> GLContextEGL::%s::%d Need handle on non nemo: %p\n", __FUNCTION__, __LINE__, (void*)sharedHandle);
+#endif
     }
 
     if (shareType != SameProcess)
