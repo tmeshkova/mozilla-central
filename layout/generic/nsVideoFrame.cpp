@@ -177,18 +177,22 @@ nsVideoFrame::BuildLayer(nsDisplayListBuilder* aBuilder,
   HTMLVideoElement* element = static_cast<HTMLVideoElement*>(GetContent());
   nsIntSize videoSize;
   if (NS_FAILED(element->GetVideoSize(&videoSize)) || area.IsEmpty()) {
+    printf(">>>>>>Func nsVideoFrame::%s::%d BAD\n", __FUNCTION__, __LINE__);
     return nullptr;
   }
 
   nsRefPtr<ImageContainer> container = element->GetImageContainer();
-  if (!container)
+  if (!container) {
+    printf(">>>>>>Func nsVideoFrame::%s::%d BAD\n", __FUNCTION__, __LINE__);
     return nullptr;
+  }
   
   // Retrieve the size of the decoded video frame, before being scaled
   // by pixel aspect ratio.
   gfxIntSize frameSize = container->GetCurrentSize();
   if (frameSize.width == 0 || frameSize.height == 0) {
     // No image, or zero-sized image. No point creating a layer.
+    printf(">>>>>>Func nsVideoFrame::%s::%d BAD\n", __FUNCTION__, __LINE__);
     return nullptr;
   }
 
@@ -203,6 +207,7 @@ nsVideoFrame::BuildLayer(nsDisplayListBuilder* aBuilder,
   r = CorrectForAspectRatio(r, videoSize);
   r.Round();
   if (r.IsEmpty()) {
+    printf(">>>>>>Func nsVideoFrame::%s::%d BAD\n", __FUNCTION__, __LINE__);
     return nullptr;
   }
   gfxIntSize scaleHint(static_cast<int32_t>(r.Width()),
@@ -213,8 +218,10 @@ nsVideoFrame::BuildLayer(nsDisplayListBuilder* aBuilder,
     (aManager->GetLayerBuilder()->GetLeafLayerFor(aBuilder, aItem));
   if (!layer) {
     layer = aManager->CreateImageLayer();
-    if (!layer)
+    if (!layer) {
+      printf(">>>>>>Func nsVideoFrame::%s::%d BAD\n", __FUNCTION__, __LINE__);
       return nullptr;
+    }
   }
 
   layer->SetContainer(container);

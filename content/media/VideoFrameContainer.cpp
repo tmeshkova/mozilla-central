@@ -38,7 +38,10 @@ void VideoFrameContainer::SetCurrentFrame(const gfxIntSize& aIntrinsicSize,
 
   if (aIntrinsicSize != mIntrinsicSize) {
     mIntrinsicSize = aIntrinsicSize;
+    printf(">>>>>>Func VideoFrameContainer::%s::%d mIntrinsicSizeChanged:true\n", __FUNCTION__, __LINE__);
     mIntrinsicSizeChanged = true;
+  } else {
+    printf(">>>>>>Func VideoFrameContainer::%s::%d mIntrinsicSizeChanged:%i sz[%i,%i]\n", __FUNCTION__, __LINE__, mIntrinsicSizeChanged, aIntrinsicSize.width, aIntrinsicSize.height);
   }
 
   gfxIntSize oldFrameSize = mImageContainer->GetCurrentSize();
@@ -111,6 +114,7 @@ void VideoFrameContainer::Invalidate()
   NS_ASSERTION(NS_IsMainThread(), "Must call on main thread");
 
   if (!mNeedInvalidation) {
+    printf(">>>>>>Func VideoFrameContainer::%s::%d no need inval\n", __FUNCTION__, __LINE__);
     return;
   }
 
@@ -123,6 +127,7 @@ void VideoFrameContainer::Invalidate()
 
   if (!mElement) {
     // Element has been destroyed
+    printf(">>>>>>Func VideoFrameContainer::%s::%d el Destro\n", __FUNCTION__, __LINE__);
     return;
   }
 
@@ -136,6 +141,7 @@ void VideoFrameContainer::Invalidate()
     invalidateFrame = mImageSizeChanged;
     mImageSizeChanged = false;
 
+    printf(">>>>>>Func VideoFrameContainer::%s::%d mIntrinsicSizeChanged:%i\n", __FUNCTION__, __LINE__, mIntrinsicSizeChanged);
     if (mIntrinsicSizeChanged) {
       mElement->UpdateMediaSize(mIntrinsicSize);
       mIntrinsicSizeChanged = false;

@@ -318,10 +318,13 @@ VideoData* VideoData::Create(VideoInfo& aInfo,
 
   SharedTextureImage* sharedImage = static_cast<SharedTextureImage*>(image.get());
   sharedImage->SetData(data);
-
-  aContainer->SetCurrentImageInTransaction(sharedImage);
+  if (getenv("SETIMG1"))
+     aContainer->SetCurrentImage(image);
+  if (getenv("SETIMG2"))
+     aContainer->SetCurrentImageInTransaction(image);
 
   v->mImage = image;
+
   return v.forget();
 }
 
@@ -495,9 +498,12 @@ VideoData* MediaDecoderReader::FindStartTime(int64_t& aOutStartTime)
 
   if (HasVideo()) {
     videoData = DecodeToFirstVideoData();
+    printf(">>>>>>Func MediaDecoderReader::%s::%d Has Video call DecodeToFirstVideoData: videoData:%p\n", __FUNCTION__, __LINE__, videoData);
     if (videoData) {
       videoStartTime = videoData->mTime;
     }
+  } else {
+    printf(">>>>>>Func MediaDecoderReader::%s::%d No HasVideo\n", __FUNCTION__, __LINE__);
   }
   if (HasAudio()) {
     AudioData* audioData = DecodeToFirstAudioData();

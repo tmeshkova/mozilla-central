@@ -1889,6 +1889,7 @@ nsresult MediaDecoderStateMachine::DecodeMetadata()
   }
   if (NS_SUCCEEDED(res) && (mState == DECODER_STATE_DECODING_METADATA) && (mReader->IsWaitingMediaResources())) {
     // change state to DECODER_STATE_WAIT_FOR_RESOURCES
+    printf(">>>>>>Func MediaDecoderStateMachine::%s::%d WAIT_FOR_RES ret\n", __FUNCTION__, __LINE__);
     StartWaitForResources();
     return NS_OK;
   }
@@ -1909,18 +1910,21 @@ nsresult MediaDecoderStateMachine::DecodeMetadata()
       NS_NewRunnableMethod(mDecoder, &MediaDecoder::DecodeError);
     ReentrantMonitorAutoExit exitMon(mDecoder->GetReentrantMonitor());
     NS_DispatchToMainThread(event, NS_DISPATCH_SYNC);
+    printf(">>>>>>Func MediaDecoderStateMachine::%s::%d DISPATCH_SYNC ret\n", __FUNCTION__, __LINE__);
     return NS_ERROR_FAILURE;
   }
   mDecoder->StartProgressUpdates();
   mGotDurationFromMetaData = (GetDuration() != -1);
 
   VideoData* videoData = FindStartTime();
+  printf(">>>>>>Func MediaDecoderStateMachine::%s::%d videoData:%p\n", __FUNCTION__, __LINE__, videoData);
   if (videoData) {
     ReentrantMonitorAutoExit exitMon(mDecoder->GetReentrantMonitor());
     RenderVideoFrame(videoData, TimeStamp::Now());
   }
 
   if (mState == DECODER_STATE_SHUTDOWN) {
+    printf(">>>>>>Func MediaDecoderStateMachine::%s::%d SHUTDOWN ret\n", __FUNCTION__, __LINE__);
     return NS_ERROR_FAILURE;
   }
 
@@ -1948,6 +1952,7 @@ nsresult MediaDecoderStateMachine::DecodeMetadata()
     mDecoder->RequestFrameBufferLength(frameBufferLength);
   }
 
+  printf(">>>>>>Func MediaDecoderStateMachine::%s::%d create AudioMetadataEventRunner ret\n", __FUNCTION__, __LINE__);
   nsCOMPtr<nsIRunnable> metadataLoadedEvent =
     new AudioMetadataEventRunner(mDecoder,
                                  mInfo.mAudioChannels,
@@ -2369,6 +2374,7 @@ void MediaDecoderStateMachine::RenderVideoFrame(VideoData* aData,
   mDecoder->GetReentrantMonitor().AssertNotCurrentThreadIn();
 
   if (aData->mDuplicate) {
+    printf(">>>>>>Func MediaDecoderStateMachine::%s::%d  ret data->mDup true\n", __PRETTY_FUNCTION__, __LINE__);
     return;
   }
 
@@ -2378,6 +2384,7 @@ void MediaDecoderStateMachine::RenderVideoFrame(VideoData* aData,
   }
 
   VideoFrameContainer* container = mDecoder->GetVideoFrameContainer();
+  printf(">>>>>>Func MediaDecoderStateMachine::%s::%d  container:%p\n", __PRETTY_FUNCTION__, __LINE__, container);
   if (container) {
     container->SetCurrentFrame(aData->mDisplay, aData->mImage, aTarget);
   }

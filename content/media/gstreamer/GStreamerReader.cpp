@@ -263,7 +263,7 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
 {
   NS_ASSERTION(mDecoder->OnDecodeThread(), "Should be on decode thread.");
   nsresult ret = NS_OK;
-
+  printf(">>>>>>Func GStreamerReader::%s::%d\n", __FUNCTION__, __LINE__);
   /* We do 3 attempts here: decoding audio and video, decoding video only,
    * decoding audio only. This allows us to play streams that have one broken
    * stream but that are otherwise decodeable.
@@ -535,8 +535,47 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
 {
   NS_ASSERTION(mDecoder->OnDecodeThread(), "Should be on decode thread.");
 
-  GstBuffer *buffer = nullptr;
+  if (mPlaySink)
+  {
+    {
+      ReentrantMonitorAutoEnter mon(mGstThreadsMonitor);
 
+      if (mReachedEos) {
+        mVideoQueue.Finish();
+        printf(">>>>>>Func GStreamerReader::%s::%d ret mReachedEos\n", __FUNCTION__, __LINE__);
+        return false;
+      }
+
+      NotifyBytesConsumed();
+      mDecoder->NotifyDecodedFrames(0, 1);
+    }
+
+    // Record number of frames decoded and parsed. Automatically update the
+    // stats counters using the AutoNotifyDecoded stack-based class.
+    uint32_t parsed = 0, decoded = 0;
+    AbstractMediaDecoder::AutoNotifyDecoded autoNotify(mDecoder, parsed, decoded);
+
+    MediaResource* resource = mDecoder->GetResource();
+    NS_ASSERTION(resource, "Decoder has no media resource");
+
+    VideoData *v = VideoData::Create(mInfo,
+                                     mDecoder->GetImageContainer(),
+                                     -1,
+                                     0,
+                                     160,
+                                     (void*)mPlaySink,
+                                     1, // In raw video every frame is a keyframe
+                                     -1,
+                                     mPicture);
+    if (!v)
+      return false;
+
+    printf(">>>>>>Func GStreamerReader::%s::%d pushVideoQueue\n", __FUNCTION__, __LINE__);
+    mVideoQueue.Push(v);
+    return true;
+  }
+
+  GstBuffer *buffer = nullptr;
   {
     ReentrantMonitorAutoEnter mon(mGstThreadsMonitor);
 
@@ -572,35 +611,6 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
 
     buffer = gst_app_sink_pull_buffer(mVideoAppSink);
     mVideoSinkBufferCount--;
-  }
-
-  if (mPlaySink)
-  {
-    NS_ASSERTION(mDecoder->OnDecodeThread(),
-               "Should be on decode thread.");
-
-    // Record number of frames decoded and parsed. Automatically update the
-    // stats counters using the AutoNotifyDecoded stack-based class.
-    uint32_t parsed = 0, decoded = 0;
-    AbstractMediaDecoder::AutoNotifyDecoded autoNotify(mDecoder, parsed, decoded);
-
-    MediaResource* resource = mDecoder->GetResource();
-    NS_ASSERTION(resource, "Decoder has no media resource");
-
-    VideoData *v = VideoData::Create(mInfo,
-                                     mDecoder->GetImageContainer(),
-                                     -1,
-                                     0,
-                                     160,
-                                     (void*)mPlaySink,
-                                     1, // In raw video every frame is a keyframe
-                                     -1,
-                                     mPicture);
-    if (!v)
-      return false;
-
-    mVideoQueue.Push(v);
-    return true;
   }
 
   bool isKeyframe = !GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DISCONT);
@@ -685,6 +695,8 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
                                        timestamp, nextTimestamp,
                                        b,
                                        isKeyframe, -1, mPicture);
+
+  printf(">>>>>>Func GStreamerReader::%s::%d pushVideoQueue\n", __FUNCTION__, __LINE__);
   mVideoQueue.Push(video);
   gst_buffer_unref(buffer);
 
@@ -987,10 +999,14 @@ GstFlowReturn GStreamerReader::NewPrerollCb(GstAppSink* aSink,
 {
   GStreamerReader* reader = reinterpret_cast<GStreamerReader*>(aUserData);
 
-  if (aSink == reader->mVideoAppSink)
+  if (aSink == reader->mVideoAppSink) {
+    printf(">>>>>>Func GStreamerReader::%s::%d Video preroll\n", __FUNCTION__, __LINE__);
     reader->VideoPreroll();
-  else
+  }
+  else {
+    printf(">>>>>>Func GStreamerReader::%s::%d Audio preroll\n", __FUNCTION__, __LINE__);
     reader->AudioPreroll();
+  }
   return GST_FLOW_OK;
 }
 
@@ -1025,6 +1041,7 @@ void GStreamerReader::VideoPreroll()
   NS_ASSERTION(mPicture.width && mPicture.height, "invalid video resolution");
   mInfo.mDisplay = nsIntSize(mPicture.width, mPicture.height);
   mInfo.mHasVideo = true;
+  printf(">>>>>>Func GStreamerReader::%s::%d Video preroll: sz[%i,%i]\n", __FUNCTION__, __LINE__, mInfo.mDisplay.width, mInfo.mDisplay.height);
   gst_caps_unref(caps);
   gst_object_unref(sinkpad);
 }

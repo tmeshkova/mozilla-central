@@ -41,11 +41,14 @@ bool ScheduleComposition(const T& op)
 {
   CompositableParent* comp = static_cast<CompositableParent*>(op.compositableParent());
   if (!comp || !comp->GetCompositorID()) {
+    printf(">>>>>>Func:%s::%d CompositableTransactionParent::ScheduleComposition bad ret: comp:%p, CompID:%lu\n", __FUNCTION__, __LINE__, comp, comp ? comp->GetCompositorID() : 0);
     return false;
   }
+  printf(">>>>>>Func:%s::%d CompositableTransactionParent::ScheduleComposition good ret: comp:%p, CompID:%lu\n", __FUNCTION__, __LINE__, comp, comp ? comp->GetCompositorID() : 0);
   CompositorParent* cp
     = CompositorParent::GetCompositor(comp->GetCompositorID());
   if (!cp) {
+    printf(">>>>>>Func:%s::%d CompositableTransactionParent::ScheduleComposition bad ret, id:%lu\n", __FUNCTION__, __LINE__, comp->GetCompositorID());
     return false;
   }
   cp->ScheduleComposition();
@@ -260,11 +263,15 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
 
       RefPtr<TextureHost> texture = compositable->GetTextureHost(op.textureID());
       MOZ_ASSERT(texture);
+      TextureFlags flags = 0;
+      if (texture) {
+        flags = texture->GetFlags();
 
-      TextureFlags flags = texture->GetFlags();
-
-      if (flags & TEXTURE_DEALLOCATE_HOST) {
-        texture->DeallocateSharedData();
+        if (flags & TEXTURE_DEALLOCATE_HOST) {
+          texture->DeallocateSharedData();
+        }
+      } else {
+        printf(">>>>>>Func:%s::%d BAD CompositableOperation::TOpRemoveTexture: Texture host not available\n", __FUNCTION__, __LINE__);
       }
 
       compositable->RemoveTextureHost(op.textureID());
@@ -291,13 +298,15 @@ CompositableParentManager::ReceiveCompositableUpdate(const CompositableOperation
       MOZ_ASSERT(compositable);
       RefPtr<TextureHost> texture = compositable->GetTextureHost(op.textureID());
       MOZ_ASSERT(texture);
+      if (texture) {
+        texture->Updated(op.region().type() == MaybeRegion::TnsIntRegion
+                         ? &op.region().get_nsIntRegion()
+                         : nullptr); // no region means invalidate the entire surface
 
-      texture->Updated(op.region().type() == MaybeRegion::TnsIntRegion
-                       ? &op.region().get_nsIntRegion()
-                       : nullptr); // no region means invalidate the entire surface
-
-
-      compositable->UseTextureHost(texture);
+        compositable->UseTextureHost(texture);
+      } else {
+        printf(">>>>>>Func:%s::%d BAD CompositableOperation::TOpUpdateTexture: Texture host not available\n", __FUNCTION__, __LINE__);
+      }
 
       break;
     }
