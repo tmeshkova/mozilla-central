@@ -1020,7 +1020,7 @@ bool GLContextEGL::GetSharedHandleDetails(SharedTextureShareType shareType,
     if (shareType == SameProcessGst)
     {
         printf(">>>>>> GLContextEGL::%s::%d return plain texture type for GST\n", __FUNCTION__, __LINE__);
-        details.mTarget = LOCAL_GL_TEXTURE_2D;
+        details.mTarget = LOCAL_GL_TEXTURE_EXTERNAL;
         details.mTextureFormat = FORMAT_R8G8B8A8;
         return true;
     }
@@ -1098,6 +1098,9 @@ bool GLContextEGL::AttachSharedHandle(SharedTextureShareType shareType,
         }
 
         printf(">>>>>> GLContextEGL::%s::%d Nemo GST EGL Image Created%p\n", __FUNCTION__, __LINE__, img);
+
+        fEGLImageTargetTexture2D(LOCAL_GL_TEXTURE_EXTERNAL, img);
+
         return true;
 #else
         printf(">>>>>> GLContextEGL::%s::%d Need handle on non nemo: %p\n", __FUNCTION__, __LINE__, (void*)sharedHandle);
