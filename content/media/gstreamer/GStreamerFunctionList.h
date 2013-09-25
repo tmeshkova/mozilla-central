@@ -3,7 +3,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this file,
  * You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#ifndef __APPLE__
+#if !defined(__APPLE__) && !defined(HAS_NEMO_INTERFACE)
 
 /*
  * List of symbol names we need to dlsym from the gstreamer library.
@@ -85,7 +85,6 @@ GST_FUNC(LIBGSTREAMER, gst_structure_get_int)
 GST_FUNC(LIBGSTREAMER, gst_structure_get_value)
 GST_FUNC(LIBGSTREAMER, gst_structure_new)
 GST_FUNC(LIBGSTREAMER, gst_util_uint64_scale)
-GST_FUNC(LIBGSTREAMER, gst_implements_interface_cast)
 GST_FUNC(LIBGSTVIDEO, gst_video_format_get_component_height)
 GST_FUNC(LIBGSTVIDEO, gst_video_format_get_component_offset)
 GST_FUNC(LIBGSTVIDEO, gst_video_format_get_component_width)

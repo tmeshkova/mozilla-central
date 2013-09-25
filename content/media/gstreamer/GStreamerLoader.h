@@ -20,9 +20,6 @@
 #pragma GCC diagnostic ignored "-Wpragmas"
 #pragma GCC diagnostic ignored "-Wreserved-user-defined-literal"
 #include <gst/video/video.h>
-#ifdef HAS_NEMO_INTERFACE
-#include <gst/interfaces/nemovideotexture.h>
-#endif
 #pragma GCC diagnostic pop
 
 namespace mozilla {
