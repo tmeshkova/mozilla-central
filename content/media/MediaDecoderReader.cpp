@@ -12,6 +12,8 @@
 #include "VideoUtils.h"
 #include "ImageContainer.h"
 #include "SharedTextureImage.h"
+#include "GLContext.h"
+#include "GLContextProvider.h"
 
 #include "mozilla/mozalloc.h"
 #include <stdint.h>
@@ -310,18 +312,17 @@ VideoData* VideoData::Create(VideoInfo& aInfo,
 
   SharedTextureImage::Data data;
   data.mShareType = gl::SameProcessGst;
-  data.mHandle = (mozilla::gl::SharedTextureHandle)aMagicHandle;
   data.mInverted = false;
+  data.mHandle = gl::GLContextProvider::CreateSharedHandle(data.mShareType,
+                                                           aMagicHandle,
+                                                           gl::GstSinkHandle);
+
   // Use the device pixel size of the IOSurface, since layers handles resolution scaling
   // already.
-  data.mSize = gfxIntSize(800, 600);
+  data.mSize = gfxIntSize(aPicture.width, aPicture.height);
 
   SharedTextureImage* sharedImage = static_cast<SharedTextureImage*>(image.get());
   sharedImage->SetData(data);
-  if (getenv("SETIMG1"))
-     aContainer->SetCurrentImage(image);
-  if (getenv("SETIMG2"))
-     aContainer->SetCurrentImageInTransaction(image);
 
   v->mImage = image;
 

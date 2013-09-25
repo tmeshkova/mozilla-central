@@ -750,6 +750,9 @@ enum SharedHandleType {
 #ifdef MOZ_WIDGET_ANDROID
     , SharedHandleType_SurfaceTexture
 #endif
+#ifdef HAS_NEMO_INTERFACE
+    , SharedHandleType_GstSynk
+#endif
 };
 
 class SharedTextureHandleWrapper
@@ -789,6 +792,26 @@ public:
 };
 
 #endif // MOZ_WIDGET_ANDROID
+
+class GstVideoSyncWrapper: public SharedTextureHandleWrapper
+{
+public:
+    GstVideoSyncWrapper(void* aPlaySink)
+      : SharedTextureHandleWrapper(SharedHandleType_GstSynk)
+      , mPlaySink(aPlaySink)
+    {
+    }
+
+    virtual ~GstVideoSyncWrapper()
+    {
+        mPlaySink = nullptr;
+    }
+
+    void* PlaySink() { return mPlaySink; }
+
+private:
+    void* mPlaySink;
+};
 
 class EGLTextureWrapper : public SharedTextureHandleWrapper
 {
@@ -1037,9 +1060,9 @@ void GLContextEGL::DetachSharedHandle(SharedTextureShareType shareType,
 {
     if (shareType == SameProcessGst)
     {
-
+        GstVideoSyncWrapper* wrapper = reinterpret_cast<GstVideoSyncWrapper*>(sharedHandle);
 #ifdef HAS_NEMO_INTERFACE
-        NemoGstVideoTexture *sink = NEMO_GST_VIDEO_TEXTURE((gpointer)sharedHandle);
+        NemoGstVideoTexture *sink = NEMO_GST_VIDEO_TEXTURE(wrapper->PlaySink());
         nemo_gst_video_texture_unbind_frame(sink);
         EGLSync sync = sEGLLibrary.fCreateSync(EGL_DISPLAY(), LOCAL_EGL_SYNC_FENCE, nullptr);
         nemo_gst_video_texture_release_frame(sink, sync);
@@ -1058,9 +1081,10 @@ bool GLContextEGL::AttachSharedHandle(SharedTextureShareType shareType,
     if (shareType == SameProcessGst)
     {
 #ifdef HAS_NEMO_INTERFACE
-        g_object_set(G_OBJECT(sharedHandle), "egl-display", EGL_DISPLAY(), NULL);
+        GstVideoSyncWrapper* wrapper = reinterpret_cast<GstVideoSyncWrapper*>(sharedHandle);
 
-        NemoGstVideoTexture *sink = NEMO_GST_VIDEO_TEXTURE((gpointer)sharedHandle);
+        g_object_set(G_OBJECT(wrapper->PlaySink()), "egl-display", EGL_DISPLAY(), NULL);
+        NemoGstVideoTexture *sink = NEMO_GST_VIDEO_TEXTURE(wrapper->PlaySink());
         if (!nemo_gst_video_texture_acquire_frame(sink)) {
             printf(">>>>>>Func GLContextEGL::%s::%d Failed to acquire frame\n", __FUNCTION__, __LINE__);
             return false;
@@ -2100,6 +2124,15 @@ GLContextProviderEGL::CreateSharedHandle(SharedTextureShareType shareType,
                                          void* buffer,
                                          SharedTextureBufferType bufferType)
 {
+
+  if (shareType == SameProcessGst &&
+      bufferType == gl::GstSinkHandle) {
+#ifdef HAS_NEMO_INTERFACE
+    GstVideoSyncWrapper* wrap = new GstVideoSyncWrapper(static_cast<GstElement*>(buffer));
+    return (SharedTextureHandle)wrap;
+#endif
+  }
+
   return 0;
 }
 

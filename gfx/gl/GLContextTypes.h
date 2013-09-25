@@ -29,6 +29,7 @@ enum SharedTextureBufferType {
 #ifdef XP_MACOSX
     , IOSurface
 #endif
+    , GstSinkHandle
 };
 
 enum ContextFlags {
