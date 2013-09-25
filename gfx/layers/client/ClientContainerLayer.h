@@ -78,7 +78,7 @@ public:
         continue;
       }
 
-      printf(">>>>>>Func ClientContainerLayer::%s::%d this:%p\n", __FUNCTION__, __LINE__, this);
+      // printf(">>>>>>Func ClientContainerLayer::%s::%d this:%p\n", __FUNCTION__, __LINE__, this);
       ToClientLayer(children.ElementAt(i))->RenderLayer();
     }
   }
@@ -93,7 +93,7 @@ public:
   {
     NS_ASSERTION(ClientManager()->InConstruction(),
                  "Can only set properties in construction phase");
-    printf(">>>>>>Func ClientContainerLayer::%s::%d aChild:%p, aAfter:%p, this:%p\n", __FUNCTION__, __LINE__, aChild, aAfter, this);
+    // printf(">>>>>>Func ClientContainerLayer::%s::%d aChild:%p, aAfter:%p, this:%p\n", __FUNCTION__, __LINE__, aChild, aAfter, this);
     ClientManager()->InsertAfter(ClientManager()->Hold(this),
                                  ClientManager()->Hold(aChild),
                                  aAfter ? ClientManager()->Hold(aAfter) : nullptr);
@@ -104,7 +104,7 @@ public:
   { 
     NS_ASSERTION(ClientManager()->InConstruction(),
                  "Can only set properties in construction phase");
-    printf(">>>>>>Func ClientContainerLayer::%s::%d aChild:%p, this:%p\n", __FUNCTION__, __LINE__, aChild, this);
+    // printf(">>>>>>Func ClientContainerLayer::%s::%d aChild:%p, this:%p\n", __FUNCTION__, __LINE__, aChild, this);
     ClientManager()->RemoveChild(ClientManager()->Hold(this),
                                  ClientManager()->Hold(aChild));
     ContainerLayer::RemoveChild(aChild);
@@ -114,7 +114,7 @@ public:
   {
     NS_ASSERTION(ClientManager()->InConstruction(),
                  "Can only set properties in construction phase");
-    printf(">>>>>>Func ClientContainerLayer::%s::%d aChild:%p, aAfter:%p, this:%p\n", __FUNCTION__, __LINE__, aChild, aAfter, this);
+    // printf(">>>>>>Func ClientContainerLayer::%s::%d aChild:%p, aAfter:%p, this:%p\n", __FUNCTION__, __LINE__, aChild, aAfter, this);
     ClientManager()->RepositionChild(ClientManager()->Hold(this),
                                      ClientManager()->Hold(aChild),
                                      aAfter ? ClientManager()->Hold(aAfter) : nullptr);

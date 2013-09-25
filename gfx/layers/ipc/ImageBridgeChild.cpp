@@ -73,7 +73,7 @@ struct CompositableTransaction
   void End()
   {
     mFinished = true;
-    printf(">>>>>>Func ImageBridgeChild::%s::%d, swReq:%i->false\n", __FUNCTION__, __LINE__, mSwapRequired);
+    // printf(">>>>>>Func ImageBridgeChild::%s::%d, swReq:%i->false\n", __FUNCTION__, __LINE__, mSwapRequired);
     mSwapRequired = false;
     mOperations.clear();
   }
@@ -89,7 +89,7 @@ struct CompositableTransaction
   void AddEdit(const CompositableOperation& op)
   {
     AddNoSwapEdit(op);
-    printf(">>>>>>Func ImageBridgeChild::%s::%d, swReq:%i->true\n", __FUNCTION__, __LINE__, mSwapRequired);
+    // printf(">>>>>>Func ImageBridgeChild::%s::%d, swReq:%i->true\n", __FUNCTION__, __LINE__, mSwapRequired);
     mSwapRequired = true;
   }
 
@@ -374,7 +374,7 @@ static void UpdateImageClientNow(ImageClient* aClient, ImageContainer* aContaine
   MOZ_ASSERT(aClient);
   MOZ_ASSERT(aContainer);
   sImageBridgeChildSingleton->BeginTransaction();
-  printf(">>>>>>Func ImageBridgeChild::%s::%d Befor UpdateImage call\n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func ImageBridgeChild::%s::%d Befor UpdateImage call\n", __FUNCTION__, __LINE__);
   aClient->UpdateImage(aContainer, Layer::CONTENT_OPAQUE);
   aClient->OnTransaction();
   sImageBridgeChildSingleton->EndTransaction();
@@ -385,11 +385,11 @@ void ImageBridgeChild::DispatchImageClientUpdate(ImageClient* aClient,
                                                  ImageContainer* aContainer)
 {
   if (InImageBridgeChildThread()) { 
-    printf(">>>>>>Func ImageBridgeChild::%s::%d\n", __FUNCTION__, __LINE__);
+    // printf(">>>>>>Func ImageBridgeChild::%s::%d\n", __FUNCTION__, __LINE__);
     UpdateImageClientNow(aClient, aContainer);
     return;
   }
-  printf(">>>>>>Func ImageBridgeChild::%s::%d Post Task\n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func ImageBridgeChild::%s::%d Post Task\n", __FUNCTION__, __LINE__);
   sImageBridgeChildSingleton->GetMessageLoop()->PostTask(
     FROM_HERE,
     NewRunnableFunction<
@@ -426,14 +426,14 @@ ImageBridgeChild::EndTransaction()
   AutoInfallibleTArray<EditReply, 10> replies;
 
   if (mTxn->mSwapRequired) {
-    printf(">>>>>>Func ImageBridgeChild::%s::%d, Just Update swReq:%i\n", __FUNCTION__, __LINE__, mTxn->mSwapRequired);
+    // printf(">>>>>>Func ImageBridgeChild::%s::%d, Just Update swReq:%i\n", __FUNCTION__, __LINE__, mTxn->mSwapRequired);
     if (!SendUpdate(cset, &replies)) {
       NS_WARNING("could not send async texture transaction");
       return;
     }
   } else {
     // If we don't require a swap we can call SendUpdateNoSwap which
-    printf(">>>>>>Func ImageBridgeChild::%s::%d, No Swap swReq:%i\n", __FUNCTION__, __LINE__, mTxn->mSwapRequired);
+    // printf(">>>>>>Func ImageBridgeChild::%s::%d, No Swap swReq:%i\n", __FUNCTION__, __LINE__, mTxn->mSwapRequired);
     if (!SendUpdateNoSwap(cset)) {
       NS_WARNING("could not send async texture transaction (no swap)");
       return;

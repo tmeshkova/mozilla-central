@@ -499,12 +499,12 @@ VideoData* MediaDecoderReader::FindStartTime(int64_t& aOutStartTime)
 
   if (HasVideo()) {
     videoData = DecodeToFirstVideoData();
-    printf(">>>>>>Func MediaDecoderReader::%s::%d Has Video call DecodeToFirstVideoData: videoData:%p\n", __FUNCTION__, __LINE__, videoData);
+    // printf(">>>>>>Func MediaDecoderReader::%s::%d Has Video call DecodeToFirstVideoData: videoData:%p\n", __FUNCTION__, __LINE__, videoData);
     if (videoData) {
       videoStartTime = videoData->mTime;
     }
   } else {
-    printf(">>>>>>Func MediaDecoderReader::%s::%d No HasVideo\n", __FUNCTION__, __LINE__);
+    // printf(">>>>>>Func MediaDecoderReader::%s::%d No HasVideo\n", __FUNCTION__, __LINE__);
   }
   if (HasAudio()) {
     AudioData* audioData = DecodeToFirstAudioData();

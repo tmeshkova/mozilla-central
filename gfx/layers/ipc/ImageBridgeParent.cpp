@@ -66,10 +66,10 @@ ImageBridgeParent::ActorDestroy(ActorDestroyReason aWhy)
 bool
 ImageBridgeParent::RecvUpdate(const EditArray& aEdits, EditReplyArray* aReply)
 {
-  printf(">>>>>>Func ImageBridgeChild::%s::%d\n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func ImageBridgeChild::%s::%d\n", __FUNCTION__, __LINE__);
   EditReplyVector replyv;
   for (EditArray::index_type i = 0; i < aEdits.Length(); ++i) {
-    printf(">>>>>>Func ImageBridgeChild::%s::%d ReceiveCompositableUpdate call\n", __FUNCTION__, __LINE__);
+    // printf(">>>>>>Func ImageBridgeChild::%s::%d ReceiveCompositableUpdate call\n", __FUNCTION__, __LINE__);
     ReceiveCompositableUpdate(aEdits[i], replyv);
   }
 
@@ -89,7 +89,7 @@ ImageBridgeParent::RecvUpdate(const EditArray& aEdits, EditReplyArray* aReply)
 bool
 ImageBridgeParent::RecvUpdateNoSwap(const EditArray& aEdits)
 {
-  printf(">>>>>>Func ImageBridgeChild::%s::%d\n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func ImageBridgeChild::%s::%d\n", __FUNCTION__, __LINE__);
   InfallibleTArray<EditReply> noReplies;
   bool success = RecvUpdate(aEdits, &noReplies);
   NS_ABORT_IF_FALSE(noReplies.Length() == 0, "RecvUpdateNoSwap requires a sync Update to carry Edits");

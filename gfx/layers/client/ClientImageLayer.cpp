@@ -120,13 +120,13 @@ protected:
 void
 ClientImageLayer::RenderLayer()
 {
-  printf(">>>>>>Func ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
   if (GetMaskLayer()) {
     ToClientLayer(GetMaskLayer())->RenderLayer();
   }
 
   if (!mContainer) {
-     printf(">>>>>>Func BAD ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
+     // printf(">>>>>>Func BAD ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
      return;
   }
 
@@ -134,12 +134,12 @@ ClientImageLayer::RenderLayer()
     mImageClient->OnTransaction();
   }
 
-  printf(">>>>>>Func Test ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func Test ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
   if (!mImageClient ||
       !mImageClient->UpdateImage(mContainer, GetContentFlags())) {
     CompositableType type = GetImageClientType();
     if (type == BUFFER_UNKNOWN) {
-      printf(">>>>>>Func BAD ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
+      // printf(">>>>>>Func BAD ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
       return;
     }
     TextureFlags flags = TEXTURE_FRONT;
@@ -154,16 +154,16 @@ ClientImageLayer::RenderLayer()
     }
 
     if (!mImageClient) {
-      printf(">>>>>>Func BAD ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
+      // printf(">>>>>>Func BAD ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
       return;
     }
-    printf(">>>>>>Func Test ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
+    // printf(">>>>>>Func Test ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
     if (HasShadow() && !mContainer->IsAsync()) {
       mImageClient->Connect();
       ClientManager()->Attach(mImageClient, this);
     }
     if (!mImageClient->UpdateImage(mContainer, GetContentFlags())) {
-      printf(">>>>>>Func BAD ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
+      // printf(">>>>>>Func BAD ClientImageLayer::%s::%d\n", __FUNCTION__, __LINE__);
       return;
     }
   }

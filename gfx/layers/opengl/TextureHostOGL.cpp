@@ -77,13 +77,13 @@ CreateTextureHostOGL(uint64_t aID,
   switch (aDesc.type()) {
     case SurfaceDescriptor::TSurfaceDescriptorShmem:
     case SurfaceDescriptor::TSurfaceDescriptorMemory: {
-      printf(">>>>>>Func TextureHostOGL::%s::%d SurfaceDescriptor::TSurfaceDescriptorShmem\n", __FUNCTION__, __LINE__);
+      // printf(">>>>>>Func TextureHostOGL::%s::%d SurfaceDescriptor::TSurfaceDescriptorShmem\n", __FUNCTION__, __LINE__);
       result = CreateBackendIndependentTextureHost(aID, aDesc,
                                                    aDeallocator, aFlags);
       break;
     }
     case SurfaceDescriptor::TSharedTextureDescriptor: {
-      printf(">>>>>>Func TextureHostOGL::%s::%d SurfaceDescriptor::TSharedTextureDescriptor:\n", __FUNCTION__, __LINE__);
+      // printf(">>>>>>Func TextureHostOGL::%s::%d SurfaceDescriptor::TSharedTextureDescriptor:\n", __FUNCTION__, __LINE__);
       const SharedTextureDescriptor& desc = aDesc.get_SharedTextureDescriptor();
       result = new SharedTextureHostOGL(aID, aFlags,
                                         desc.shareType(),
@@ -160,7 +160,7 @@ TextureImageTextureSourceOGL::Update(gfx::DataSourceSurface* aSurface,
                                      nsIntRegion* aDestRegion,
                                      gfx::IntPoint* aSrcOffset)
 {
-  printf(">>>>>>Func TextureImageTextureSourceOGL::%s::%d \n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func TextureImageTextureSourceOGL::%s::%d \n", __FUNCTION__, __LINE__);
   MOZ_ASSERT(mGL);
   if (!mGL) {
     NS_WARNING("trying to update TextureImageTextureSourceOGL without a GLContext");
@@ -226,7 +226,7 @@ nsIntRect TextureImageTextureSourceOGL::GetTileRect()
 void
 TextureImageTextureSourceOGL::BindTexture(GLenum aTextureUnit)
 {
-  printf(">>>>>>Func TextureImageTextureSourceOGL::%s::%d \n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func TextureImageTextureSourceOGL::%s::%d \n", __FUNCTION__, __LINE__);
   MOZ_ASSERT(mTexImage,
     "Trying to bind a TextureSource that does not have an underlying GL texture.");
   mTexImage->BindTexture(aTextureUnit);
@@ -253,7 +253,7 @@ SharedTextureSourceOGL::SharedTextureSourceOGL(CompositorOGL* aCompositor,
 void
 SharedTextureSourceOGL::BindTexture(GLenum aTextureUnit)
 {
-  printf(">>>>>>Func SharedTextureHostOGL::%s::%d \n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func SharedTextureHostOGL::%s::%d \n", __FUNCTION__, __LINE__);
   if (!gl()) {
     NS_WARNING("Trying to bind a texture without a GLContext");
     return;
@@ -272,7 +272,7 @@ SharedTextureSourceOGL::BindTexture(GLenum aTextureUnit)
 void
 SharedTextureSourceOGL::DetachSharedHandle()
 {
-  printf(">>>>>>Func SharedTextureHostOGL::%s::%d \n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func SharedTextureHostOGL::%s::%d \n", __FUNCTION__, __LINE__);
   if (!gl()) {
     return;
   }
@@ -326,7 +326,7 @@ SharedTextureHostOGL::gl() const
 bool
 SharedTextureHostOGL::Lock()
 {
-  printf(">>>>>>Func SharedTextureHostOGL::%s::%d \n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func SharedTextureHostOGL::%s::%d \n", __FUNCTION__, __LINE__);
   if (!mCompositor) {
     return false;
   }
@@ -356,7 +356,7 @@ SharedTextureHostOGL::Lock()
 void
 SharedTextureHostOGL::Unlock()
 {
-  printf(">>>>>>Func SharedTextureHostOGL::%s::%d \n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func SharedTextureHostOGL::%s::%d \n", __FUNCTION__, __LINE__);
   if (!mTextureSource) {
     return;
   }

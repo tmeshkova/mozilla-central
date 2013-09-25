@@ -903,7 +903,7 @@ GLContextEGL::UpdateSharedHandle(SharedTextureShareType shareType,
 {
     if (shareType == SameProcessGst)
     {
-        printf(">>>>>> GLContextEGL::%s::%d GST Need to Handle\n", __FUNCTION__, __LINE__);
+        // printf(">>>>>> GLContextEGL::%s::%d GST Need to Handle\n", __FUNCTION__, __LINE__);
         return;
     }
 
@@ -981,7 +981,7 @@ void GLContextEGL::ReleaseSharedHandle(SharedTextureShareType shareType,
 {
     if (shareType == SameProcessGst)
     {
-        printf(">>>>>> GLContextEGL::%s::%d GST Need to Handle\n", __FUNCTION__, __LINE__);
+        // printf(">>>>>> GLContextEGL::%s::%d GST Need to Handle\n", __FUNCTION__, __LINE__);
         return;
     }
 
@@ -1019,7 +1019,7 @@ bool GLContextEGL::GetSharedHandleDetails(SharedTextureShareType shareType,
 {
     if (shareType == SameProcessGst)
     {
-        printf(">>>>>> GLContextEGL::%s::%d return plain texture type for GST\n", __FUNCTION__, __LINE__);
+        // printf(">>>>>> GLContextEGL::%s::%d return plain texture type for GST\n", __FUNCTION__, __LINE__);
         details.mTarget = LOCAL_GL_TEXTURE_EXTERNAL;
         details.mTextureFormat = FORMAT_R8G8B8A8;
         return true;
@@ -1066,10 +1066,10 @@ void GLContextEGL::DetachSharedHandle(SharedTextureShareType shareType,
         nemo_gst_video_texture_unbind_frame(sink);
         EGLSync sync = sEGLLibrary.fCreateSync(EGL_DISPLAY(), LOCAL_EGL_SYNC_FENCE, nullptr);
         nemo_gst_video_texture_release_frame(sink, sync);
-        printf(">>>>>> GLContextEGL::%s::%d Released nemo GST frame: %p\n", __FUNCTION__, __LINE__, (void*)sharedHandle);
+        // printf(">>>>>> GLContextEGL::%s::%d Released nemo GST frame: %p\n", __FUNCTION__, __LINE__, (void*)sharedHandle);
         return;
 #else
-        printf(">>>>>> GLContextEGL::%s::%d Need handle on non nemo: %p\n", __FUNCTION__, __LINE__, (void*)sharedHandle);
+        // printf(">>>>>> GLContextEGL::%s::%d Need handle on non nemo: %p\n", __FUNCTION__, __LINE__, (void*)sharedHandle);
 #endif
     }
     return;
@@ -1086,24 +1086,24 @@ bool GLContextEGL::AttachSharedHandle(SharedTextureShareType shareType,
         g_object_set(G_OBJECT(wrapper->PlaySink()), "egl-display", EGL_DISPLAY(), NULL);
         NemoGstVideoTexture *sink = NEMO_GST_VIDEO_TEXTURE(wrapper->PlaySink());
         if (!nemo_gst_video_texture_acquire_frame(sink)) {
-            printf(">>>>>>Func GLContextEGL::%s::%d Failed to acquire frame\n", __FUNCTION__, __LINE__);
+            // printf(">>>>>>Func GLContextEGL::%s::%d Failed to acquire frame\n", __FUNCTION__, __LINE__);
             return false;
         }
 
         EGLImage img;
         if (!nemo_gst_video_texture_bind_frame (sink, &img)) {
-            printf(">>>>>>Func GLContextEGL::%s::%d Failed to bind frame\n", __FUNCTION__, __LINE__);
+            // printf(">>>>>>Func GLContextEGL::%s::%d Failed to bind frame\n", __FUNCTION__, __LINE__);
             nemo_gst_video_texture_release_frame (sink, NULL);
             return false;
         }
 
-        printf(">>>>>> GLContextEGL::%s::%d Nemo GST EGL Image Created%p\n", __FUNCTION__, __LINE__, img);
+        // printf(">>>>>> GLContextEGL::%s::%d Nemo GST EGL Image Created%p\n", __FUNCTION__, __LINE__, img);
 
         fEGLImageTargetTexture2D(LOCAL_GL_TEXTURE_EXTERNAL, img);
 
         return true;
 #else
-        printf(">>>>>> GLContextEGL::%s::%d Need handle on non nemo: %p\n", __FUNCTION__, __LINE__, (void*)sharedHandle);
+        // printf(">>>>>> GLContextEGL::%s::%d Need handle on non nemo: %p\n", __FUNCTION__, __LINE__, (void*)sharedHandle);
 #endif
     }
 

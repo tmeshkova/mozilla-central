@@ -87,6 +87,9 @@ private:
   static void PlaySinkFrameSetupCb(GstElement* aPlayBin,
                                    gint aFrame,
                                    gpointer aUserData);
+  static void PlaySinkCapsNotify(GObject *obj,
+                                 GParamSpec *pspec,
+                                 gpointer aUserData);
   void PlaySinkFrameSetup(gint aFrame);
 
   /* Called from appsrc when we need to read more data from the resource */

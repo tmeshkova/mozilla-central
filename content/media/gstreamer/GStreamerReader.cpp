@@ -131,7 +131,7 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
   if (!mPlaySink) {
     LOG(PR_LOG_DEBUG, ("could not create egl sink: %p", mPlaySink));
   }
-  printf(">>>>>>Func GStreamerReader::%s::%d Created droideglsink:%p\n", __FUNCTION__, __LINE__, mPlaySink);
+//  printf(">>>>>>Func GStreamerReader::%s::%d Created droideglsink:%p\n", __FUNCTION__, __LINE__, mPlaySink);
 #endif
   g_object_set(mPlayBin, "buffer-size", 0, nullptr);
   mBus = gst_pipeline_get_bus(GST_PIPELINE(mPlayBin));
@@ -147,6 +147,12 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
   GstPad* sinkpad = gst_element_get_pad(mPlaySink ? mPlaySink : GST_ELEMENT(mVideoAppSink), "sink");
   gst_pad_add_event_probe(sinkpad,
       G_CALLBACK(&GStreamerReader::EventProbeCb), this);
+
+#ifdef HAS_NEMO_INTERFACE
+  g_signal_connect (G_OBJECT (sinkpad), "notify::caps",
+                    G_CALLBACK (GStreamerReader::PlaySinkCapsNotify), this);
+#endif
+
   gst_object_unref(sinkpad);
   gst_pad_set_bufferalloc_function(sinkpad, GStreamerReader::AllocateVideoBufferCb);
   gst_pad_set_element_private(sinkpad, this);
@@ -264,7 +270,7 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
 {
   NS_ASSERTION(mDecoder->OnDecodeThread(), "Should be on decode thread.");
   nsresult ret = NS_OK;
-  printf(">>>>>>Func GStreamerReader::%s::%d\n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func GStreamerReader::%s::%d\n", __FUNCTION__, __LINE__);
   /* We do 3 attempts here: decoding audio and video, decoding video only,
    * decoding audio only. This allows us to play streams that have one broken
    * stream but that are otherwise decodeable.
@@ -543,7 +549,7 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
 
       if (mReachedEos) {
         mVideoQueue.Finish();
-        printf(">>>>>>Func GStreamerReader::%s::%d ret mReachedEos\n", __FUNCTION__, __LINE__);
+        // printf(">>>>>>Func GStreamerReader::%s::%d ret mReachedEos\n", __FUNCTION__, __LINE__);
         return false;
       }
 
@@ -571,7 +577,7 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
     if (!v)
       return false;
 
-    printf(">>>>>>Func GStreamerReader::%s::%d pushVideoQueue\n", __FUNCTION__, __LINE__);
+    // printf(">>>>>>Func GStreamerReader::%s::%d pushVideoQueue\n", __FUNCTION__, __LINE__);
     mVideoQueue.Push(v);
     return true;
   }
@@ -697,7 +703,7 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
                                        b,
                                        isKeyframe, -1, mPicture);
 
-  printf(">>>>>>Func GStreamerReader::%s::%d pushVideoQueue\n", __FUNCTION__, __LINE__);
+  // printf(">>>>>>Func GStreamerReader::%s::%d pushVideoQueue\n", __FUNCTION__, __LINE__);
   mVideoQueue.Push(video);
   gst_buffer_unref(buffer);
 
@@ -1001,11 +1007,11 @@ GstFlowReturn GStreamerReader::NewPrerollCb(GstAppSink* aSink,
   GStreamerReader* reader = reinterpret_cast<GStreamerReader*>(aUserData);
 
   if (aSink == reader->mVideoAppSink) {
-    printf(">>>>>>Func GStreamerReader::%s::%d Video preroll\n", __FUNCTION__, __LINE__);
+    // printf(">>>>>>Func GStreamerReader::%s::%d Video preroll\n", __FUNCTION__, __LINE__);
     reader->VideoPreroll();
   }
   else {
-    printf(">>>>>>Func GStreamerReader::%s::%d Audio preroll\n", __FUNCTION__, __LINE__);
+    // printf(">>>>>>Func GStreamerReader::%s::%d Audio preroll\n", __FUNCTION__, __LINE__);
     reader->AudioPreroll();
   }
   return GST_FLOW_OK;
@@ -1042,9 +1048,20 @@ void GStreamerReader::VideoPreroll()
   NS_ASSERTION(mPicture.width && mPicture.height, "invalid video resolution");
   mInfo.mDisplay = nsIntSize(mPicture.width, mPicture.height);
   mInfo.mHasVideo = true;
-  printf(">>>>>>Func GStreamerReader::%s::%d Video preroll: sz[%i,%i]\n", __FUNCTION__, __LINE__, mInfo.mDisplay.width, mInfo.mDisplay.height);
+  // printf(">>>>>>Func GStreamerReader::%s::%d Video preroll: sz[%i,%i]\n", __FUNCTION__, __LINE__, mInfo.mDisplay.width, mInfo.mDisplay.height);
   gst_caps_unref(caps);
   gst_object_unref(sinkpad);
+}
+
+void GStreamerReader::PlaySinkCapsNotify(GObject *obj,
+                                         GParamSpec *pspec,
+                                         gpointer aUserData)
+{
+  GstPad *pad = GST_PAD(obj);
+  if (pad && GST_PAD_CAPS(pad)) {
+    GStreamerReader* reader = reinterpret_cast<GStreamerReader*>(aUserData);
+    reader->VideoPreroll();
+  }
 }
 
 void GStreamerReader::PlaySinkFrameSetupCb(GstElement* aPlaySink,
@@ -1057,8 +1074,7 @@ void GStreamerReader::PlaySinkFrameSetupCb(GstElement* aPlaySink,
 
 void GStreamerReader::PlaySinkFrameSetup(gint aFrame)
 {
-    printf("Notify Frame is Ready: %i\n", aFrame);
-    VideoPreroll();
+    // printf(">>>> Notify Frame is Ready: %i\n", aFrame);
     NewVideoBuffer();
 }
 
