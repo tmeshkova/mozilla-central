@@ -105,23 +105,18 @@ ImageClientSingle::UpdateImage(ImageContainer* aContainer,
 
   Image *image = autoLock.GetImage();
   if (!image) {
-    // printf(">>>>>>Func ImageClient::%s::%d return no image\n", __FUNCTION__, __LINE__);
     return false;
   }
 
   if (mLastPaintedImageSerial == image->GetSerial()) {
-    // printf(">>>>>>Func ImageClient::%s::%d return image Serial: last:%i, new %i\n", __FUNCTION__, __LINE__, mLastPaintedImageSerial, image->GetSerial());
     return true;
   }
 
-
   if (image->AsSharedImage() && image->AsSharedImage()->GetTextureClient()) {
-    // printf(">>>>>>Func ImageClient::%s::%d Do Tex Client Update image Serial: last:%i, new %i\n", __FUNCTION__, __LINE__, mLastPaintedImageSerial, image->GetSerial());
     // fast path: no need to allocate and/or copy image data
     RefPtr<TextureClient> texture = image->AsSharedImage()->GetTextureClient();
 
     if (texture->IsSharedWithCompositor()) {
-      // printf(">>>>>>Func ImageClient::%s::%d Image not Shared with compositor\n", __FUNCTION__, __LINE__);
       // XXX - temporary fix for bug 911941
       // This will be changed with bug 912907
       return false;
@@ -132,11 +127,9 @@ ImageClientSingle::UpdateImage(ImageContainer* aContainer,
     }
     mFrontBuffer = texture;
     AddTextureClient(texture);
-    // printf(">>>>>>Func ImageClient::%s::%d Texture Client Update\n", __FUNCTION__, __LINE__);
     GetForwarder()->UpdatedTexture(this, texture, nullptr);
     GetForwarder()->UseTexture(this, texture);
   } else if (image->GetFormat() == PLANAR_YCBCR) {
-    // printf(">>>>>>Func ImageClient::%s::%d \n", __FUNCTION__, __LINE__);
     PlanarYCbCrImage* ycbcr = static_cast<PlanarYCbCrImage*>(image);
     const PlanarYCbCrImage::Data* data = ycbcr->GetData();
     if (!data) {
@@ -179,7 +172,6 @@ ImageClientSingle::UpdateImage(ImageContainer* aContainer,
     }
 
   } else if (image->GetFormat() == SHARED_TEXTURE) {
-    // printf(">>>>>>Func ImageClient::%s::%d SHARED_TEXTURE\n", __FUNCTION__, __LINE__);
     SharedTextureImage* sharedImage = static_cast<SharedTextureImage*>(image);
     const SharedTextureImage::Data *data = sharedImage->GetData();
     gfx::IntSize size = gfx::IntSize(image->GetSize().width, image->GetSize().height);
@@ -194,9 +186,6 @@ ImageClientSingle::UpdateImage(ImageContainer* aContainer,
     mFrontBuffer = buffer;
 
     AddTextureClient(mFrontBuffer);
-    if (getenv("DO_TEX_UPDATE")) {
-      GetForwarder()->UpdatedTexture(this, mFrontBuffer, nullptr);
-    }
     GetForwarder()->UseTexture(this, mFrontBuffer);
   } else {
     nsRefPtr<gfxASurface> surface = image->GetAsSurface();
@@ -453,15 +442,12 @@ bool
 ImageClientBridge::UpdateImage(ImageContainer* aContainer, uint32_t aContentFlags)
 {
   if (!GetForwarder() || !mLayer) {
-    // printf(">>>>>>Func ImageClientBridge::%s::%d bad\n", __FUNCTION__, __LINE__);
     return false;
   }
   if (mAsyncContainerID == aContainer->GetAsyncContainerID()) {
-    // printf(">>>>>>Func ImageClientBridge::%s::%d contID not match\n", __FUNCTION__, __LINE__);
     return true;
   }
   mAsyncContainerID = aContainer->GetAsyncContainerID();
-  // printf(">>>>>>Func ImageClientBridge::%s::%d ContID:%lu\n", __FUNCTION__, __LINE__, mAsyncContainerID);
   static_cast<ShadowLayerForwarder*>(GetForwarder())->AttachAsyncCompositable(mAsyncContainerID, mLayer);
   AutoLockImage autoLock(aContainer);
   aContainer->NotifyPaintedImage(autoLock.GetImage());

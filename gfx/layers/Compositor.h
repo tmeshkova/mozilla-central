@@ -368,13 +368,11 @@ public:
    */
   uint32_t GetCompositorID() const
   {
-    // printf(">>>>>>Func CompositableHost::%s::%d, t:%p mComp:%lu\n", __FUNCTION__, __LINE__, this, mCompositorID);
     return mCompositorID;
   }
   void SetCompositorID(uint32_t aID)
   {
     MOZ_ASSERT(mCompositorID == 0, "The compositor ID must be set only once.");
-    // printf(">>>>>>Func CompositableHost::%s::%d, t:%p, mComp:%lu, aComp:%lu\n", __FUNCTION__, __LINE__, this, mCompositorID, aID);
     mCompositorID = aID;
   }
 

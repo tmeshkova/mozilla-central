@@ -716,14 +716,12 @@ void MediaDecoder::MetadataLoaded(int aChannels, int aRate, bool aHasAudio, bool
 {
   MOZ_ASSERT(NS_IsMainThread());
   if (mShuttingDown) {
-    // printf(">>>>>>Func MediaDecoder::%s::%d Shutdown\n", __FUNCTION__, __LINE__);
     return;
   }
 
   {
     ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
     if (mPlayState == PLAY_STATE_LOADING && mIsDormant && !mIsExitingDormant) {
-      // printf(">>>>>>Func MediaDecoder::%s::%d Ret loading\n", __FUNCTION__, __LINE__);
       return;
     } else if (mPlayState == PLAY_STATE_LOADING && mIsDormant && mIsExitingDormant) {
       mIsDormant = false;
@@ -741,7 +739,6 @@ void MediaDecoder::MetadataLoaded(int aChannels, int aRate, bool aHasAudio, bool
   if (mOwner) {
     // Make sure the element and the frame (if any) are told about
     // our new size.
-    // printf(">>>>>>Func MediaDecoder::%s::%d Call Invalidate\n", __FUNCTION__, __LINE__);
     Invalidate();
     mOwner->MetadataLoaded(aChannels, aRate, aHasAudio, aHasVideo, aTags);
   }
@@ -1467,7 +1464,6 @@ ImageContainer* MediaDecoder::GetImageContainer()
 void MediaDecoder::Invalidate()
 {
   if (mVideoFrameContainer) {
-    // printf(">>>>>>Func MediaDecoder::%s::%d Call mVideoFrameContainer Invalidate\n", __FUNCTION__, __LINE__);
     mVideoFrameContainer->Invalidate();
   }
 }

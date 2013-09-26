@@ -17,8 +17,7 @@ typedef uintptr_t SharedTextureHandle;
 
 enum SharedTextureShareType {
     SameProcess = 0,
-    CrossProcess,
-    SameProcessGst
+    CrossProcess
 };
 
 enum SharedTextureBufferType {
@@ -29,7 +28,7 @@ enum SharedTextureBufferType {
 #ifdef XP_MACOSX
     , IOSurface
 #endif
-    , GstSinkHandle
+    , GstreamerMagicHandle
 };
 
 enum ContextFlags {

@@ -182,7 +182,6 @@ ClientLayerManager::EndTransactionInternal(DrawThebesLayerCallback aCallback,
 
   GetRoot()->ComputeEffectiveTransforms(gfx3DMatrix());
 
-  // printf(">>>>>>Func ClientLayerManager::%s::%d\n", __FUNCTION__, __LINE__);
   root->RenderLayer();
   
   mThebesLayerCallback = nullptr;
@@ -206,7 +205,6 @@ ClientLayerManager::EndTransaction(DrawThebesLayerCallback aCallback,
   if (mWidget) {
     mWidget->PrepareWindowEffects();
   }
-  // printf(">>>>>>Func ClientLayerManager::%s::%d\n", __FUNCTION__, __LINE__);
   EndTransactionInternal(aCallback, aCallbackData, aFlags);
   ForwardTransaction();
 
@@ -214,7 +212,6 @@ ClientLayerManager::EndTransaction(DrawThebesLayerCallback aCallback,
     mRepeatTransaction = false;
     mIsRepeatTransaction = true;
     BeginTransaction();
-    // printf(">>>>>>Func ClientLayerManager::%s::%d\n", __FUNCTION__, __LINE__);
     ClientLayerManager::EndTransaction(aCallback, aCallbackData, aFlags);
     mIsRepeatTransaction = false;
   } else {

@@ -308,20 +308,11 @@ public:
 
   void SetCompositorID(uint64_t aCompositorID)
   {
-    if (aCompositorID == 0)
-    {
-      // printf(">>>>>>Func CompositableHost::%s::%d, t:%p mComp:%lu, aComp:%lu\n", __FUNCTION__, __LINE__, this, mCompositorID, aCompositorID);
-    }
-    else
-    {
-      // printf(">>>>>>Func CompositableHost::%s::%d, t:%p mComp:%lu, aComp:%lu\n", __FUNCTION__, __LINE__, this, mCompositorID, aCompositorID);
-    }
     mCompositorID = aCompositorID;
   }
 
   uint64_t GetCompositorID() const
   {
-    // printf(">>>>>>Func CompositableHost::%s::%d t:%p, mComp:%lu\n", __FUNCTION__, __LINE__,  this, mCompositorID);
     return mCompositorID;
   }
 

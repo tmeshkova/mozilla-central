@@ -287,19 +287,14 @@ VideoData* VideoData::Create(VideoInfo& aInfo,
 
 VideoData* VideoData::Create(VideoInfo& aInfo,
                              ImageContainer* aContainer,
-                             int64_t aOffset,
-                             int64_t aTime,
-                             int64_t aEndTime,
                              void* aMagicHandle,
-                             bool aKeyframe,
-                             int64_t aTimecode,
                              nsIntRect aPicture)
 {
-  nsAutoPtr<VideoData> v(new VideoData(aOffset,
-                                       aTime,
-                                       aEndTime,
-                                       aKeyframe,
-                                       aTimecode,
+  nsAutoPtr<VideoData> v(new VideoData(-1,
+                                       0,
+                                       160,
+                                       true,
+                                       -1,
                                        aInfo.mDisplay));
 
   ImageFormat format = SHARED_TEXTURE;
@@ -311,11 +306,11 @@ VideoData* VideoData::Create(VideoInfo& aInfo,
   NS_ASSERTION(image->GetFormat() == SHARED_TEXTURE, "Wrong format?");
 
   SharedTextureImage::Data data;
-  data.mShareType = gl::SameProcessGst;
+  data.mShareType = gl::SameProcess;
   data.mInverted = false;
   data.mHandle = gl::GLContextProvider::CreateSharedHandle(data.mShareType,
                                                            aMagicHandle,
-                                                           gl::GstSinkHandle);
+                                                           gl::GstreamerMagicHandle);
 
   // Use the device pixel size of the IOSurface, since layers handles resolution scaling
   // already.
@@ -499,12 +494,9 @@ VideoData* MediaDecoderReader::FindStartTime(int64_t& aOutStartTime)
 
   if (HasVideo()) {
     videoData = DecodeToFirstVideoData();
-    // printf(">>>>>>Func MediaDecoderReader::%s::%d Has Video call DecodeToFirstVideoData: videoData:%p\n", __FUNCTION__, __LINE__, videoData);
     if (videoData) {
       videoStartTime = videoData->mTime;
     }
-  } else {
-    // printf(">>>>>>Func MediaDecoderReader::%s::%d No HasVideo\n", __FUNCTION__, __LINE__);
   }
   if (HasAudio()) {
     AudioData* audioData = DecodeToFirstAudioData();
