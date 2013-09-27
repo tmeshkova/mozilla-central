@@ -452,6 +452,9 @@ public:
 #ifdef XP_MACOSX
         , IOSurface
 #endif
+#ifdef HAS_NEMO_INTERFACE
+        , GstreamerMagicHandle
+#endif
     };
 
     /*
