@@ -1,4 +1,4 @@
-%define greversion 25.0a1
+%define greversion 26.0a1
 
 Name:       xulrunner-qt5
 Summary:    XUL runner
