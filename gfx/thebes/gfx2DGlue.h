@@ -54,11 +54,18 @@ inline Size ToSize(const gfxSize &aSize)
   return Size(Float(aSize.width), Float(aSize.height));
 }
 
+inline IntSize ToIntSize(const gfxIntSize &aSize)
+{
+  return IntSize(aSize.width, aSize.height);
+}
+
 inline Filter ToFilter(gfxPattern::GraphicsFilter aFilter)
 {
   switch (aFilter) {
   case gfxPattern::FILTER_NEAREST:
     return FILTER_POINT;
+  case gfxPattern::FILTER_GOOD:
+    return FILTER_GOOD;
   default:
     return FILTER_LINEAR;
   }

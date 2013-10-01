@@ -13,6 +13,7 @@ include $(DEPTH)/config/autoconf.mk
 LIBRARY_NAME	= gkconbase_s
 MSVC_ENABLE_PGO := 1
 LIBXUL_LIBRARY	= 1
+FAIL_ON_WARNINGS = 1
 
 ifdef MOZ_WEBRTC
 LOCAL_INCLUDES += \
@@ -22,17 +23,9 @@ endif
 
 GQI_SRCS = contentbase.gqi
 
-EXTRA_COMPONENTS = \
-		contentSecurityPolicy.manifest \
-		contentAreaDropListener.js \
-		contentAreaDropListener.manifest \
-		messageWakeupService.js \
-		messageWakeupService.manifest \
-		$(NULL)
-
 include $(topsrcdir)/config/config.mk
-include $(topsrcdir)/ipc/chromium/chromium-config.mk
 include $(topsrcdir)/config/rules.mk
+include $(topsrcdir)/ipc/chromium/chromium-config.mk
 
 LOCAL_INCLUDES += \
   -I$(topsrcdir)/caps/include \
@@ -46,6 +39,7 @@ LOCAL_INCLUDES += \
   -I$(topsrcdir)/content/xul/document/src \
   -I$(topsrcdir)/dom/base \
   -I$(topsrcdir)/dom/ipc \
+  -I$(topsrcdir)/js/ipc \
   -I$(topsrcdir)/image/src \
   -I$(topsrcdir)/js/xpconnect/src \
   -I$(topsrcdir)/layout/base \

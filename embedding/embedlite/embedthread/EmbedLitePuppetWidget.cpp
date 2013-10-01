@@ -546,6 +546,19 @@ void EmbedLitePuppetWidget::CreateCompositor()
   CreateCompositor(glSize.width, glSize.height);
 }
 
+static void
+CheckForBasicBackends(nsTArray<LayersBackend>& aHints)
+{
+  for (size_t i = 0; i < aHints.Length(); ++i) {
+    if (aHints[i] == LAYERS_BASIC &&
+        !Preferences::GetBool("layers.offmainthreadcomposition.force-basic", false) &&
+        !Preferences::GetBool("browser.tabs.remote", false)) {
+      // basic compositor is not stable enough for regular use
+      aHints[i] = LAYERS_NONE;
+    }
+  }
+}
+
 void EmbedLitePuppetWidget::CreateCompositor(int aWidth, int aHeight)
 {
   mCompositorParent = NewCompositorParent(aWidth, aHeight);
@@ -570,10 +583,11 @@ void EmbedLitePuppetWidget::CreateCompositor(int aWidth, int aHeight)
     backendHint = mozilla::layers::LAYERS_OPENGL;
   }
 
+  bool success = false;
   shadowManager = mCompositorChild->SendPLayerTransactionConstructor(
-    backendHint, 0, &textureFactoryIdentifier);
+   backendHint, 0, &textureFactoryIdentifier, &success);
 
-  if (shadowManager) {
+  if (success) {
     ShadowLayerForwarder* lf = lm->AsShadowForwarder();
     if (!lf) {
       delete lm;

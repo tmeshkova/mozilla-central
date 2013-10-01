@@ -93,7 +93,8 @@ class EmbedContentController : public GeckoContentController
      * |aContentRect| is in CSS pixels, relative to the current cssPage.
      * |aScrollableSize| is the current content width/height in CSS pixels.
      */
-    virtual void SendAsyncScrollDOMEvent(const CSSRect& aContentRect,
+    virtual void SendAsyncScrollDOMEvent(FrameMetrics::ViewID aScrollId,
+                                         const CSSRect& aContentRect,
                                          const CSSSize& aScrollableSize) {
       if (MessageLoop::current() != mUILoop) {
         // We have to send this message from the "UI thread" (main
@@ -101,7 +102,7 @@ class EmbedContentController : public GeckoContentController
         mUILoop->PostTask(
           FROM_HERE,
           NewRunnableMethod(this, &EmbedContentController::SendAsyncScrollDOMEvent,
-                            aContentRect, aScrollableSize));
+                            aScrollId, aContentRect, aScrollableSize));
         return;
       }
       LOGNI("contentR[%g,%g,%g,%g], scrSize[%g,%g]",
@@ -247,7 +248,7 @@ EmbedLiteViewThreadParent::UpdateScrollController()
     } else {
       return;
     }
-    mController = new AsyncPanZoomController(mGeckoController, type);
+    mController = new AsyncPanZoomController(0, mGeckoController, type);
     mController->SetCompositorParent(mCompositor);
     mController->UpdateCompositionBounds(ScreenIntRect(0, 0, mViewSize.width, mViewSize.height));
   }

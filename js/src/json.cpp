@@ -9,6 +9,7 @@
 #include "mozilla/FloatingPoint.h"
 
 #include <string.h>
+
 #include "jsapi.h"
 #include "jsarray.h"
 #include "jsatom.h"
@@ -199,7 +200,7 @@ PreprocessValue(JSContext *cx, HandleObject holder, KeyType key, MutableHandleVa
 
             args.setCallee(toJSON);
             args.setThis(vp);
-            args[0] = StringValue(keyStr);
+            args[0].setString(keyStr);
 
             if (!Invoke(cx, args))
                 return false;
@@ -221,8 +222,8 @@ PreprocessValue(JSContext *cx, HandleObject holder, KeyType key, MutableHandleVa
 
         args.setCallee(ObjectValue(*scx->replacer));
         args.setThis(ObjectValue(*holder));
-        args[0] = StringValue(keyStr);
-        args[1] = vp;
+        args[0].setString(keyStr);
+        args[1].set(vp);
 
         if (!Invoke(cx, args))
             return false;
@@ -746,8 +747,8 @@ Walk(JSContext *cx, HandleObject holder, HandleId name, HandleValue reviver, Mut
 
     args.setCallee(reviver);
     args.setThis(ObjectValue(*holder));
-    args[0] = StringValue(key);
-    args[1] = val;
+    args[0].setString(key);
+    args[1].set(val);
 
     if (!Invoke(cx, args))
         return false;
@@ -785,7 +786,7 @@ js::ParseJSONWithReviver(JSContext *cx, StableCharPtr chars, size_t length, Hand
 }
 
 #if JS_HAS_TOSOURCE
-static JSBool
+static bool
 json_toSource(JSContext *cx, unsigned argc, Value *vp)
 {
     vp->setString(cx->names().JSON);
@@ -794,14 +795,14 @@ json_toSource(JSContext *cx, unsigned argc, Value *vp)
 #endif
 
 /* ES5 15.12.2. */
-JSBool
-js_json_parse(JSContext *cx, unsigned argc, Value *vp)
+static bool
+json_parse(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
     /* Step 1. */
     JSString *str = (args.length() >= 1)
-                    ? ToString<CanGC>(cx, args.handleAt(0))
+                    ? ToString<CanGC>(cx, args[0])
                     : cx->names().undefined;
     if (!str)
         return false;
@@ -819,8 +820,8 @@ js_json_parse(JSContext *cx, unsigned argc, Value *vp)
 }
 
 /* ES5 15.12.3. */
-JSBool
-js_json_stringify(JSContext *cx, unsigned argc, Value *vp)
+bool
+json_stringify(JSContext *cx, unsigned argc, Value *vp)
 {
     RootedObject replacer(cx, (argc >= 2 && vp[3].isObject())
                               ? &vp[3].toObject()
@@ -851,8 +852,8 @@ static const JSFunctionSpec json_static_methods[] = {
 #if JS_HAS_TOSOURCE
     JS_FN(js_toSource_str,  json_toSource,      0, 0),
 #endif
-    JS_FN("parse",          js_json_parse,      2, 0),
-    JS_FN("stringify",      js_json_stringify,  3, 0),
+    JS_FN("parse",          json_parse,         2, 0),
+    JS_FN("stringify",      json_stringify,     3, 0),
     JS_FS_END
 };
 

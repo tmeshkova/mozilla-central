@@ -6,27 +6,36 @@
 
 #include "vm/TypedArrayObject.h"
 
-#include <string.h>
-
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/PodOperations.h"
 
-#include "jstypes.h"
-#include "jsutil.h"
+#include <string.h>
+#ifndef XP_WIN
+# include <sys/mman.h>
+#endif
+
 #include "jsapi.h"
 #include "jsarray.h"
 #include "jscntxt.h"
 #include "jscpucfg.h"
-#include "jsversion.h"
 #include "jsgc.h"
 #include "jsnum.h"
 #include "jsobj.h"
+#include "jstypes.h"
+#include "jsutil.h"
+#include "jsversion.h"
+#ifdef XP_WIN
+# include "jswin.h"
+#endif
+#include "jswrapper.h"
 
 #include "gc/Barrier.h"
 #include "gc/Marking.h"
+#include "ion/AsmJS.h"
 #include "vm/GlobalObject.h"
 #include "vm/Interpreter.h"
 #include "vm/NumericConversions.h"
+#include "vm/WrapperObject.h"
 
 #include "jsatominlines.h"
 #include "jsinferinlines.h"
@@ -34,11 +43,10 @@
 
 #include "vm/GlobalObject-inl.h"
 
-# ifdef XP_WIN
-#  include "jswin.h"
-# else
-#  include <sys/mman.h>
-# endif
+#if USE_NEW_OBJECT_REPRESENTATION
+// See the comment above OldObjectRepresentationHack.
+#  error "TypedArray support for new object representation unimplemented."
+#endif
 
 using namespace js;
 using namespace js::gc;
@@ -91,7 +99,7 @@ ValueIsLength(const Value &v, uint32_t *len)
  * the output value is in the range [0, length].
  */
 static bool
-ToClampedIndex(JSContext *cx, const Value &v, uint32_t length, uint32_t *out)
+ToClampedIndex(JSContext *cx, HandleValue v, uint32_t length, uint32_t *out)
 {
     int32_t result;
     if (!ToInt32(cx, v, &result))
@@ -129,7 +137,7 @@ ArrayBufferObject::byteLengthGetterImpl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 ArrayBufferObject::byteLengthGetter(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -167,7 +175,7 @@ ArrayBufferObject::fun_slice_impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 ArrayBufferObject::fun_slice(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -177,11 +185,12 @@ ArrayBufferObject::fun_slice(JSContext *cx, unsigned argc, Value *vp)
 /*
  * new ArrayBuffer(byteLength)
  */
-JSBool
+bool
 ArrayBufferObject::class_constructor(JSContext *cx, unsigned argc, Value *vp)
 {
     int32_t nbytes = 0;
-    if (argc > 0 && !ToInt32(cx, vp[2], &nbytes))
+    CallArgs args = CallArgsFromVp(argc, vp);
+    if (argc > 0 && !ToInt32(cx, args[0], &nbytes))
         return false;
 
     if (nbytes < 0) {
@@ -197,7 +206,7 @@ ArrayBufferObject::class_constructor(JSContext *cx, unsigned argc, Value *vp)
     JSObject *bufobj = create(cx, uint32_t(nbytes));
     if (!bufobj)
         return false;
-    vp->setObject(*bufobj);
+    args.rval().setObject(*bufobj);
     return true;
 }
 
@@ -270,26 +279,54 @@ ArrayBufferObject::allocateSlots(JSContext *maybecx, uint32_t bytes, uint8_t *co
     return true;
 }
 
-static HeapPtr<ArrayBufferViewObject> *
+static inline void
+PostBarrierTypedArrayObject(JSObject *obj)
+{
+#ifdef JSGC_GENERATIONAL
+    JS_ASSERT(obj);
+    JSRuntime *rt = obj->runtimeFromMainThread();
+    if (!rt->isHeapBusy() && !IsInsideNursery(rt, obj))
+        rt->gcStoreBuffer.putWholeCell(obj);
+#endif
+}
+
+// The list of views must be stored somewhere in the ArrayBufferObject, but
+// the slots are already being used for the element storage and the private
+// field is used for a delegate object. The ObjectElements header has space
+// for it, but I don't want to mess around with adding unions to it with
+// USE_NEW_OBJECT_REPRESENTATION pending, since it will solve this much
+// more cleanly.
+struct OldObjectRepresentationHack {
+    uint32_t capacity;
+    uint32_t initializedLength;
+    EncapsulatedPtr<ArrayBufferViewObject> views;
+};
+
+static ArrayBufferViewObject *
 GetViewList(ArrayBufferObject *obj)
 {
-#if USE_NEW_OBJECT_REPRESENTATION
-    // untested
-    return obj->getElementsHeader()->asArrayBufferElements().viewList();
-#else
-    // The list of views must be stored somewhere in the ArrayBufferObject, but
-    // the slots are already being used for the element storage and the private
-    // field is used for a delegate object. The ObjectElements header has space
-    // for it, but I don't want to mess around with adding unions to it with
-    // USE_NEW_OBJECT_REPRESENTATION pending, since it will solve this much
-    // more cleanly.
-    struct OldObjectRepresentationHack {
-            uint32_t capacity;
-            uint32_t initializedLength;
-            HeapPtr<ArrayBufferViewObject> views;
-    };
-    return &reinterpret_cast<OldObjectRepresentationHack*>(obj->getElementsHeader())->views;
-#endif
+    return reinterpret_cast<OldObjectRepresentationHack*>(obj->getElementsHeader())->views;
+}
+
+static void
+SetViewList(ArrayBufferObject *obj, ArrayBufferViewObject *viewsHead)
+{
+    reinterpret_cast<OldObjectRepresentationHack*>(obj->getElementsHeader())->views = viewsHead;
+    PostBarrierTypedArrayObject(obj);
+}
+
+static void
+InitViewList(ArrayBufferObject *obj, ArrayBufferViewObject *viewsHead)
+{
+    reinterpret_cast<OldObjectRepresentationHack*>(obj->getElementsHeader())->views.init(viewsHead);
+    PostBarrierTypedArrayObject(obj);
+}
+
+static EncapsulatedPtr<ArrayBufferViewObject> &
+GetViewListRef(ArrayBufferObject *obj)
+{
+    JS_ASSERT(obj->runtimeFromMainThread()->isHeapBusy());
+    return reinterpret_cast<OldObjectRepresentationHack*>(obj->getElementsHeader())->views;
 }
 
 void
@@ -298,7 +335,7 @@ ArrayBufferObject::changeContents(JSContext *maybecx, ObjectElements *newHeader)
    // Grab out data before invalidating it.
    uint32_t byteLengthCopy = byteLength();
    uintptr_t oldDataPointer = uintptr_t(dataPointer());
-   ArrayBufferViewObject *viewListHead = *GetViewList(this);
+   ArrayBufferViewObject *viewListHead = GetViewList(this);
 
    // Update all views.
    uintptr_t newDataPointer = uintptr_t(newHeader->elements());
@@ -311,12 +348,12 @@ ArrayBufferObject::changeContents(JSContext *maybecx, ObjectElements *newHeader)
            MarkObjectStateChange(maybecx, view);
    }
 
-   // Change to the new header (now, so we can use GetViewList).
+   // Change to the new header (now, so we can use SetViewList).
    elements = newHeader->elements();
 
    // Initialize 'newHeader'.
    ArrayBufferObject::setElementsHeader(newHeader, byteLengthCopy);
-   *GetViewList(this) = viewListHead;
+   SetViewList(this, viewListHead);
 }
 
 bool
@@ -461,31 +498,6 @@ ArrayBufferObject::neuterAsmJSArrayBuffer(ArrayBufferObject &buffer)
 }
 #endif
 
-#ifdef JSGC_GENERATIONAL
-class WeakObjectSlotRef : public js::gc::BufferableRef
-{
-    JSObject *owner;
-    size_t slot;
-    const char *desc;
-
-  public:
-    explicit WeakObjectSlotRef(JSObject *owner, size_t slot, const char desc[])
-      : owner(owner), slot(slot), desc(desc)
-    {
-    }
-
-    virtual void mark(JSTracer *trc) {
-        MarkObjectUnbarriered(trc, &owner, "weak TypeArrayView ref");
-        JSObject *obj = static_cast<JSObject*>(owner->getFixedSlot(slot).toPrivate());
-        if (obj && obj != UNSET_BUFFER_LINK) {
-            JS_SET_TRACING_LOCATION(trc, (void*)&owner->getFixedSlotRef(slot));
-            MarkObjectUnbarriered(trc, &obj, desc);
-        }
-        owner->setFixedSlot(slot, PrivateValue(obj));
-    }
-};
-#endif
-
 void
 ArrayBufferObject::addView(ArrayBufferViewObject *view)
 {
@@ -497,16 +509,16 @@ ArrayBufferObject::addView(ArrayBufferViewObject *view)
     // list was nonempty and will be made weak during this call (and weak
     // pointers cannot violate the snapshot-at-the-beginning invariant.)
 
-    HeapPtr<ArrayBufferViewObject> *views = GetViewList(this);
-    if (*views == NULL) {
+    ArrayBufferViewObject *viewsHead = GetViewList(this);
+    if (viewsHead == NULL) {
         // This ArrayBufferObject will have a single view at this point, so it
         // is a strong pointer (it will be marked during tracing.)
         JS_ASSERT(view->nextView() == NULL);
     } else {
-        view->prependToViews(views);
+        view->prependToViews(viewsHead);
     }
 
-    *views = view;
+    SetViewList(this, view);
 }
 
 JSObject *
@@ -576,7 +588,7 @@ ArrayBufferObject::createDataViewForThisImpl(JSContext *cx, CallArgs args)
     return DataViewObject::construct(cx, buffer, frobbedArgs, proto);
 }
 
-JSBool
+bool
 ArrayBufferObject::createDataViewForThis(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -588,10 +600,10 @@ ArrayBufferObject::stealContents(JSContext *cx, JSObject *obj, void **contents,
                                  uint8_t **data)
 {
     ArrayBufferObject &buffer = obj->as<ArrayBufferObject>();
-    ArrayBufferViewObject *views = *GetViewList(&buffer);
+    ArrayBufferViewObject *views = GetViewList(&buffer);
     js::ObjectElements *header = js::ObjectElements::fromElements((js::HeapSlot*)buffer.dataPointer());
     if (buffer.hasDynamicElements() && !buffer.isAsmJSArrayBuffer()) {
-        *GetViewList(&buffer) = NULL;
+        SetViewList(&buffer, NULL);
         *contents = header;
         *data = buffer.dataPointer();
 
@@ -616,7 +628,7 @@ ArrayBufferObject::stealContents(JSContext *cx, JSObject *obj, void **contents,
 
     // Neuter the donor ArrayBufferObject and all views of it
     ArrayBufferObject::setElementsHeader(header, 0);
-    GetViewList(&buffer)->init(views);
+    InitViewList(&buffer, views);
     for (ArrayBufferViewObject *view = views; view; view = view->nextView())
         view->neuter();
 
@@ -649,16 +661,15 @@ ArrayBufferObject::obj_trace(JSTracer *trc, JSObject *obj)
     // multiple views are collected into a linked list during collection, and
     // then swept to prune out their dead views.
 
-    HeapPtr<ArrayBufferViewObject> *views = GetViewList(&obj->as<ArrayBufferObject>());
-    if (!*views)
+    ArrayBufferObject &buffer = obj->as<ArrayBufferObject>();
+    ArrayBufferViewObject *viewsHead = GetViewList(&buffer);
+    if (!viewsHead)
         return;
 
-    // During minor collections, these edges are normally kept alive by the
-    // store buffer. If the store buffer overflows, fallback marking should
-    // just treat these as strong references for simplicity.
+    // During minor collections, mark weak pointers on the buffer strongly.
     if (trc->runtime->isHeapMinorCollecting()) {
-        MarkObject(trc, views, "arraybuffer.viewlist");
-        ArrayBufferViewObject *prior = views->get();
+        MarkObject(trc, &GetViewListRef(&buffer), "arraybuffer.viewlist");
+        ArrayBufferViewObject *prior = GetViewList(&buffer);
         for (ArrayBufferViewObject *view = prior->nextView();
              view;
              prior = view, view = view->nextView())
@@ -669,13 +680,13 @@ ArrayBufferObject::obj_trace(JSTracer *trc, JSObject *obj)
         return;
     }
 
-    ArrayBufferViewObject *firstView = *views;
+    ArrayBufferViewObject *firstView = viewsHead;
     if (firstView->nextView() == NULL) {
         // Single view: mark it, but only if we're actually doing a GC pass
         // right now. Otherwise, the tracing pass for barrier verification will
         // fail if we add another view and the pointer becomes weak.
         if (IS_GC_MARKING_TRACER(trc))
-            MarkObject(trc, views, "arraybuffer.singleview");
+            MarkObject(trc, &GetViewListRef(&buffer), "arraybuffer.singleview");
     } else {
         // Multiple views: do not mark, but append buffer to list.
         if (IS_GC_MARKING_TRACER(trc)) {
@@ -691,7 +702,7 @@ ArrayBufferObject::obj_trace(JSTracer *trc, JSObject *obj)
                 bool found = false;
                 for (ArrayBufferObject *p = obj->compartment()->gcLiveArrayBuffers;
                      p;
-                     p = (*GetViewList(p))->bufferLink())
+                     p = GetViewList(p)->bufferLink())
                 {
                     if (p == obj)
                         found = true;
@@ -711,17 +722,17 @@ ArrayBufferObject::sweep(JSCompartment *compartment)
     compartment->gcLiveArrayBuffers = NULL;
 
     while (buffer) {
-        HeapPtr<ArrayBufferViewObject> *views = GetViewList(buffer);
-        JS_ASSERT(*views);
+        ArrayBufferViewObject *viewsHead = GetViewList(buffer);
+        JS_ASSERT(viewsHead);
 
-        ArrayBufferObject *nextBuffer = (*views)->bufferLink();
+        ArrayBufferObject *nextBuffer = viewsHead->bufferLink();
         JS_ASSERT(nextBuffer != UNSET_BUFFER_LINK);
-        (*views)->setBufferLink(UNSET_BUFFER_LINK);
+        viewsHead->setBufferLink(UNSET_BUFFER_LINK);
 
         // Rebuild the list of views of the ArrayBufferObject, discarding dead
         // views.  If there is only one view, it will have already been marked.
         ArrayBufferViewObject *prevLiveView = NULL;
-        ArrayBufferViewObject *view = *views;
+        ArrayBufferViewObject *view = viewsHead;
         while (view) {
             JS_ASSERT(buffer->compartment() == view->compartment());
             ArrayBufferViewObject *nextView = view->nextView();
@@ -731,7 +742,7 @@ ArrayBufferObject::sweep(JSCompartment *compartment)
             }
             view = nextView;
         }
-        *(views->unsafeGet()) = prevLiveView;
+        SetViewList(buffer, prevLiveView);
 
         buffer = nextBuffer;
     }
@@ -745,7 +756,7 @@ ArrayBufferObject::resetArrayBufferList(JSCompartment *comp)
     comp->gcLiveArrayBuffers = NULL;
 
     while (buffer) {
-        ArrayBufferViewObject *view = *GetViewList(buffer);
+        ArrayBufferViewObject *view = GetViewList(buffer);
         JS_ASSERT(view);
 
         ArrayBufferObject *nextBuffer = view->bufferLink();
@@ -765,7 +776,7 @@ ArrayBufferObject::saveArrayBufferList(JSCompartment *comp, ArrayBufferVector &v
         if (!vector.append(buffer))
             return false;
 
-        ArrayBufferViewObject *view = *GetViewList(buffer);
+        ArrayBufferViewObject *view = GetViewList(buffer);
         JS_ASSERT(view);
         buffer = view->bufferLink();
     }
@@ -778,7 +789,7 @@ ArrayBufferObject::restoreArrayBufferLists(ArrayBufferVector &vector)
     for (ArrayBufferObject **p = vector.begin(); p != vector.end(); p++) {
         ArrayBufferObject *buffer = *p;
         JSCompartment *comp = buffer->compartment();
-        ArrayBufferViewObject *firstView = *GetViewList(buffer);
+        ArrayBufferViewObject *firstView = GetViewList(buffer);
         JS_ASSERT(firstView);
         JS_ASSERT(firstView->compartment() == comp);
         JS_ASSERT(firstView->bufferLink() == UNSET_BUFFER_LINK);
@@ -1116,12 +1127,14 @@ inline void
 ArrayBufferViewObject::setBufferLink(ArrayBufferObject *buffer)
 {
     setFixedSlot(NEXT_BUFFER_SLOT, PrivateValue(buffer));
+    PostBarrierTypedArrayObject(this);
 }
 
 inline void
 ArrayBufferViewObject::setNextView(ArrayBufferViewObject *view)
 {
     setFixedSlot(NEXT_VIEW_SLOT, PrivateValue(view));
+    PostBarrierTypedArrayObject(this);
 }
 
 /*
@@ -1320,6 +1333,31 @@ js::ClampDoubleToUint8(const double x)
     return y;
 }
 
+bool
+js::ToDoubleForTypedArray(JSContext *cx, JS::HandleValue vp, double *d)
+{
+    if (vp.isDouble()) {
+        *d = vp.toDouble();
+    } else if (vp.isNull()) {
+        *d = 0.0;
+    } else if (vp.isPrimitive()) {
+        JS_ASSERT(vp.isString() || vp.isUndefined() || vp.isBoolean());
+        if (vp.isString()) {
+            if (!ToNumber(cx, vp, d))
+                return false;
+        } else if (vp.isUndefined()) {
+            *d = js_NaN;
+        } else {
+            *d = double(vp.toBoolean());
+        }
+    } else {
+        // non-primitive assignments become NaN or 0 (for float/int arrays)
+        *d = js_NaN;
+    }
+
+    return true;
+}
+
 /*
  * This method is used to trace TypedArrayObjects and DataViewObjects. We need
  * a custom tracer because some of an ArrayBufferViewObject's reserved slots
@@ -1332,14 +1370,15 @@ ArrayBufferViewObject::trace(JSTracer *trc, JSObject *obj)
     HeapSlot &bufSlot = obj->getReservedSlotRef(BUFFER_SLOT);
     MarkSlot(trc, &bufSlot, "typedarray.buffer");
 
-    /* Update obj's data slot if the array buffer moved. */
+    /* Update obj's data slot if the array buffer moved. Note that during
+     * initialization, bufSlot may still be JSVAL_VOID. */
     if (bufSlot.isObject()) {
         ArrayBufferObject &buf = bufSlot.toObject().as<ArrayBufferObject>();
         int32_t offset = obj->getReservedSlot(BYTEOFFSET_SLOT).toInt32();
         obj->initPrivate(buf.dataPointer() + offset);
     }
 
-    /* Update NEXT_VEIW_SLOT, if the view moved. */
+    /* Update NEXT_VIEW_SLOT, if the view moved. */
     IsSlotMarked(&obj->getReservedSlotRef(NEXT_VIEW_SLOT));
 }
 
@@ -1365,21 +1404,6 @@ template<typename ElementType>
 static inline JSObject *
 NewArray(JSContext *cx, uint32_t nelements);
 
-#ifdef JSGC_GENERATIONAL
-class ArrayBufferViewByteOffsetRef : public gc::BufferableRef
-{
-    JSObject *obj;
-
-  public:
-    explicit ArrayBufferViewByteOffsetRef(JSObject *obj) : obj(obj) {}
-
-    void mark(JSTracer *trc) {
-        MarkObjectUnbarriered(trc, &obj, "TypedArray");
-        obj->getClass()->trace(trc, obj);
-    }
-};
-#endif
-
 static inline void
 InitArrayBufferViewDataPointer(JSObject *obj, ArrayBufferObject *buffer, size_t byteOffset)
 {
@@ -1389,10 +1413,7 @@ InitArrayBufferViewDataPointer(JSObject *obj, ArrayBufferObject *buffer, size_t 
      * on private Values.
      */
     obj->initPrivate(buffer->dataPointer() + byteOffset);
-#ifdef JSGC_GENERATIONAL
-    if (IsInsideNursery(obj->runtime(), buffer) && buffer->hasFixedElements())
-        obj->runtime()->gcStoreBuffer.putGeneric(ArrayBufferViewByteOffsetRef(obj));
-#endif
+    PostBarrierTypedArrayObject(obj);
 }
 
 template<typename NativeType>
@@ -1508,31 +1529,6 @@ class TypedArrayObjectTemplate : public TypedArrayObject
     }
 
     static bool
-    toDoubleForTypedArray(JSContext *cx, HandleValue vp, double *d)
-    {
-        if (vp.isDouble()) {
-            *d = vp.toDouble();
-        } else if (vp.isNull()) {
-            *d = 0.0;
-        } else if (vp.isPrimitive()) {
-            JS_ASSERT(vp.isString() || vp.isUndefined() || vp.isBoolean());
-            if (vp.isString()) {
-                if (!ToNumber(cx, vp, d))
-                    return false;
-            } else if (vp.isUndefined()) {
-                *d = js_NaN;
-            } else {
-                *d = double(vp.toBoolean());
-            }
-        } else {
-            // non-primitive assignments become NaN or 0 (for float/int arrays)
-            *d = js_NaN;
-        }
-
-        return true;
-    }
-
-    static bool
     setElementTail(JSContext *cx, HandleObject tarray, uint32_t index,
                    MutableHandleValue vp, JSBool strict)
     {
@@ -1545,7 +1541,7 @@ class TypedArrayObjectTemplate : public TypedArrayObject
         }
 
         double d;
-        if (!toDoubleForTypedArray(cx, vp, &d))
+        if (!ToDoubleForTypedArray(cx, vp, &d))
             return false;
 
         // If the array is an integer array, we only handle up to
@@ -1830,34 +1826,33 @@ class TypedArrayObjectTemplate : public TypedArrayObject
      * new [Type]Array(JSArray)
      * new [Type]Array(ArrayBuffer, [optional] byteOffset, [optional] length)
      */
-    static JSBool
+    static bool
     class_constructor(JSContext *cx, unsigned argc, Value *vp)
     {
         /* N.B. this is a constructor for protoClass, not fastClass! */
-        JSObject *obj = create(cx, argc, JS_ARGV(cx, vp));
+        CallArgs args = CallArgsFromVp(argc, vp);
+        JSObject *obj = create(cx, args);
         if (!obj)
             return false;
-        vp->setObject(*obj);
+        args.rval().setObject(*obj);
         return true;
     }
 
     static JSObject *
-    create(JSContext *cx, unsigned argc, Value *argv)
+    create(JSContext *cx, const CallArgs& args)
     {
-        /* N.B. there may not be an argv[-2]/argv[-1]. */
-
         /* () or (number) */
         uint32_t len = 0;
-        if (argc == 0 || ValueIsLength(argv[0], &len))
+        if (args.length() == 0 || ValueIsLength(args[0], &len))
             return fromLength(cx, len);
 
         /* (not an object) */
-        if (!argv[0].isObject()) {
+        if (!args[0].isObject()) {
             JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL, JSMSG_TYPED_ARRAY_BAD_ARGS);
             return NULL;
         }
 
-        RootedObject dataObj(cx, &argv[0].toObject());
+        RootedObject dataObj(cx, &args.get(0).toObject());
 
         /*
          * (typedArray)
@@ -1874,8 +1869,8 @@ class TypedArrayObjectTemplate : public TypedArrayObject
         int32_t byteOffset = 0;
         int32_t length = -1;
 
-        if (argc > 1) {
-            if (!ToInt32(cx, argv[1], &byteOffset))
+        if (args.length() > 1) {
+            if (!ToInt32(cx, args[1], &byteOffset))
                 return NULL;
             if (byteOffset < 0) {
                 JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
@@ -1883,8 +1878,8 @@ class TypedArrayObjectTemplate : public TypedArrayObject
                 return NULL;
             }
 
-            if (argc > 2) {
-                if (!ToInt32(cx, argv[2], &length))
+            if (args.length() > 2) {
+                if (!ToInt32(cx, args[2], &length))
                     return NULL;
                 if (length < 0) {
                     JS_ReportErrorNumber(cx, js_GetErrorMessage, NULL,
@@ -1915,7 +1910,7 @@ class TypedArrayObjectTemplate : public TypedArrayObject
     // returns a Value. Given such a function, Getter<> is a native that
     // retrieves a given Value, probably from a slot on the object.
     template<Value ValueGetter(TypedArrayObject *tarr)>
-    static JSBool
+    static bool
     Getter(JSContext *cx, unsigned argc, Value *vp)
     {
         CallArgs args = CallArgsFromVp(argc, vp);
@@ -1992,7 +1987,7 @@ class TypedArrayObjectTemplate : public TypedArrayObject
         return true;
     }
 
-    static JSBool
+    static bool
     fun_subarray(JSContext *cx, unsigned argc, Value *vp)
     {
         CallArgs args = CallArgsFromVp(argc, vp);
@@ -2056,7 +2051,7 @@ class TypedArrayObjectTemplate : public TypedArrayObject
         return true;
     }
 
-    static JSBool
+    static bool
     fun_move(JSContext *cx, unsigned argc, Value *vp)
     {
         CallArgs args = CallArgsFromVp(argc, vp);
@@ -2122,7 +2117,7 @@ class TypedArrayObjectTemplate : public TypedArrayObject
         return true;
     }
 
-    static JSBool
+    static bool
     fun_set(JSContext *cx, unsigned argc, Value *vp)
     {
         CallArgs args = CallArgsFromVp(argc, vp);
@@ -2183,9 +2178,9 @@ class TypedArrayObjectTemplate : public TypedArrayObject
 
                 args.setCallee(cx->compartment()->maybeGlobal()->createArrayFromBuffer<NativeType>());
                 args.setThis(ObjectValue(*bufobj));
-                args[0] = NumberValue(byteOffset);
-                args[1] = Int32Value(lengthInt);
-                args[2] = ObjectValue(*proto);
+                args[0].setNumber(byteOffset);
+                args[1].setInt32(lengthInt);
+                args[2].setObject(*proto);
 
                 if (!Invoke(cx, args))
                     return NULL;
@@ -2639,34 +2634,22 @@ ArrayBufferObject::createTypedArrayFromBufferImpl(JSContext *cx, CallArgs args)
 }
 
 template<typename T>
-JSBool
+bool
 ArrayBufferObject::createTypedArrayFromBuffer(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
     return CallNonGenericMethod<IsArrayBuffer, createTypedArrayFromBufferImpl<T> >(cx, args);
 }
 
-// Custom barrier is necessary for PrivateValues because they are not traced by
-// default.
-static void
-WeakObjectSlotBarrierPost(JSObject *obj, size_t slot, const char *desc)
-{
-#ifdef JSGC_GENERATIONAL
-    obj->runtime()->gcStoreBuffer.putGeneric(WeakObjectSlotRef(obj, slot, desc));
-#endif
-}
-
 void
-ArrayBufferViewObject::prependToViews(HeapPtr<ArrayBufferViewObject> *views)
+ArrayBufferViewObject::prependToViews(ArrayBufferViewObject *viewsHead)
 {
-    setNextView(*views);
-    WeakObjectSlotBarrierPost(this, NEXT_VIEW_SLOT, "arraybuffer.nextview");
+    setNextView(viewsHead);
 
     // Move the multiview buffer list link into this view since we're
     // prepending it to the list.
-    setBufferLink((*views)->bufferLink());
-    (*views)->setBufferLink(UNSET_BUFFER_LINK);
-    WeakObjectSlotBarrierPost(this, NEXT_BUFFER_SLOT, "view.nextbuffer");
+    setBufferLink(viewsHead->bufferLink());
+    viewsHead->setBufferLink(UNSET_BUFFER_LINK);
 }
 
 void
@@ -2866,7 +2849,7 @@ DataViewObject::construct(JSContext *cx, JSObject *bufobj, const CallArgs &args,
     return true;
 }
 
-JSBool
+bool
 DataViewObject::class_constructor(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -2875,7 +2858,7 @@ DataViewObject::class_constructor(JSContext *cx, unsigned argc, Value *vp)
     if (!GetFirstArgumentAsObject(cx, args, "DataView constructor", &bufobj))
         return false;
 
-    if (bufobj->isWrapper() && UncheckedUnwrap(bufobj)->is<ArrayBufferObject>()) {
+    if (bufobj->is<WrapperObject>() && UncheckedUnwrap(bufobj)->is<ArrayBufferObject>()) {
         Rooted<GlobalObject*> global(cx, cx->compartment()->maybeGlobal());
         Rooted<JSObject*> proto(cx, global->getOrCreateDataViewPrototype(cx));
         if (!proto)
@@ -2887,7 +2870,7 @@ DataViewObject::class_constructor(JSContext *cx, unsigned argc, Value *vp)
         args2.setCallee(global->createDataViewForThis());
         args2.setThis(ObjectValue(*bufobj));
         PodCopy(args2.array(), args.array(), args.length());
-        args2[argc] = ObjectValue(*proto);
+        args2[argc].setObject(*proto);
         if (!Invoke(cx, args2))
             return false;
         args.rval().set(args2.rval());
@@ -3057,7 +3040,7 @@ DataViewObject::write(JSContext *cx, Handle<DataViewObject*> obj,
         return false;
 
     NativeType value;
-    if (!WebIDLCast(cx, args.handleAt(1), &value))
+    if (!WebIDLCast(cx, args[1], &value))
         return false;
 
     bool toLittleEndian = args.length() >= 3 && ToBoolean(args[2]);
@@ -3079,7 +3062,7 @@ DataViewObject::getInt8Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_getInt8(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3100,7 +3083,7 @@ DataViewObject::getUint8Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_getUint8(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3121,7 +3104,7 @@ DataViewObject::getInt16Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_getInt16(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3142,7 +3125,7 @@ DataViewObject::getUint16Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_getUint16(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3163,7 +3146,7 @@ DataViewObject::getInt32Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_getInt32(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3184,7 +3167,7 @@ DataViewObject::getUint32Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_getUint32(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3206,7 +3189,7 @@ DataViewObject::getFloat32Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_getFloat32(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3228,7 +3211,7 @@ DataViewObject::getFloat64Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_getFloat64(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3248,7 +3231,7 @@ DataViewObject::setInt8Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_setInt8(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3268,7 +3251,7 @@ DataViewObject::setUint8Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_setUint8(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3288,7 +3271,7 @@ DataViewObject::setInt16Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_setInt16(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3308,7 +3291,7 @@ DataViewObject::setUint16Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_setUint16(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3328,7 +3311,7 @@ DataViewObject::setInt32Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_setInt32(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3348,7 +3331,7 @@ DataViewObject::setUint32Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_setUint32(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3368,7 +3351,7 @@ DataViewObject::setFloat32Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_setFloat32(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3388,7 +3371,7 @@ DataViewObject::setFloat64Impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 DataViewObject::fun_setFloat64(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -3473,8 +3456,8 @@ Class ArrayBufferObject::class_ = {
     NULL,           /* finalize    */
     NULL,           /* checkAccess */
     NULL,           /* call        */
-    NULL,           /* construct   */
     NULL,           /* hasInstance */
+    NULL,           /* construct   */
     ArrayBufferObject::obj_trace,
     JS_NULL_CLASS_EXT,
     {
@@ -3636,8 +3619,8 @@ IMPL_TYPED_ARRAY_COMBINED_UNWRAPPERS(Float64, double, double)
     NULL,                    /* finalize */                                    \
     NULL,                    /* checkAccess */                                 \
     NULL,                    /* call        */                                 \
-    NULL,                    /* construct   */                                 \
     NULL,                    /* hasInstance */                                 \
+    NULL,                    /* construct   */                                 \
     ArrayBufferViewObject::trace, /* trace  */                                 \
     {                                                                          \
         NULL,       /* outerObject */                                          \
@@ -3852,8 +3835,8 @@ Class DataViewObject::class_ = {
     NULL,                    /* finalize */
     NULL,                    /* checkAccess */
     NULL,                    /* call        */
-    NULL,                    /* construct   */
     NULL,                    /* hasInstance */
+    NULL,                    /* construct   */
     ArrayBufferViewObject::trace, /* trace  */
     JS_NULL_CLASS_EXT,
     JS_NULL_OBJECT_OPS
@@ -3888,7 +3871,7 @@ DataViewObject::getterImpl(JSContext *cx, CallArgs args)
 }
 
 template<Value ValueGetter(DataViewObject *view)>
-JSBool
+bool
 DataViewObject::getter(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -4087,7 +4070,7 @@ JS_NewArrayBufferWithContents(JSContext *cx, void *contents)
     if (!obj)
         return NULL;
     obj->setDynamicElements(reinterpret_cast<js::ObjectElements *>(contents));
-    JS_ASSERT(*GetViewList(&obj->as<ArrayBufferObject>()) == NULL);
+    JS_ASSERT(GetViewList(&obj->as<ArrayBufferObject>()) == NULL);
     return obj;
 }
 

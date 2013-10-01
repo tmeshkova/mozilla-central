@@ -543,7 +543,7 @@ EmbedLiteViewThreadChild::RecvAsyncScrollDOMEvent(const gfxRect& contentRect,
   mozilla::CSSRect rect(contentRect.x, contentRect.y, contentRect.width, contentRect.height);
   mozilla::CSSSize size(scrollSize.width, scrollSize.height);
   for (unsigned int i = 0; i < mControllerListeners.Length(); i++) {
-    mControllerListeners[i]->SendAsyncScrollDOMEvent(rect, size);
+    mControllerListeners[i]->SendAsyncScrollDOMEvent(0, rect, size);
   }
 
   if (sPostAZPCAsJson.scroll) {

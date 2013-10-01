@@ -8,22 +8,19 @@
  * JS boolean implementation.
  */
 
-#include "jsbool.h"
+#include "jsboolinlines.h"
 
-#include "jstypes.h"
 #include "jsapi.h"
 #include "jsatom.h"
 #include "jscntxt.h"
 #include "jsobj.h"
+#include "jstypes.h"
 
 #include "vm/GlobalObject.h"
 #include "vm/ProxyObject.h"
 #include "vm/StringBuffer.h"
 
-#include "jsboolinlines.h"
-
 #include "vm/BooleanObject-inl.h"
-#include "vm/GlobalObject-inl.h"
 
 using namespace js;
 using namespace js::types;
@@ -66,7 +63,7 @@ bool_toSource_impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 bool_toSource(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -85,7 +82,7 @@ bool_toString_impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 bool_toString(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -103,7 +100,7 @@ bool_valueOf_impl(JSContext *cx, CallArgs args)
     return true;
 }
 
-JSBool
+bool
 bool_valueOf(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
@@ -118,7 +115,7 @@ static const JSFunctionSpec boolean_methods[] = {
     JS_FS_END
 };
 
-static JSBool
+static bool
 Boolean(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);

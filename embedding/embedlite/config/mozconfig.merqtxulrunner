@@ -29,16 +29,18 @@ ac_add_options --enable-mobile-optimize
 ac_add_options --enable-profile-guided-optimization
 ac_add_options --enable-debug-symbols="-gdwarf-4"
 ac_add_options --enable-cpp-rtti
-ac_add_options --enable-skia
+ac_add_options --disable-skia
 ac_add_options --disable-dbus
 ac_add_options --disable-updater
 ac_add_options --disable-gamepad
 
 # disabling for now, since the build fails...
-ac_add_options --enable-webrtc
+ac_add_options --disable-webrtc
 ac_add_options --enable-profiling
 ac_add_options --enable-gstreamer
-ac_add_options --enable-webapp-runtime
+ac_add_options --disable-webapp-runtime
+ac_add_options --disable-dbus
+ac_add_options --disable-necko-wifi
 
 ac_add_options --disable-accessibility
 ac_add_options --without-x

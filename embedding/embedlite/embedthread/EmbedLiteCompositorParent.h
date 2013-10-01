@@ -49,7 +49,8 @@ public:
 protected:
   PLayerTransactionParent* AllocPLayerTransactionParent(const LayersBackend& aBackendHint,
                                                         const uint64_t& aId,
-                                                        TextureFactoryIdentifier* aTextureFactoryIdentifier);
+                                                        TextureFactoryIdentifier* aTextureFactoryIdentifier,
+                                                        bool* aSuccess);
   virtual void ScheduleTask(CancelableTask*, int);
   virtual void SetFirstPaintViewport(const nsIntPoint& aOffset, float aZoom, const nsIntRect& aPageRect, const gfx::Rect& aCssPageRect);
   virtual void SetPageRect(const gfx::Rect& aCssPageRect);
