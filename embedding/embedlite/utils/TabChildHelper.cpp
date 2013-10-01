@@ -274,7 +274,7 @@ TabChildHelper::DoLoadFrameScript(const nsAString& aURL)
   return true;
 }
 
-static JSBool
+static bool
 JSONCreator(const jschar* aBuf, uint32_t aLen, void* aData)
 {
   nsAString* result = static_cast<nsAString*>(aData);
