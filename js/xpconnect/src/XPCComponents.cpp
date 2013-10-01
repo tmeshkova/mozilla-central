@@ -2693,7 +2693,7 @@ nsXPCComponents_Utils::LookupMethod(const JS::Value& object,
         // Alright, now do the lookup.
         *retval = UndefinedValue();
         Rooted<JSPropertyDescriptor> desc(cx);
-        if (!JS_GetPropertyDescriptorById(cx, xray, methodId, 0, desc.address()))
+        if (!JS_GetPropertyDescriptorById(cx, xray, methodId, 0, &desc))
             return NS_ERROR_FAILURE;
 
         // First look for a method value. If that's not there, try a getter,
@@ -3141,7 +3141,7 @@ xpc::SandboxProxyHandler::getPropertyDescriptor(JSContext *cx,
 
     MOZ_ASSERT(js::GetObjectCompartment(obj) == js::GetObjectCompartment(proxy));
     if (!JS_GetPropertyDescriptorById(cx, obj, id,
-                                      flags, desc.address()))
+                                      flags, desc))
         return false;
 
     if (!desc.object())
@@ -3261,8 +3261,7 @@ xpc_CreateSandboxObject(JSContext *cx, jsval *vp, nsISupports *prinOrSop, Sandbo
             principal = sop->GetPrincipal();
         } else {
             principal = do_CreateInstance("@mozilla.org/nullprincipal;1", &rv);
-            NS_ASSERTION(NS_FAILED(rv) || principal,
-                         "Bad return from do_CreateInstance");
+            MOZ_ASSERT(NS_FAILED(rv) || principal, "Bad return from do_CreateInstance");
 
             if (!principal || NS_FAILED(rv)) {
                 if (NS_SUCCEEDED(rv)) {
@@ -3737,10 +3736,7 @@ public:
     NS_DECL_ISUPPORTS
 
 private:
-    static bool ContextHolderOperationCallback(JSContext *cx);
-
     JSContext* mJSContext;
-    JSContext* mOrigCx;
     nsCOMPtr<nsIPrincipal> mPrincipal;
 };
 
@@ -3750,7 +3746,6 @@ ContextHolder::ContextHolder(JSContext *aOuterCx,
                              HandleObject aSandbox,
                              nsIPrincipal *aPrincipal)
     : mJSContext(JS_NewContext(JS_GetRuntime(aOuterCx), 1024)),
-      mOrigCx(aOuterCx),
       mPrincipal(aPrincipal)
 {
     if (mJSContext) {
@@ -3765,7 +3760,6 @@ ContextHolder::ContextHolder(JSContext *aOuterCx,
                       JSOPTION_PRIVATE_IS_NSISUPPORTS);
         js::SetDefaultObjectForContext(mJSContext, aSandbox);
         JS_SetContextPrivate(mJSContext, this);
-        JS_SetOperationCallback(mJSContext, ContextHolderOperationCallback);
     }
 }
 
@@ -3773,21 +3767,6 @@ ContextHolder::~ContextHolder()
 {
     if (mJSContext)
         JS_DestroyContextNoGC(mJSContext);
-}
-
-bool
-ContextHolder::ContextHolderOperationCallback(JSContext *cx)
-{
-    ContextHolder* thisObject =
-        static_cast<ContextHolder*>(JS_GetContextPrivate(cx));
-    NS_ASSERTION(thisObject, "How did that happen?");
-
-    JSContext *origCx = thisObject->mOrigCx;
-    JSOperationCallback callback = JS_GetOperationCallback(origCx);
-    bool ok = true;
-    if (callback)
-        ok = callback(origCx);
-    return ok;
 }
 
 /***************************************************************************/
@@ -3880,7 +3859,7 @@ xpc_EvalInSandbox(JSContext *cx, HandleObject sandboxArg, const nsAString& sourc
 
     nsIScriptObjectPrincipal *sop =
         (nsIScriptObjectPrincipal*)xpc_GetJSPrivate(sandbox);
-    NS_ASSERTION(sop, "Invalid sandbox passed");
+    MOZ_ASSERT(sop, "Invalid sandbox passed");
     nsCOMPtr<nsIPrincipal> prin = sop->GetPrincipal();
     NS_ENSURE_TRUE(prin, NS_ERROR_FAILURE);
 
@@ -4231,7 +4210,7 @@ FunctionWrapper(JSContext *cx, unsigned argc, Value *vp)
     CallArgs args = CallArgsFromVp(argc, vp);
 
     RootedValue v(cx, js::GetFunctionNativeReserved(&args.callee(), 0));
-    NS_ASSERTION(v.isObject(), "weird function");
+    MOZ_ASSERT(v.isObject(), "weird function");
 
     JSObject *obj = JS_THIS_OBJECT(cx, vp);
     if (!obj) {
@@ -4755,7 +4734,7 @@ nsXPCComponents::GetStack(nsIStackFrame * *aStack)
 NS_IMETHODIMP
 nsXPCComponents::GetManager(nsIComponentManager * *aManager)
 {
-    NS_ASSERTION(aManager, "bad param");
+    MOZ_ASSERT(aManager, "bad param");
     return NS_GetComponentManager(aManager);
 }
 

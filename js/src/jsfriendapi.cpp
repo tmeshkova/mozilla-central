@@ -24,6 +24,7 @@
 
 #include "jsfuninlines.h"
 #include "jsobjinlines.h"
+#include "jsscriptinlines.h"
 
 using namespace js;
 using namespace JS;
@@ -243,12 +244,9 @@ JS_SetCompartmentPrincipals(JSCompartment *compartment, JSPrincipals *principals
 }
 
 JS_FRIEND_API(bool)
-JS_WrapPropertyDescriptor(JSContext *cx, js::PropertyDescriptor *descArg)
+JS_WrapPropertyDescriptor(JSContext *cx, JS::MutableHandle<js::PropertyDescriptor> desc)
 {
-    Rooted<PropertyDescriptor> desc(cx, *descArg);
-    bool status = cx->compartment()->wrap(cx, &desc);
-    *descArg = desc;
-    return status;
+    return cx->compartment()->wrap(cx, desc);
 }
 
 JS_FRIEND_API(bool)
@@ -279,7 +277,7 @@ JS_FRIEND_API(bool)
 JS_DefineFunctionsWithHelp(JSContext *cx, JSObject *objArg, const JSFunctionSpecWithHelp *fs)
 {
     RootedObject obj(cx, objArg);
-    JS_ASSERT(cx->compartment() != cx->runtime()->atomsCompartment);
+    JS_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
 
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj);
@@ -340,7 +338,7 @@ js::IsSystemZone(Zone *zone)
 JS_FRIEND_API(bool)
 js::IsAtomsCompartment(JSCompartment *comp)
 {
-    return comp == comp->runtimeFromAnyThread()->atomsCompartment;
+    return comp->runtimeFromAnyThread()->isAtomsCompartment(comp);
 }
 
 JS_FRIEND_API(bool)
@@ -433,7 +431,7 @@ js::DefineFunctionWithReserved(JSContext *cx, JSObject *objArg, const char *name
                                unsigned nargs, unsigned attrs)
 {
     RootedObject obj(cx, objArg);
-    JS_THREADSAFE_ASSERT(cx->compartment() != cx->runtime()->atomsCompartment);
+    JS_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj);
     JSAtom *atom = Atomize(cx, name, strlen(name));
@@ -448,7 +446,7 @@ js::NewFunctionWithReserved(JSContext *cx, JSNative native, unsigned nargs, unsi
                             JSObject *parentArg, const char *name)
 {
     RootedObject parent(cx, parentArg);
-    JS_THREADSAFE_ASSERT(cx->compartment() != cx->runtime()->atomsCompartment);
+    JS_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
 
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, parent);
@@ -471,7 +469,7 @@ js::NewFunctionByIdWithReserved(JSContext *cx, JSNative native, unsigned nargs, 
 {
     RootedObject parent(cx, parentArg);
     JS_ASSERT(JSID_IS_STRING(id));
-    JS_THREADSAFE_ASSERT(cx->compartment() != cx->runtime()->atomsCompartment);
+    JS_ASSERT(!cx->runtime()->isAtomsCompartment(cx->compartment()));
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, parent);
 
@@ -815,14 +813,6 @@ GCDescription::formatJSON(JSRuntime *rt, uint64_t timestamp) const
     return rt->gcStats.formatJSON(timestamp);
 }
 
-JS_FRIEND_API(AnalysisPurgeCallback)
-js::SetAnalysisPurgeCallback(JSRuntime *rt, AnalysisPurgeCallback callback)
-{
-    AnalysisPurgeCallback old = rt->analysisPurgeCallback;
-    rt->analysisPurgeCallback = callback;
-    return old;
-}
-
 JS_FRIEND_API(void)
 JS::NotifyDidPaint(JSRuntime *rt)
 {
@@ -1091,11 +1081,10 @@ js::GetObjectMetadata(JSObject *obj)
 
 JS_FRIEND_API(bool)
 js_DefineOwnProperty(JSContext *cx, JSObject *objArg, jsid idArg,
-                     const js::PropertyDescriptor& descriptorArg, bool *bp)
+                     JS::Handle<js::PropertyDescriptor> descriptor, bool *bp)
 {
     RootedObject obj(cx, objArg);
     RootedId id(cx, idArg);
-    Rooted<PropertyDescriptor> descriptor(cx, descriptorArg);
     JS_ASSERT(cx->runtime()->heapState == js::Idle);
     CHECK_REQUEST(cx);
     assertSameCompartment(cx, obj, id, descriptor.value());

@@ -22,7 +22,6 @@
 #include "jit/IonInstrumentation.h"
 #include "jit/ParallelFunctions.h"
 #include "jit/VMFunctions.h"
-#include "vm/ForkJoin.h"
 #include "vm/ProxyObject.h"
 #include "vm/Shape.h"
 #include "vm/TypedArrayObject.h"
@@ -385,6 +384,8 @@ class MacroAssembler : public MacroAssemblerSpecific
         uint32_t bit = JSFunction::INTERPRETED << 16;
         branchTest32(Assembler::NonZero, address, Imm32(bit), label);
     }
+
+    void branchIfNotInterpretedConstructor(Register fun, Register scratch, Label *label);
 
     using MacroAssemblerSpecific::Push;
     using MacroAssemblerSpecific::Pop;

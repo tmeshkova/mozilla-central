@@ -11,15 +11,12 @@
 
 #include "mozilla/MemoryReporting.h"
 
-#include "jsalloc.h"
 #include "jsfriendapi.h"
 
-#include "ds/LifoAlloc.h"
 #include "ds/IdValuePair.h"
+#include "ds/LifoAlloc.h"
 #include "gc/Barrier.h"
-#include "gc/Heap.h"
-#include "js/HashTable.h"
-#include "js/Vector.h"
+#include "js/Utility.h"
 
 class JSScript;
 
@@ -538,8 +535,6 @@ class TypeSet
      * This variant doesn't freeze constraints. That variant is called knownSubset
      */
     bool isSubset(TypeSet *other);
-    bool isSubsetIgnorePrimitives(TypeSet *other);
-    bool intersectionEmpty(TypeSet *other);
 
     inline StackTypeSet *toStackTypeSet();
     inline HeapTypeSet *toHeapTypeSet();
@@ -652,12 +647,6 @@ class StackTypeSet : public TypeSet
      * specified type.
      */
     bool filtersType(const StackTypeSet *other, Type type) const;
-
-    /*
-     * Get whether this type only contains non-string primitives:
-     * null/undefined/int/double, or some combination of those.
-     */
-    bool knownNonStringPrimitive();
 
     enum DoubleConversion {
         /* All types in the set should use eager double conversion. */
@@ -1441,8 +1430,6 @@ struct TypeCompartment
     void sweep(FreeOp *fop);
     void sweepShapes(FreeOp *fop);
     void sweepCompilerOutputs(FreeOp *fop, bool discardConstraints);
-
-    void maybePurgeAnalysis(JSContext *cx, bool force = false);
 
     void finalizeObjects();
 };

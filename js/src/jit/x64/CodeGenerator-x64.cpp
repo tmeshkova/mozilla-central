@@ -6,11 +6,8 @@
 
 #include "jit/x64/CodeGenerator-x64.h"
 
-#include "jsnum.h"
-
 #include "jit/MIR.h"
 #include "jit/MIRGraph.h"
-#include "vm/Shape.h"
 
 #include "jsscriptinlines.h"
 
@@ -282,9 +279,6 @@ CodeGeneratorX64::visitImplicitThis(LImplicitThis *lir)
     masm.moveValue(UndefinedValue(), ToOutValue(lir));
     return true;
 }
-
-typedef bool (*InterruptCheckFn)(JSContext *);
-static const VMFunction InterruptCheckInfo = FunctionInfo<InterruptCheckFn>(InterruptCheck);
 
 bool
 CodeGeneratorX64::visitInterruptCheck(LInterruptCheck *lir)

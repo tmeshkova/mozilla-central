@@ -109,7 +109,7 @@ HistoryView.prototype = Util.extend(Object.create(View.prototype), {
   _setContextActions: function bv__setContextActions(aItem) {
     let uri = aItem.getAttribute("value");
     aItem.setAttribute("data-contextactions", "delete," + (this._pinHelper.isPinned(uri) ? "unpin" : "pin"));
-    if (aItem.refresh) aItem.refresh();
+    if ("refresh" in aItem) aItem.refresh();
   },
 
   _sendNeedsRefresh: function bv__sendNeedsRefresh(){
@@ -201,6 +201,7 @@ HistoryView.prototype = Util.extend(Object.create(View.prototype), {
 
           // Clear context app bar
           let event = document.createEvent("Events");
+          event.actions = [];
           event.initEvent("MozContextActionsChange", true, false);
           this._set.dispatchEvent(event);
 
@@ -215,7 +216,7 @@ HistoryView.prototype = Util.extend(Object.create(View.prototype), {
       case "TabClose":
         // Flush any pending actions - appbar will call us back
         // before this returns with 'MozAppbarDismissing' above.
-        StartUI.chromeWin.ContextUI.dismiss();
+        StartUI.chromeWin.ContextUI.dismissContextAppbar();
       break;
     }
   },
@@ -273,6 +274,8 @@ HistoryView.prototype = Util.extend(Object.create(View.prototype), {
         let currIcon = item.getAttribute("iconURI");
         if (currIcon != aValue) {
           item.setAttribute("iconURI", aValue);
+          if("refresh" in item)
+            item.refresh();
         }
       }
     }

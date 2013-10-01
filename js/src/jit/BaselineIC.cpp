@@ -6,6 +6,9 @@
 
 #include "jit/BaselineIC.h"
 
+#include "jsautooplen.h"
+#include "jslibmath.h"
+
 #include "builtin/Eval.h"
 #include "jit/BaselineCompiler.h"
 #include "jit/BaselineHelpers.h"
@@ -15,8 +18,10 @@
 #include "jit/VMFunctions.h"
 
 #include "jsboolinlines.h"
+#include "jsscriptinlines.h"
 
 #include "vm/Interpreter-inl.h"
+#include "vm/ScopeObject-inl.h"
 
 namespace js {
 namespace ion {
@@ -6894,6 +6899,10 @@ TryAttachCallStub(JSContext *cx, ICCall_Fallback *stub, HandleScript script, jsb
         if (op == JSOP_FUNAPPLY)
             return true;
 
+        // If callee is not an interpreted constructor, we have to throw.
+        if (constructing && !fun->isInterpretedConstructor())
+            return true;
+
         RootedScript calleeScript(cx, fun->nonLazyScript());
         if (!calleeScript->hasBaselineScript() && !calleeScript->hasIonScript())
             return true;
@@ -7311,7 +7320,10 @@ ICCallScriptedCompiler::generateStubCode(MacroAssembler &masm)
         Address expectedScript(BaselineStubReg, ICCall_Scripted::offsetOfCalleeScript());
         masm.branchPtr(Assembler::NotEqual, expectedScript, callee, &failure);
     } else {
-        masm.branchIfFunctionHasNoScript(callee, &failure);
+        if (isConstructing_)
+            masm.branchIfNotInterpretedConstructor(callee, regs.getAny(), &failure);
+        else
+            masm.branchIfFunctionHasNoScript(callee, &failure);
         masm.loadPtr(Address(callee, JSFunction::offsetOfNativeOrScript()), callee);
     }
 

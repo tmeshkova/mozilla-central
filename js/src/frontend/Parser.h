@@ -266,21 +266,9 @@ struct ParseContext : public GenericParseContext
         prs->pc = this;
     }
 
-    ~ParseContext() {
-        // |*parserPC| pointed to this object.  Now that this object is about to
-        // die, make |*parserPC| point to this object's parent.
-        JS_ASSERT(*parserPC == this);
-        *parserPC = this->oldpc;
-        js_delete(funcStmts);
-    }
+    ~ParseContext();
 
-    inline bool init()
-{
-    if (!frontend::GenerateBlockId(this, this->bodyid))
-        return false;
-
-    return decls_.init() && lexdeps.ensureMap(sc->context);
-}
+    bool init();
 
     unsigned blockid() { return topStmt ? topStmt->blockid : bodyid; }
 
@@ -583,7 +571,10 @@ class Parser : private AutoGCRooter, public StrictModeGetter
     Node pushLexicalScope(Handle<StaticBlockObject*> blockObj, StmtInfoPC *stmt);
     Node pushLetScope(Handle<StaticBlockObject*> blockObj, StmtInfoPC *stmt);
     bool noteNameUse(HandlePropertyName name, Node pn);
+    Node objectLiteral();
+    Node arrayInitializer();
     Node newRegExp();
+
     Node newBindingNode(PropertyName *name, bool functionScope, VarContext varContext = HoistVars);
     bool checkDestructuring(BindData<ParseHandler> *data, Node left, bool toplevel = true);
     bool bindDestructuringVar(BindData<ParseHandler> *data, Node pn);

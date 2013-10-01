@@ -229,7 +229,7 @@ class IonBuilder : public MIRGenerator
                             AutoObjectVector &targets,
                             uint32_t maxTargets,
                             bool *gotLambda);
-    bool canInlineTarget(JSFunction *target);
+    bool canInlineTarget(JSFunction *target, bool constructing);
 
     void popCfgStack();
     DeferredEdge *filterDeadDeferredEdges(DeferredEdge *edge);
@@ -367,6 +367,45 @@ class IonBuilder : public MIRGenerator
     bool getPropTryCache(bool *emitted, HandlePropertyName name, HandleId id,
                          bool barrier, types::StackTypeSet *types);
 
+    // jsop_setprop() helpers.
+    bool setPropTryCommonSetter(bool *emitted, MDefinition *obj,
+                                HandlePropertyName name, HandleId id,
+                                MDefinition *value);
+    bool setPropTryCommonDOMSetter(bool *emitted, MDefinition *obj,
+                                   MDefinition *value, HandleFunction setter,
+                                   bool isDOM);
+    bool setPropTryDefiniteSlot(bool *emitted, MDefinition *obj,
+                                HandlePropertyName name, MDefinition *value,
+                                bool barrier, types::StackTypeSet *objTypes);
+    bool setPropTryInlineAccess(bool *emitted, MDefinition *obj,
+                                HandlePropertyName name, HandleId id,
+                                MDefinition *value, bool barrier,
+                                types::StackTypeSet *objTypes);
+    bool setPropTryCache(bool *emitted, MDefinition *obj,
+                         HandlePropertyName name, MDefinition *value,
+                         bool barrier, types::StackTypeSet *objTypes);
+
+    // jsop_setelem() helpers.
+    bool setElemTryTyped(bool *emitted, MDefinition *object,
+                         MDefinition *index, MDefinition *value);
+    bool setElemTryTypedStatic(bool *emitted, MDefinition *object,
+                               MDefinition *index, MDefinition *value);
+    bool setElemTryDense(bool *emitted, MDefinition *object,
+                         MDefinition *index, MDefinition *value);
+    bool setElemTryArguments(bool *emitted, MDefinition *object,
+                             MDefinition *index, MDefinition *value);
+    bool setElemTryCache(bool *emitted, MDefinition *object,
+                         MDefinition *index, MDefinition *value);
+
+    // jsop_getelem() helpers.
+    bool getElemTryDense(bool *emitted, MDefinition *obj, MDefinition *index);
+    bool getElemTryTypedStatic(bool *emitted, MDefinition *obj, MDefinition *index);
+    bool getElemTryTyped(bool *emitted, MDefinition *obj, MDefinition *index);
+    bool getElemTryString(bool *emitted, MDefinition *obj, MDefinition *index);
+    bool getElemTryArguments(bool *emitted, MDefinition *obj, MDefinition *index);
+    bool getElemTryArgumentsInlined(bool *emitted, MDefinition *obj, MDefinition *index);
+    bool getElemTryCache(bool *emitted, MDefinition *obj, MDefinition *index);
+
     // Typed array helpers.
     MInstruction *getTypedArrayLength(MDefinition *obj);
     MInstruction *getTypedArrayElements(MDefinition *obj);
@@ -400,10 +439,8 @@ class IonBuilder : public MIRGenerator
     bool jsop_intrinsic(HandlePropertyName name);
     bool jsop_bindname(PropertyName *name);
     bool jsop_getelem();
-    bool jsop_getelem_dense();
-    bool jsop_getelem_typed(int arrayType);
-    bool jsop_getelem_typed_static(bool *psucceeded);
-    bool jsop_getelem_string();
+    bool jsop_getelem_dense(MDefinition *obj, MDefinition *index);
+    bool jsop_getelem_typed(MDefinition *obj, MDefinition *index, int arrayType);
     bool jsop_setelem();
     bool jsop_setelem_dense(types::StackTypeSet::DoubleConversion conversion,
                             SetElemSafety safety,
@@ -411,14 +448,11 @@ class IonBuilder : public MIRGenerator
     bool jsop_setelem_typed(int arrayType,
                             SetElemSafety safety,
                             MDefinition *object, MDefinition *index, MDefinition *value);
-    bool jsop_setelem_typed_static(MDefinition *object, MDefinition *index, MDefinition *value,
-                                   bool *psucceeded);
     bool jsop_length();
     bool jsop_length_fastPath();
     bool jsop_arguments();
     bool jsop_arguments_length();
     bool jsop_arguments_getelem();
-    bool jsop_arguments_setelem(MDefinition *object, MDefinition *index, MDefinition *value);
     bool jsop_runonce();
     bool jsop_rest();
     bool jsop_not();
@@ -543,7 +577,6 @@ class IonBuilder : public MIRGenerator
                                   MTypeObjectDispatch *dispatch, MGetPropertyCache *cache,
                                   MBasicBlock **fallbackTarget);
 
-    bool anyFunctionIsCloneAtCallsite(types::StackTypeSet *funTypes);
     MDefinition *makeCallsiteClone(HandleFunction target, MDefinition *fun);
     MCall *makeCallHelper(HandleFunction target, CallInfo &callInfo, bool cloneAtCallsite);
     bool makeCall(HandleFunction target, CallInfo &callInfo, bool cloneAtCallsite);

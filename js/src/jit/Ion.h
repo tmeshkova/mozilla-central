@@ -13,11 +13,9 @@
 
 #include "jscntxt.h"
 #include "jscompartment.h"
-#include "jsinfer.h"
 
 #include "jit/CompileInfo.h"
 #include "jit/IonCode.h"
-#include "vm/Interpreter.h"
 
 namespace js {
 namespace ion {
@@ -373,6 +371,8 @@ void PurgeCaches(JSScript *script, JS::Zone *zone);
 size_t SizeOfIonData(JSScript *script, mozilla::MallocSizeOf mallocSizeOf);
 void DestroyIonScripts(FreeOp *fop, JSScript *script);
 void TraceIonScripts(JSTracer* trc, JSScript *script);
+
+void TriggerOperationCallbackForIonCode(JSRuntime *rt, JSRuntime::OperationCallbackTrigger trigger);
 
 } // namespace ion
 } // namespace js

@@ -686,16 +686,17 @@ MetroWidget::WindowProcedure(HWND aWnd, UINT aMsg, WPARAM aWParam, LPARAM aLPara
       // UiaReturnRawElementProvider passing the return result from FrameworkView
       // OnAutomationProviderRequested as the hwnd (me scratches head) which results in
       // GetLastError always being set to invalid handle (6) after CallWindowProc returns.
-      if (dwObjId == UiaRootObjectId) {
-        NS_ASSERTION(gProviderRoot.Get(), "gProviderRoot is null??");
+      if (dwObjId == UiaRootObjectId && gProviderRoot) {
         ComPtr<IRawElementProviderSimple> simple;
         gProviderRoot.As(&simple);
-        LRESULT res = UiaReturnRawElementProvider(aWnd, aWParam, aLParam, simple.Get());
-        if (res) {
-          return res;
+        if (simple) {
+          LRESULT res = UiaReturnRawElementProvider(aWnd, aWParam, aLParam, simple.Get());
+          if (res) {
+            return res;
+          }
+          NS_ASSERTION(res, "UiaReturnRawElementProvider failed!");
+          Log("UiaReturnRawElementProvider failed! GetLastError=%X", GetLastError());
         }
-        NS_ASSERTION(res, "UiaReturnRawElementProvider failed!");
-        Log("UiaReturnRawElementProvider failed! GetLastError=%X", GetLastError());
       }
       break;
     }
@@ -997,16 +998,16 @@ void MetroWidget::UserActivity()
   }
 }
 
+// InitEvent assumes physical coordinates and is used by shared win32 code. Do
+// not hand winrt event coordinates to this routine.
 void
 MetroWidget::InitEvent(nsGUIEvent& event, nsIntPoint* aPoint)
 {
   if (!aPoint) {
     event.refPoint.x = event.refPoint.y = 0;
   } else {
-    CSSIntPoint cssPoint(aPoint->x, aPoint->y);
-    LayoutDeviceIntPoint layoutDeviceIntPoint = CSSIntPointToLayoutDeviceIntPoint(cssPoint);
-    event.refPoint.x = layoutDeviceIntPoint.x;
-    event.refPoint.y = layoutDeviceIntPoint.y;
+    event.refPoint.x = aPoint->x;
+    event.refPoint.y = aPoint->y;
   }
   event.time = ::GetMessageTime();
 }
@@ -1329,14 +1330,6 @@ MetroWidget::HasPendingInputEvent()
 }
 
 // GeckoContentController interface impl
-
-#include "nsIBrowserDOMWindow.h"
-#include "nsIWebNavigation.h"
-#include "nsIDocShellTreeItem.h"
-#include "nsIDOMWindow.h"
-#include "nsIDOMChromeWindow.h"
-#include "nsIWindowMediator.h"
-#include "nsIInterfaceRequestorUtils.h"
 
 class RequestContentRepaintEvent : public nsRunnable
 {

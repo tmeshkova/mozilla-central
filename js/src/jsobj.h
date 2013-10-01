@@ -18,16 +18,8 @@
 
 #include "mozilla/MemoryReporting.h"
 
-#include "jsapi.h"
-#include "jsatom.h"
-#include "jsclass.h"
-#include "jsfriendapi.h"
-
-#include "gc/Barrier.h"
-#include "gc/Heap.h"
 #include "vm/ObjectImpl.h"
 #include "vm/Shape.h"
-#include "vm/String.h"
 
 namespace JS {
 struct ObjectsExtraSizes;
@@ -1447,6 +1439,9 @@ js_GetClassPrototype(js::ExclusiveContext *cx, JSProtoKey protoKey, js::MutableH
                      js::Class *clasp = NULL);
 
 namespace js {
+
+JSObject *
+GetClassPrototypePure(GlobalObject *global, JSProtoKey protoKey);
 
 extern bool
 SetClassAndProto(JSContext *cx, HandleObject obj,

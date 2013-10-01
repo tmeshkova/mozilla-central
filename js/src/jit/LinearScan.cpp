@@ -8,8 +8,6 @@
 
 #include "mozilla/DebugOnly.h"
 
-#include <limits.h>
-
 #include "jit/BitSet.h"
 #include "jit/IonBuilder.h"
 #include "jit/IonSpewer.h"
@@ -265,13 +263,25 @@ LinearScanAllocator::resolveControlFlow()
         BitSet *live = liveIn[mSuccessor->id()];
 
         for (BitSet::Iterator liveRegId(*live); liveRegId; liveRegId++) {
-            LiveInterval *to = vregs[*liveRegId].intervalFor(inputOf(successor->firstId()));
+            LinearScanVirtualRegister *vreg = &vregs[*liveRegId];
+            LiveInterval *to = vreg->intervalFor(inputOf(successor->firstId()));
             JS_ASSERT(to);
 
             for (size_t j = 0; j < mSuccessor->numPredecessors(); j++) {
                 LBlock *predecessor = mSuccessor->getPredecessor(j)->lir();
                 LiveInterval *from = vregs[*liveRegId].intervalFor(outputOf(predecessor->lastId()));
                 JS_ASSERT(from);
+
+                if (*from->getAllocation() == *to->getAllocation())
+                    continue;
+
+                // If this value is spilled at its definition, other stores
+                // are redundant.
+                if (vreg->mustSpillAtDefinition() && to->getAllocation()->isStackSlot()) {
+                    JS_ASSERT(vreg->canonicalSpill());
+                    JS_ASSERT(*vreg->canonicalSpill() == *to->getAllocation());
+                    continue;
+                }
 
                 if (mSuccessor->numPredecessors() > 1) {
                     JS_ASSERT(predecessor->mir()->numSuccessors() == 1);
@@ -342,7 +352,23 @@ LinearScanAllocator::reifyAllocations()
             if (def->policy() == LDefinition::PRESET && def->output()->isRegister()) {
                 AnyRegister fixedReg = def->output()->toRegister();
                 LiveInterval *from = fixedIntervals[fixedReg.code()];
-                if (!moveAfter(outputOf(reg->ins()), from, interval))
+
+                // Insert the move after any OsiPoint or Nop instructions
+                // following this one. See minimalDefEnd for more info.
+                CodePosition defEnd = minimalDefEnd(reg->ins());
+
+                // If we just skipped an OsiPoint, and it uses this vreg, it
+                // should use the fixed register instead.
+                for (UsePositionIterator usePos(interval->usesBegin());
+                     usePos != interval->usesEnd();
+                     usePos++)
+                {
+                    if (usePos->pos > defEnd)
+                        break;
+                    *static_cast<LAllocation *>(usePos->use) = LAllocation(fixedReg);
+                }
+
+                if (!moveAfter(defEnd, from, interval))
                     return false;
                 spillFrom = from->getAllocation();
             } else {
@@ -1339,26 +1365,6 @@ LinearScanAllocator::UnhandledQueue::enqueueForward(LiveInterval *after, LiveInt
         }
     }
     insertBefore(*i, interval);
-}
-
-/*
- * Append to the queue head in O(1).
- */
-void
-LinearScanAllocator::UnhandledQueue::enqueueAtHead(LiveInterval *interval)
-{
-#ifdef DEBUG
-    // Assuming that the queue is in sorted order, assert that order is
-    // maintained by inserting at the back.
-    if (!empty()) {
-        LiveInterval *back = peekBack();
-        JS_ASSERT(back->start() >= interval->start());
-        JS_ASSERT_IF(back->start() == interval->start(),
-                     back->requirement()->priority() >= interval->requirement()->priority());
-    }
-#endif
-
-    pushBack(interval);
 }
 
 void

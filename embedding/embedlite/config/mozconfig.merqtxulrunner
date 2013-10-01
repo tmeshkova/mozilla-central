@@ -41,6 +41,7 @@ ac_add_options --enable-gstreamer
 ac_add_options --disable-webapp-runtime
 ac_add_options --disable-dbus
 ac_add_options --disable-necko-wifi
+ac_add_options --enable-release
 
 ac_add_options --disable-accessibility
 ac_add_options --without-x

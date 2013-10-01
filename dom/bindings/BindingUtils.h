@@ -11,6 +11,7 @@
 
 #include "jsfriendapi.h"
 #include "jswrapper.h"
+#include "mozilla/Alignment.h"
 #include "mozilla/dom/BindingDeclarations.h"
 #include "mozilla/dom/CallbackObject.h"
 #include "mozilla/dom/DOMJSClass.h"
@@ -20,6 +21,7 @@
 #include "mozilla/dom/workers/Workers.h"
 #include "mozilla/ErrorResult.h"
 #include "mozilla/Likely.h"
+#include "mozilla/Util.h"
 #include "nsCycleCollector.h"
 #include "nsIXPConnect.h"
 #include "nsTraceRefcnt.h"
@@ -1924,7 +1926,7 @@ XrayResolveOwnProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
 bool
 XrayResolveNativeProperty(JSContext* cx, JS::Handle<JSObject*> wrapper,
                           JS::Handle<JSObject*> obj,
-                          JS::Handle<jsid> id, JSPropertyDescriptor* desc);
+                          JS::Handle<jsid> id, JS::MutableHandle<JSPropertyDescriptor> desc);
 
 /**
  * Define a property on obj through an Xray wrapper.
@@ -2298,21 +2300,21 @@ class GetCCParticipant
 {
   // Helper for GetCCParticipant for classes that participate in CC.
   template<class U>
-  static nsCycleCollectionParticipant*
+  static MOZ_CONSTEXPR nsCycleCollectionParticipant*
   GetHelper(int, typename U::NS_CYCLE_COLLECTION_INNERCLASS* dummy=nullptr)
   {
     return T::NS_CYCLE_COLLECTION_INNERCLASS::GetParticipant();
   }
   // Helper for GetCCParticipant for classes that don't participate in CC.
   template<class U>
-  static nsCycleCollectionParticipant*
+  static MOZ_CONSTEXPR nsCycleCollectionParticipant*
   GetHelper(double)
   {
     return nullptr;
   }
 
 public:
-  static nsCycleCollectionParticipant*
+  static MOZ_CONSTEXPR nsCycleCollectionParticipant*
   Get()
   {
     // Passing int() here will try to call the GetHelper that takes an int as

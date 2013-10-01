@@ -7,10 +7,12 @@
 #ifndef jsfriendapi_h
 #define jsfriendapi_h
 
+#ifdef JS_HAS_CTYPES
 #include "mozilla/MemoryReporting.h"
+#endif
 
-#include "jsclass.h"
 #include "jsbytecode.h"
+#include "jsclass.h"
 #include "jspubtd.h"
 
 #include "js/CallArgs.h"
@@ -173,7 +175,7 @@ extern JS_FRIEND_API(bool)
 JS_CopyPropertiesFrom(JSContext *cx, JSObject *target, JSObject *obj);
 
 extern JS_FRIEND_API(bool)
-JS_WrapPropertyDescriptor(JSContext *cx, JSPropertyDescriptor *desc);
+JS_WrapPropertyDescriptor(JSContext *cx, JS::MutableHandle<JSPropertyDescriptor> desc);
 
 extern JS_FRIEND_API(bool)
 JS_WrapAutoIdVector(JSContext *cx, JS::AutoIdVector &props);
@@ -573,18 +575,6 @@ AtomToLinearString(JSAtom *atom)
     return reinterpret_cast<JSLinearString *>(atom);
 }
 
-static inline JSPropertyOp
-CastAsJSPropertyOp(JSObject *object)
-{
-    return JS_DATA_TO_FUNC_PTR(JSPropertyOp, object);
-}
-
-static inline JSStrictPropertyOp
-CastAsJSStrictPropertyOp(JSObject *object)
-{
-    return JS_DATA_TO_FUNC_PTR(JSStrictPropertyOp, object);
-}
-
 JS_FRIEND_API(bool)
 GetPropertyNames(JSContext *cx, JSObject *obj, unsigned flags, js::AutoIdVector *props);
 
@@ -781,12 +771,6 @@ GetContextStructuredCloneCallbacks(JSContext *cx);
 
 extern JS_FRIEND_API(bool)
 IsContextRunningJS(JSContext *cx);
-
-typedef void
-(* AnalysisPurgeCallback)(JSRuntime *rt, JS::Handle<JSFlatString*> desc);
-
-extern JS_FRIEND_API(AnalysisPurgeCallback)
-SetAnalysisPurgeCallback(JSRuntime *rt, AnalysisPurgeCallback callback);
 
 typedef bool
 (* DOMInstanceClassMatchesProto)(JS::HandleObject protoObject, uint32_t protoID,
@@ -1814,7 +1798,7 @@ class AsmJSModuleSourceDesc
 
 extern JS_FRIEND_API(bool)
 js_DefineOwnProperty(JSContext *cx, JSObject *objArg, jsid idArg,
-                     const JSPropertyDescriptor& descriptor, bool *bp);
+                     JS::Handle<JSPropertyDescriptor> descriptor, bool *bp);
 
 extern JS_FRIEND_API(bool)
 js_ReportIsNotFunction(JSContext *cx, const JS::Value& v);

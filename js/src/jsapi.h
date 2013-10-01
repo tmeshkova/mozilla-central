@@ -12,7 +12,6 @@
 #include "mozilla/FloatingPoint.h"
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/RangedPtr.h"
-#include "mozilla/ThreadLocal.h"
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -24,7 +23,6 @@
 #include "jspubtd.h"
 
 #include "js/CallArgs.h"
-#include "js/CharacterEncoding.h"
 #include "js/HashTable.h"
 #include "js/RootingAPI.h"
 #include "js/Utility.h"
@@ -34,6 +32,9 @@
 /************************************************************************/
 
 namespace JS {
+
+class Latin1CharsZ;
+class TwoByteChars;
 
 typedef mozilla::RangedPtr<const jschar> CharPtr;
 
@@ -117,7 +118,6 @@ class JS_PUBLIC_API(AutoGCRooter) {
         DESCRIPTORS =  -7, /* js::AutoPropDescArrayRooter */
         ID =           -9, /* js::AutoIdRooter */
         VALVECTOR =   -10, /* js::AutoValueVector */
-        DESCRIPTOR =  -11, /* js::AutoPropertyDescriptorRooter */
         STRING =      -12, /* js::AutoStringRooter */
         IDVECTOR =    -13, /* js::AutoIdVector */
         OBJVECTOR =   -14, /* js::AutoObjectVector */
@@ -2784,18 +2784,15 @@ typedef enum JSGCParamKey {
     /* If true, high-frequency GCs will use a longer mark slice. */
     JSGC_DYNAMIC_MARK_SLICE = 18,
 
-    /* Number of megabytes of analysis data to allocate before purging. */
-    JSGC_ANALYSIS_PURGE_TRIGGER = 19,
-
     /* Lower limit after which we limit the heap growth. */
-    JSGC_ALLOCATION_THRESHOLD = 20,
+    JSGC_ALLOCATION_THRESHOLD = 19,
 
     /*
      * We decommit memory lazily. If more than this number of megabytes is
      * available to be decommitted, then JS_MaybeGC will trigger a shrinking GC
      * to decommit it.
      */
-    JSGC_DECOMMIT_THRESHOLD = 21
+    JSGC_DECOMMIT_THRESHOLD = 20
 } JSGCParamKey;
 
 typedef enum JSGCMode {
@@ -3478,11 +3475,6 @@ class PropertyDescriptorOperations
     JS::Handle<Value> value() const {
         return JS::Handle<Value>::fromMarkedLocation(&desc()->value);
     }
-
-    bool isClear() const {
-        return desc()->obj == NULL && desc()->attrs == 0 && desc()->getter == NULL &&
-               desc()->setter == NULL && desc()->value.isUndefined();
-    }
 };
 
 template <typename Outer>
@@ -3491,6 +3483,16 @@ class MutablePropertyDescriptorOperations : public PropertyDescriptorOperations<
     JSPropertyDescriptor * desc() { return static_cast<Outer*>(this)->extractMutable(); }
 
   public:
+
+    void clear() {
+        object().set(NULL);
+        setAttributes(0);
+        setShortId(0);
+        setGetter(NULL);
+        setSetter(NULL);
+        value().setUndefined();
+    }
+
     JS::MutableHandle<JSObject*> object() {
         return JS::MutableHandle<JSObject*>::fromMarkedLocation(&desc()->obj);
     }
@@ -3574,7 +3576,7 @@ class MutableHandleBase<JSPropertyDescriptor>
  */
 extern JS_PUBLIC_API(bool)
 JS_GetPropertyDescriptorById(JSContext *cx, JSObject *obj, jsid id, unsigned flags,
-                             JSPropertyDescriptor *desc);
+                             JS::MutableHandle<JSPropertyDescriptor> desc);
 
 extern JS_PUBLIC_API(bool)
 JS_GetOwnPropertyDescriptor(JSContext *cx, JSObject *obj, jsid id, JS::MutableHandle<JS::Value> vp);
@@ -4117,6 +4119,33 @@ Compile(JSContext *cx, JS::Handle<JSObject*> obj, CompileOptions options, FILE *
 extern JS_PUBLIC_API(JSScript *)
 Compile(JSContext *cx, JS::Handle<JSObject*> obj, CompileOptions options, const char *filename);
 
+extern JS_PUBLIC_API(bool)
+CanCompileOffThread(JSContext *cx, const CompileOptions &options);
+
+/*
+ * Off thread compilation control flow.
+ *
+ * After successfully triggering an off thread compile of a script, the
+ * callback will eventually be invoked with the specified data and the result
+ * script or NULL. The callback will be invoked while off the main thread, so
+ * must ensure that its operations are thread safe. Afterwards,
+ * FinishOffThreadScript must be invoked on the main thread to make the script
+ * usable (correct compartment/zone); this method must be invoked even if the
+ * off thread compilation produced a NULL script.
+ *
+ * The characters passed in to CompileOffThread must remain live until the
+ * callback is invoked, and the resulting script will be rooted until the call
+ * to FinishOffThreadScript.
+ */
+
+extern JS_PUBLIC_API(bool)
+CompileOffThread(JSContext *cx, Handle<JSObject*> obj, CompileOptions options,
+                 const jschar *chars, size_t length,
+                 OffThreadCompileCallback callback, void *callbackData);
+
+extern JS_PUBLIC_API(void)
+FinishOffThreadScript(JSRuntime *rt, JSScript *script);
+
 extern JS_PUBLIC_API(JSFunction *)
 CompileFunction(JSContext *cx, JS::Handle<JSObject*> obj, CompileOptions options,
                 const char *name, unsigned nargs, const char **argnames,
@@ -4325,10 +4354,10 @@ Call(JSContext *cx, jsval thisv, JSObject *funObj, unsigned argc, jsval *argv,
  * is disconnected before attempting such re-entry.
  */
 extern JS_PUBLIC_API(JSOperationCallback)
-JS_SetOperationCallback(JSContext *cx, JSOperationCallback callback);
+JS_SetOperationCallback(JSRuntime *rt, JSOperationCallback callback);
 
 extern JS_PUBLIC_API(JSOperationCallback)
-JS_GetOperationCallback(JSContext *cx);
+JS_GetOperationCallback(JSRuntime *rt);
 
 extern JS_PUBLIC_API(void)
 JS_TriggerOperationCallback(JSRuntime *rt);
@@ -4830,7 +4859,7 @@ JS_ResetDefaultLocale(JSRuntime *rt);
 struct JSLocaleCallbacks {
     JSLocaleToUpperCase     localeToUpperCase;
     JSLocaleToLowerCase     localeToLowerCase;
-    JSLocaleCompare         localeCompare; // not used #if ENABLE_INTL_API
+    JSLocaleCompare         localeCompare; // not used #if EXPOSE_INTL_API
     JSLocaleToUnicode       localeToUnicode;
     JSErrorCallback         localeGetErrorMessage;
 };
@@ -5114,36 +5143,10 @@ JS_GetCurrentThread();
  * thread. Embeddings may check this invariant outside the JS engine by calling
  * JS_AbortIfWrongThread (which will abort if not on the owner thread, even for
  * non-debug builds).
- *
- * It is possible to "move" a runtime between threads. This is accomplished by
- * calling JS_ClearRuntimeThread on a runtime's owner thread and then calling
- * JS_SetRuntimeThread on the new owner thread. The runtime must not be
- * accessed between JS_ClearRuntimeThread and JS_SetRuntimeThread. Also, the
- * caller is responsible for synchronizing the calls to Set/Clear.
  */
 
 extern JS_PUBLIC_API(void)
 JS_AbortIfWrongThread(JSRuntime *rt);
-
-extern JS_PUBLIC_API(void)
-JS_ClearRuntimeThread(JSRuntime *rt);
-
-extern JS_PUBLIC_API(void)
-JS_SetRuntimeThread(JSRuntime *rt);
-
-class JSAutoSetRuntimeThread
-{
-    JSRuntime *runtime_;
-
-  public:
-    JSAutoSetRuntimeThread(JSRuntime *runtime) : runtime_(runtime) {
-        JS_SetRuntimeThread(runtime_);
-    }
-
-    ~JSAutoSetRuntimeThread() {
-        JS_ClearRuntimeThread(runtime_);
-    }
-};
 
 /************************************************************************/
 
