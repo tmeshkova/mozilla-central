@@ -20,7 +20,7 @@ class GLXLibrary
 public:
     GLXLibrary() : mInitialized(false), mTriedInitializing(false),
                    mUseTextureFromPixmap(false), mDebug(false),
-                   mHasRobustness(false), mIsATI(false),
+                   mHasRobustness(false), mIsATI(false), mIsNVIDIA(false),
                    mClientIsMesa(false), mGLXMajorVersion(0),
                    mGLXMinorVersion(0), mLibType(OPENGL_LIB),
                    mOGLLibrary(nullptr) {}
@@ -204,6 +204,7 @@ private:
     bool mDebug;
     bool mHasRobustness;
     bool mIsATI;
+    bool mIsNVIDIA;
     bool mClientIsMesa;
     int mGLXMajorVersion;
     int mGLXMinorVersion;

@@ -572,20 +572,14 @@ void EmbedLitePuppetWidget::CreateCompositor(int aWidth, int aHeight)
 
   TextureFactoryIdentifier textureFactoryIdentifier;
   PLayerTransactionChild* shadowManager;
-  mozilla::layers::LayersBackend backendHint;
-  // We need a separate preference here (instead of using mUseLayersAcceleration)
-  // because we force enable accelerated layers with e10s. Once the BasicCompositor
-  // is stable enough to be used for Ripc/Cipc, then we can remove that and this
-  // pref.
-  if (Preferences::GetBool("layers.offmainthreadcomposition.prefer-basic", false) || !mUseLayersAcceleration) {
-    backendHint = mozilla::layers::LAYERS_BASIC;
-  } else {
-    backendHint = mozilla::layers::LAYERS_OPENGL;
-  }
+  nsTArray<LayersBackend> backendHints;
+  GetPreferredCompositorBackends(backendHints);
+
+  CheckForBasicBackends(backendHints);
 
   bool success = false;
   shadowManager = mCompositorChild->SendPLayerTransactionConstructor(
-   backendHint, 0, &textureFactoryIdentifier, &success);
+   backendHints, 0, &textureFactoryIdentifier, &success);
 
   if (success) {
     ShadowLayerForwarder* lf = lm->AsShadowForwarder();
@@ -597,6 +591,7 @@ void EmbedLitePuppetWidget::CreateCompositor(int aWidth, int aHeight)
     lf->SetShadowManager(shadowManager);
     lf->IdentifyTextureHost(textureFactoryIdentifier);
     ImageBridgeChild::IdentifyCompositorTextureHost(textureFactoryIdentifier);
+    WindowUsesOMTC();
 
     mLayerManager = lm;
   } else {

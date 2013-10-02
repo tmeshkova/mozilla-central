@@ -80,7 +80,6 @@ class LIRGenerator : public LIRGeneratorSpecific
     // intercept without a bunch of explicit gunk in the .cpp.
     bool visitParameter(MParameter *param);
     bool visitCallee(MCallee *callee);
-    bool visitForceUse(MForceUse *forceUse);
     bool visitGoto(MGoto *ins);
     bool visitTableSwitch(MTableSwitch *tableswitch);
     bool visitNewSlots(MNewSlots *ins);
@@ -120,7 +119,6 @@ class LIRGenerator : public LIRGeneratorSpecific
     bool visitTest(MTest *test);
     bool visitFunctionDispatch(MFunctionDispatch *ins);
     bool visitTypeObjectDispatch(MTypeObjectDispatch *ins);
-    bool visitPolyInlineDispatch(MPolyInlineDispatch *ins);
     bool visitCompare(MCompare *comp);
     bool visitTypeOf(MTypeOf *ins);
     bool visitToId(MToId *ins);

@@ -1628,7 +1628,8 @@ var NativeWindow = {
         type: "PageActions:Add",
         id: id,
         title: aOptions.title,
-        icon: resolveGeckoURI(aOptions.icon)
+        icon: resolveGeckoURI(aOptions.icon),
+        important: "important" in aOptions ? aOptions.important : false
       });
       this._items[id] = {
         clickCallback: aOptions.clickCallback,
@@ -3276,15 +3277,13 @@ Tab.prototype = {
     let remeasureNeeded = false;
 
     if (hasHorizontalMargins) {
-      let screenWidth = gScreenWidth + gViewportMargins.left + gViewportMargins.right;
-      let viewportShouldExcludeHorizontalMargins = (Math.round(pageWidth) <= screenWidth);
+      let viewportShouldExcludeHorizontalMargins = (pageWidth <= gScreenWidth - 0.5);
       if (viewportShouldExcludeHorizontalMargins != this.viewportExcludesHorizontalMargins) {
         remeasureNeeded = true;
       }
     }
     if (hasVerticalMargins) {
-      let screenHeight = gScreenHeight + gViewportMargins.top + gViewportMargins.bottom;
-      let viewportShouldExcludeVerticalMargins = (Math.round(pageHeight) <= screenHeight);
+      let viewportShouldExcludeVerticalMargins = (pageHeight <= gScreenHeight - 0.5);
       if (viewportShouldExcludeVerticalMargins != this.viewportExcludesVerticalMargins) {
         remeasureNeeded = true;
       }
@@ -3339,17 +3338,26 @@ Tab.prototype = {
           // Ignore. Catching and ignoring exceptions here ensures that Talos succeeds.
         }
 
+        let docURI = target.documentURI;
+        let errorType = "";
+        if (docURI.startsWith("about:certerror"))
+          errorType = "certerror";
+        else if (docURI.startsWith("about:blocked"))
+          errorType = "blocked"
+        else if (docURI.startsWith("about:neterror"))
+          errorType = "neterror";
+
         sendMessageToJava({
           type: "DOMContentLoaded",
           tabID: this.id,
-          bgColor: backgroundColor
+          bgColor: backgroundColor,
+          errorType: errorType
         });
 
         // Attach a listener to watch for "click" events bubbling up from error
         // pages and other similar page. This lets us fix bugs like 401575 which
         // require error page UI to do privileged things, without letting error
         // pages have any privilege themselves.
-        let docURI = target.documentURI;
         if (docURI.startsWith("about:certerror") || docURI.startsWith("about:blocked")) {
           this.browser.addEventListener("click", ErrorPageEventHandler, true);
           let listener = function() {
@@ -3633,7 +3641,6 @@ Tab.prototype = {
       fixedURI = URIFixup.createExposableURI(aLocationURI);
     } catch (ex) { }
 
-    let documentURI = contentWin.document.documentURIObject.spec;
     let contentType = contentWin.document.contentType;
 
     // If fixedURI matches browser.lastURI, we assume this isn't a real location
@@ -3650,6 +3657,7 @@ Tab.prototype = {
     this.shouldShowPluginDoorhanger = true;
     this.clickToPlayPluginsActivated = false;
     // Borrowed from desktop Firefox: http://mxr.mozilla.org/mozilla-central/source/browser/base/content/urlbarBindings.xml#174
+    let documentURI = contentWin.document.documentURIObject.spec
     let matchedURL = documentURI.match(/^((?:[a-z]+:\/\/)?(?:[^\/]+@)?)(.+?)(?::\d+)?(?:\/|$)/);
     let baseDomain = "";
     if (matchedURL) {
@@ -3671,7 +3679,6 @@ Tab.prototype = {
       tabID: this.id,
       uri: fixedURI.spec,
       userSearch: this.userSearch || "",
-      documentURI: documentURI,
       baseDomain: baseDomain,
       contentType: (contentType ? contentType : ""),
       sameDocument: sameDocument
@@ -7151,14 +7158,16 @@ let Reader = {
       this.pageAction.id = NativeWindow.pageactions.add({
         title: Strings.browser.GetStringFromName("readerMode.exit"),
         icon: "drawable://reader_active",
-        clickCallback: this.pageAction.readerModeCallback
+        clickCallback: this.pageAction.readerModeCallback,
+        important: true
       });
     } else if (tab.readerEnabled) {
       this.pageAction.id = NativeWindow.pageactions.add({
         title: Strings.browser.GetStringFromName("readerMode.enter"),
         icon: "drawable://reader",
         clickCallback:this.pageAction.readerModeCallback,
-        longClickCallback: this.pageAction.readerModeActiveCallback
+        longClickCallback: this.pageAction.readerModeActiveCallback,
+        important: true
       });
     }
   },

@@ -60,8 +60,6 @@ class CodeGenerator : public CodeGeneratorSpecific
     bool visitTableSwitchV(LTableSwitchV *ins);
     bool visitParameter(LParameter *lir);
     bool visitCallee(LCallee *lir);
-    bool visitForceUseV(LForceUseV *lir);
-    bool visitForceUseT(LForceUseT *lir);
     bool visitStart(LStart *lir);
     bool visitReturn(LReturn *ret);
     bool visitDefVar(LDefVar *lir);
@@ -79,7 +77,6 @@ class CodeGenerator : public CodeGeneratorSpecific
     bool visitTestVAndBranch(LTestVAndBranch *lir);
     bool visitFunctionDispatch(LFunctionDispatch *lir);
     bool visitTypeObjectDispatch(LTypeObjectDispatch *lir);
-    bool visitPolyInlineDispatch(LPolyInlineDispatch *lir);
     bool visitIntToString(LIntToString *lir);
     bool visitDoubleToString(LDoubleToString *lir);
     bool visitInteger(LInteger *lir);
@@ -303,6 +300,9 @@ class CodeGenerator : public CodeGeneratorSpecific
     bool visitBindNameIC(OutOfLineUpdateCache *ool, BindNameIC *ic);
     bool visitNameIC(OutOfLineUpdateCache *ool, NameIC *ic);
     bool visitCallsiteCloneIC(OutOfLineUpdateCache *ool, CallsiteCloneIC *ic);
+
+    bool visitRangeAssert(LRangeAssert *ins);
+    bool visitDoubleRangeAssert(LDoubleRangeAssert *ins);
 
     IonScriptCounts *extractUnassociatedScriptCounts() {
         IonScriptCounts *counts = unassociatedScriptCounts_;

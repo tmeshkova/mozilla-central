@@ -231,6 +231,7 @@ JSRuntime::JSRuntime(JSUseHelperThreads useHelperThreads)
     data(NULL),
     gcLock(NULL),
     gcHelperThread(thisFromCtor()),
+    signalHandlersInstalled_(false),
 #ifdef JS_THREADSAFE
 #ifdef JS_ION
     workerThreadState(NULL),
@@ -379,6 +380,10 @@ JSRuntime::init(uint32_t maxbytes)
     nativeStackBase = GetNativeStackBase();
 
     jitSupportsFloatingPoint = JitSupportsFloatingPoint();
+
+#ifdef JS_ION
+    signalHandlersInstalled_ = EnsureAsmJSSignalHandlersInstalled(this);
+#endif
     return true;
 }
 
@@ -711,6 +716,13 @@ JSRuntime::onOutOfMemory(void *p, size_t nbytes, JSContext *cx)
     return NULL;
 }
 
+bool
+JSRuntime::activeGCInAtomsZone()
+{
+    Zone *zone = atomsCompartment_->zone();
+    return zone->needsBarrier() || zone->isGCScheduled() || zone->wasGCStarted();
+}
+
 #ifdef JS_THREADSAFE
 
 void
@@ -732,7 +744,7 @@ JSRuntime::clearUsedByExclusiveThread(Zone *zone)
 bool
 js::CurrentThreadCanAccessRuntime(JSRuntime *rt)
 {
-    PerThreadData *pt = js::TlsPerThreadData.get();
+    DebugOnly<PerThreadData *> pt = js::TlsPerThreadData.get();
     JS_ASSERT(pt && pt->associatedWith(rt));
     return rt->ownerThread_ == PR_GetCurrentThread() || InExclusiveParallelSection();
 }
@@ -740,7 +752,7 @@ js::CurrentThreadCanAccessRuntime(JSRuntime *rt)
 bool
 js::CurrentThreadCanAccessZone(Zone *zone)
 {
-    PerThreadData *pt = js::TlsPerThreadData.get();
+    DebugOnly<PerThreadData *> pt = js::TlsPerThreadData.get();
     JS_ASSERT(pt && pt->associatedWith(zone->runtime_));
     return !InParallelSection() || InExclusiveParallelSection();
 }
