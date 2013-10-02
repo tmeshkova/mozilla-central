@@ -15,6 +15,10 @@
 
 #include "jit/IonFrameIterator.h"
 
+#ifdef CHECK_OSIPOINT_REGISTERS
+#include "jit/Registers.h" // for RegisterDump
+#endif
+
 struct JSContext;
 struct JSCompartment;
 struct JSGenerator;
@@ -1040,6 +1044,7 @@ class InterpreterStack
 
     // Number of interpreter frames on the stack, for over-recursion checks.
     static const size_t MAX_FRAMES = 50 * 1000;
+    static const size_t MAX_FRAMES_TRUSTED = MAX_FRAMES + 1000;
     size_t frameCount_;
 
     inline uint8_t *allocateFrame(JSContext *cx, size_t size);

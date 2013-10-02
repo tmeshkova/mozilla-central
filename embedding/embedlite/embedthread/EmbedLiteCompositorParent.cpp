@@ -49,17 +49,17 @@ EmbedLiteCompositorParent::~EmbedLiteCompositorParent()
 }
 
 PLayerTransactionParent*
-EmbedLiteCompositorParent::AllocPLayerTransactionParent(const LayersBackend& aBackendHint,
+EmbedLiteCompositorParent::AllocPLayerTransactionParent(const nsTArray<LayersBackend>& aBackendHints,
                                                         const uint64_t& aId,
                                                         TextureFactoryIdentifier* aTextureFactoryIdentifier,
-                                                        bool* aSuccess)
+                                                        bool *aSuccess)
 {
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
   EmbedLiteViewListener* list = view ? view->GetListener() : nullptr;
   if (list) {
     list->CompositorCreated();
   }
-  return CompositorParent::AllocPLayerTransactionParent(aBackendHint,
+  return CompositorParent::AllocPLayerTransactionParent(aBackendHints,
                                                         aId,
                                                         aTextureFactoryIdentifier,
                                                         aSuccess);

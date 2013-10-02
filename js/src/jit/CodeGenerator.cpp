@@ -593,45 +593,6 @@ CodeGenerator::visitTypeObjectDispatch(LTypeObjectDispatch *lir)
     return true;
 }
 
-bool
-CodeGenerator::visitPolyInlineDispatch(LPolyInlineDispatch *lir)
-{
-    MPolyInlineDispatch *mir = lir->mir();
-    Register inputReg = ToRegister(lir->input());
-
-    InlinePropertyTable *inlinePropTable = mir->propTable();
-    if (inlinePropTable) {
-        // Temporary register is only assigned in the TypeObject case.
-        Register tempReg = ToRegister(lir->temp());
-        masm.loadPtr(Address(inputReg, JSObject::offsetOfType()), tempReg);
-
-        // Detect functions by TypeObject.
-        for (size_t i = 0; i < inlinePropTable->numEntries(); i++) {
-            types::TypeObject *typeObj = inlinePropTable->getTypeObject(i);
-            JSFunction *func = inlinePropTable->getFunction(i);
-            LBlock *target = mir->getFunctionBlock(func)->lir();
-            masm.branchPtr(Assembler::Equal, tempReg, ImmGCPtr(typeObj), target->label());
-        }
-
-        // Unknown function: jump to fallback block.
-        LBlock *fallback = mir->fallbackPrepBlock()->lir();
-        masm.jump(fallback->label());
-        return true;
-    }
-
-    // Compare function pointers directly.
-    for (size_t i = 0; i < mir->numCallees() - 1; i++) {
-        JSFunction *func = mir->getFunction(i);
-        LBlock *target = mir->getFunctionBlock(i)->lir();
-        masm.branchPtr(Assembler::Equal, inputReg, ImmGCPtr(func), target->label());
-    }
-
-    // There's no fallback case, so a final guard isn't necessary.
-    LBlock *target = mir->getFunctionBlock(mir->numCallees() - 1)->lir();
-    masm.jump(target->label());
-    return true;
-}
-
 typedef JSFlatString *(*IntToStringFn)(ThreadSafeContext *, int);
 typedef ParallelResult (*IntToStringParFn)(ForkJoinSlice *, int, MutableHandleString);
 static const VMFunctionsModal IntToStringInfo = VMFunctionsModal(
@@ -966,18 +927,6 @@ CodeGenerator::visitCallee(LCallee *lir)
 
     masm.loadPtr(ptr, callee);
     masm.clearCalleeTag(callee, gen->info().executionMode());
-    return true;
-}
-
-bool
-CodeGenerator::visitForceUseV(LForceUseV *lir)
-{
-    return true;
-}
-
-bool
-CodeGenerator::visitForceUseT(LForceUseT *lir)
-{
     return true;
 }
 
@@ -5559,42 +5508,19 @@ CodeGenerator::link()
 {
     JSContext *cx = GetIonContext()->cx;
 
-    // Lock the runtime against operation callbacks during the link.
-    // We don't want an operation callback to protect the code for the script
-    // before it has been filled in, as we could segv before the runtime's
-    // patchable backedges have been fully updated.
-    JSRuntime::AutoLockForOperationCallback lock(cx->runtime());
+    // Check to make sure we didn't have a mid-build invalidation. If so, we
+    // will trickle to ion::Compile() and return Method_Skipped.
+    if (cx->compartment()->types.compiledInfo.compilerOutput(cx)->isInvalidated())
+        return true;
 
-    // Make sure we don't segv while filling in the code, to avoid deadlocking
-    // inside the signal handler.
-    cx->runtime()->ionRuntime()->ensureIonCodeAccessible(cx->runtime());
-
-    // Implicit interrupts are used only for sequential code. In parallel mode
-    // use the normal executable allocator so that we cannot segv during
-    // execution off the main thread.
     ExecutionMode executionMode = gen->info().executionMode();
-
-    Linker linker(masm);
-    IonCode *code = (executionMode == SequentialExecution)
-                    ? linker.newCodeForIonScript(cx)
-                    : linker.newCode(cx, JSC::ION_CODE);
-    if (!code)
-        return false;
-
-    // We encode safepoints after the OSI-point offsets have been determined.
-    encodeSafepoints();
-
-    JSScript *script = gen->info().script();
-    JS_ASSERT(!HasIonScript(script, executionMode));
 
     uint32_t scriptFrameSize = frameClass_ == FrameSizeClass::None()
                            ? frameDepth_
                            : FrameSizeClass::FromDepth(frameDepth_).frameSize();
 
-    // Check to make sure we didn't have a mid-build invalidation. If so, we
-    // will trickle to ion::Compile() and return Method_Skipped.
-    if (cx->compartment()->types.compiledInfo.compilerOutput(cx)->isInvalidated())
-        return true;
+    // We encode safepoints after the OSI-point offsets have been determined.
+    encodeSafepoints();
 
     // List of possible scripts that this graph may call. Currently this is
     // only tracked when compiling for parallel execution.
@@ -5609,6 +5535,31 @@ CodeGenerator::link()
                      cacheList_.length(), runtimeData_.length(),
                      safepoints_.size(), graph.mir().numScripts(),
                      callTargets.length(), patchableBackedges_.length());
+    if (!ionScript)
+        return false;
+
+    // Lock the runtime against operation callbacks during the link.
+    // We don't want an operation callback to protect the code for the script
+    // before it has been filled in, as we could segv before the runtime's
+    // patchable backedges have been fully updated.
+    JSRuntime::AutoLockForOperationCallback lock(cx->runtime());
+
+    // Make sure we don't segv while filling in the code, to avoid deadlocking
+    // inside the signal handler.
+    cx->runtime()->ionRuntime()->ensureIonCodeAccessible(cx->runtime());
+
+    // Implicit interrupts are used only for sequential code. In parallel mode
+    // use the normal executable allocator so that we cannot segv during
+    // execution off the main thread.
+    Linker linker(masm);
+    IonCode *code = (executionMode == SequentialExecution)
+                    ? linker.newCodeForIonScript(cx)
+                    : linker.newCode(cx, JSC::ION_CODE);
+    if (!code)
+        return false;
+
+    JSScript *script = gen->info().script();
+    JS_ASSERT(!HasIonScript(script, executionMode));
 
     ionScript->setMethod(code);
     ionScript->setSkipArgCheckEntryOffset(getSkipArgCheckEntryOffset());
@@ -5625,8 +5576,6 @@ CodeGenerator::link()
     if (callTargets.length() != 0)
         ionScript->setHasUncompiledCallTarget();
 
-    if (!ionScript)
-        return false;
     invalidateEpilogueData_.fixup(&masm);
     Assembler::patchDataWithValueCheck(CodeLocationLabel(code, invalidateEpilogueData_),
                                        ImmWord(uintptr_t(ionScript)),
@@ -6183,7 +6132,7 @@ CodeGenerator::visitBindNameIC(OutOfLineUpdateCache *ool, BindNameIC *ic)
 }
 
 typedef bool (*SetPropertyFn)(JSContext *, HandleObject,
-                              HandlePropertyName, const HandleValue, bool, int);
+                              HandlePropertyName, const HandleValue, bool, jsbytecode *);
 static const VMFunction SetPropertyInfo =
     FunctionInfo<SetPropertyFn>(SetProperty);
 
@@ -6193,9 +6142,8 @@ CodeGenerator::visitCallSetProperty(LCallSetProperty *ins)
     ConstantOrRegister value = TypedOrValueRegister(ToValue(ins, LCallSetProperty::Value));
 
     const Register objReg = ToRegister(ins->getOperand(0));
-    JSOp op = JSOp(*ins->mir()->resumePoint()->pc());
 
-    pushArg(Imm32(op));
+    pushArg(ImmWord(ins->mir()->resumePoint()->pc()));
     pushArg(Imm32(ins->mir()->strict()));
 
     pushArg(value);
@@ -6229,11 +6177,8 @@ CodeGenerator::visitSetPropertyCacheV(LSetPropertyCacheV *ins)
     RegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register objReg = ToRegister(ins->getOperand(0));
     ConstantOrRegister value = TypedOrValueRegister(ToValue(ins, LSetPropertyCacheV::Value));
-    jsbytecode *pc = ins->mir()->resumePoint()->pc();
-    bool isSetName = JSOp(*pc) == JSOP_SETNAME || JSOp(*pc) == JSOP_SETGNAME;
 
-    SetPropertyIC cache(liveRegs, objReg, ins->mir()->name(), value,
-                        isSetName, ins->mir()->strict());
+    SetPropertyIC cache(liveRegs, objReg, ins->mir()->name(), value, ins->mir()->strict());
     return addCache(ins, allocateCache(cache));
 }
 
@@ -6243,16 +6188,13 @@ CodeGenerator::visitSetPropertyCacheT(LSetPropertyCacheT *ins)
     RegisterSet liveRegs = ins->safepoint()->liveRegs();
     Register objReg = ToRegister(ins->getOperand(0));
     ConstantOrRegister value;
-    jsbytecode *pc = ins->mir()->resumePoint()->pc();
-    bool isSetName = JSOp(*pc) == JSOP_SETNAME || JSOp(*pc) == JSOP_SETGNAME;
 
     if (ins->getOperand(1)->isConstant())
         value = ConstantOrRegister(*ins->getOperand(1)->toConstant());
     else
         value = TypedOrValueRegister(ins->valueType(), ToAnyRegister(ins->getOperand(1)));
 
-    SetPropertyIC cache(liveRegs, objReg, ins->mir()->name(), value,
-                        isSetName, ins->mir()->strict());
+    SetPropertyIC cache(liveRegs, objReg, ins->mir()->name(), value, ins->mir()->strict());
     return addCache(ins, allocateCache(cache));
 }
 
@@ -7313,6 +7255,86 @@ CodeGenerator::visitAsmJSCheckOverRecursed(LAsmJSCheckOverRecursed *lir)
                    AbsoluteAddress(limitAddr),
                    StackPointer,
                    lir->mir()->onError());
+    return true;
+}
+
+bool
+CodeGenerator::visitRangeAssert(LRangeAssert *ins)
+{
+     Register input = ToRegister(ins->input());
+     Range *r = ins->range();
+
+    // Check the lower bound.
+    if (r->lower() != INT32_MIN) {
+        Label success;
+        masm.branch32(Assembler::GreaterThanOrEqual, input, Imm32(r->lower()), &success);
+        masm.breakpoint();
+        masm.bind(&success);
+    }
+
+    // Check the upper bound.
+    if (r->upper() != INT32_MAX) {
+        Label success;
+        masm.branch32(Assembler::LessThanOrEqual, input, Imm32(r->upper()), &success);
+        masm.breakpoint();
+        masm.bind(&success);
+    }
+
+    // For r->isDecimal() and r->exponent(), there's nothing to check, because
+    // if we ended up in the integer range checking code, the value is already
+    // in an integer register in the integer range.
+
+    return true;
+}
+
+bool
+CodeGenerator::visitDoubleRangeAssert(LDoubleRangeAssert *ins)
+{
+     FloatRegister input = ToFloatRegister(ins->input());
+     FloatRegister temp = ToFloatRegister(ins->temp());
+     Range *r = ins->range();
+
+    // Check the lower bound.
+    if (!r->isLowerInfinite()) {
+        Label success;
+        masm.loadConstantDouble(r->lower(), temp);
+        if (r->isUpperInfinite())
+            masm.branchDouble(Assembler::DoubleUnordered, input, input, &success);
+        masm.branchDouble(Assembler::DoubleGreaterThanOrEqual, input, temp, &success);
+        masm.breakpoint();
+        masm.bind(&success);
+    }
+    // Check the upper bound.
+    if (!r->isUpperInfinite()) {
+        Label success;
+        masm.loadConstantDouble(r->upper(), temp);
+        if (r->isLowerInfinite())
+            masm.branchDouble(Assembler::DoubleUnordered, input, input, &success);
+        masm.branchDouble(Assembler::DoubleLessThanOrEqual, input, temp, &success);
+        masm.breakpoint();
+        masm.bind(&success);
+    }
+
+    // This code does not yet check r->isDecimal(). This would require new
+    // assembler interfaces to make rounding instructions available.
+
+    if (!r->isInfinite()) {
+        // Check the bounds implied by the maximum exponent.
+        Label exponentLoOk;
+        masm.loadConstantDouble(pow(2.0, r->exponent() + 1), temp);
+        masm.branchDouble(Assembler::DoubleUnordered, input, input, &exponentLoOk);
+        masm.branchDouble(Assembler::DoubleLessThanOrEqual, input, temp, &exponentLoOk);
+        masm.breakpoint();
+        masm.bind(&exponentLoOk);
+
+        Label exponentHiOk;
+        masm.loadConstantDouble(-pow(2.0, r->exponent() + 1), temp);
+        masm.branchDouble(Assembler::DoubleUnordered, input, input, &exponentHiOk);
+        masm.branchDouble(Assembler::DoubleGreaterThanOrEqual, input, temp, &exponentHiOk);
+        masm.breakpoint();
+        masm.bind(&exponentHiOk);
+    }
+
     return true;
 }
 

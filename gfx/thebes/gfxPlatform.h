@@ -17,6 +17,7 @@
 
 #include "qcms.h"
 
+#include "mozilla/gfx/2D.h"
 #include "gfx2DGlue.h"
 #include "mozilla/RefPtr.h"
 #include "GfxInfoCollector.h"
@@ -486,6 +487,8 @@ public:
     static bool GetPrefLayersPreferD3D9();
     static bool CanUseDirect3D9();
     static int  GetPrefLayoutFrameRate();
+
+    static bool OffMainThreadCompositionRequired();
 
     /**
      * Is it possible to use buffer rotation

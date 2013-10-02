@@ -23,6 +23,7 @@
 #include "mozilla/layers/CompositorChild.h"
 #include "mozilla/layers/ImageBridgeChild.h"
 #include "mozilla/layers/PLayerTransactionChild.h"
+#include "mozilla/layers/ShadowLayers.h"
 #include "mozilla/layout/RenderFrameChild.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/unused.h"
@@ -2288,9 +2289,11 @@ TabChild::InitRenderingState()
           NS_WARNING("failed to get CompositorChild instance");
           return false;
         }
+        nsTArray<LayersBackend> backends;
+        backends.AppendElement(mTextureFactoryIdentifier.mParentBackend);
         bool success;
         shadowManager =
-            compositorChild->SendPLayerTransactionConstructor(mTextureFactoryIdentifier.mParentBackend,
+            compositorChild->SendPLayerTransactionConstructor(backends,
                                                               id, &mTextureFactoryIdentifier, &success);
         if (!success) {
           NS_WARNING("failed to properly allocate layer transaction");

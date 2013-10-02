@@ -73,6 +73,7 @@
 #include "prtime.h"
 #include "prprf.h"
 #include "prmem.h"
+#include "prenv.h"
 
 #include "mozilla/WidgetTraceEvent.h"
 #include "nsIAppShell.h"
@@ -6558,18 +6559,19 @@ nsWindow::StartAllowingD3D9(bool aReinitialize)
   }
 }
 
-mozilla::layers::LayersBackend
-nsWindow::GetPreferredCompositorBackend()
+void
+nsWindow::GetPreferredCompositorBackends(nsTArray<LayersBackend>& aHints)
 {
   LayerManagerPrefs prefs;
   GetLayerManagerPrefs(&prefs);
-  if (prefs.mDisableAcceleration) {
-    return mozilla::layers::LAYERS_BASIC;
+
+  if (!prefs.mDisableAcceleration) {
+    if (!prefs.mPreferD3D9) {
+      aHints.AppendElement(LAYERS_D3D11);
+    }
+    aHints.AppendElement(LAYERS_D3D9);
   }
-  if (prefs.mPreferD3D9) {
-    return mozilla::layers::LAYERS_D3D9;
-  }
-  return mozilla::layers::LAYERS_D3D11;
+  aHints.AppendElement(LAYERS_BASIC);
 }
 
 void

@@ -38,6 +38,7 @@
 
 #include "frontend/BytecodeCompiler.h"
 #include "gc/Marking.h"
+#include "jit/AsmJSModule.h"
 #include "jit/BaselineJIT.h"
 #include "js/MemoryMetrics.h"
 #include "vm/ArgumentsObject.h"
@@ -1182,6 +1183,18 @@ JSObject::isSealedOrFrozen(JSContext *cx, HandleObject obj, ImmutabilityType it,
         return false;
     if (extensible) {
         *resultp = false;
+        return true;
+    }
+
+    if (obj->is<TypedArrayObject>()) {
+        if (it == SEAL) {
+            // Typed arrays are always sealed.
+            *resultp = true;
+        } else {
+            // Typed arrays cannot be frozen, but an empty typed array is
+            // trivially frozen.
+            *resultp = (obj->as<TypedArrayObject>().length() == 0);
+        }
         return true;
     }
 
@@ -5662,6 +5675,11 @@ JSObject::sizeOfExcludingThis(mozilla::MallocSizeOf mallocSizeOf, JS::ObjectsExt
         sizes->regExpStatics = as<RegExpStaticsObject>().sizeOfData(mallocSizeOf);
     } else if (is<PropertyIteratorObject>()) {
         sizes->propertyIteratorData = as<PropertyIteratorObject>().sizeOfMisc(mallocSizeOf);
+#ifdef JS_ION
+    } else if (is<AsmJSModuleObject>()) {
+        as<AsmJSModuleObject>().sizeOfMisc(mallocSizeOf, &sizes->asmJSModuleCode,
+                                           &sizes->asmJSModuleData);
+#endif
 #ifdef JS_HAS_CTYPES
     } else {
         // This must be the last case.
