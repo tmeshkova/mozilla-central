@@ -1442,6 +1442,7 @@ void AsyncPanZoomController::SendAsyncScrollEvent() {
   CSSRect contentRect;
   CSSSize scrollableSize;
   CSSToScreenScale resolution;
+  CSSPoint scrollOffset;
   {
     ReentrantMonitorAutoEnter lock(mMonitor);
 
@@ -1450,10 +1451,11 @@ void AsyncPanZoomController::SendAsyncScrollEvent() {
     contentRect = mFrameMetrics.CalculateCompositedRectInCssPixels();
     contentRect.MoveTo(mCurrentAsyncScrollOffset);
     resolution = mFrameMetrics.mZoom;
+    scrollOffset = mFrameMetrics.mScrollOffset;
   }
 
   controller->SendAsyncScrollDOMEvent(scrollId, contentRect, scrollableSize);
-  controller->ScrollUpdate(mCurrentAsyncScrollOffset, resolution.scale);
+  controller->ScrollUpdate(scrollOffset, resolution.scale);
 }
 
 void AsyncPanZoomController::UpdateScrollOffset(const CSSPoint& aScrollOffset)
