@@ -236,8 +236,7 @@ AsyncPanZoomController::AsyncPanZoomController(uint64_t aLayersId,
      mAsyncScrollTimeoutTask(nullptr),
      mDisableNextTouchBatch(false),
      mHandlingTouchQueue(false),
-     mDelayPanning(false),
-     mContentScrollHappend(false)
+     mDelayPanning(false)
 {
   MOZ_COUNT_CTOR(AsyncPanZoomController);
 
@@ -248,11 +247,6 @@ AsyncPanZoomController::AsyncPanZoomController(uint64_t aLayersId,
 
 AsyncPanZoomController::~AsyncPanZoomController() {
   MOZ_COUNT_DTOR(AsyncPanZoomController);
-}
-
-void AsyncPanZoomController::ContentScrollPerformed()
-{
-  mContentScrollHappend = true;
 }
 
 already_AddRefed<GeckoContentController>
@@ -1179,11 +1173,6 @@ void AsyncPanZoomController::NotifyLayersUpdated(const FrameMetrics& aLayerMetri
 
   bool isDefault = mFrameMetrics.IsDefault();
   mFrameMetrics.mMayHaveTouchListeners = aLayerMetrics.mMayHaveTouchListeners;
-
-  if (mContentScrollHappend) {
-    mFrameMetrics.mScrollOffset = aLayerMetrics.mScrollOffset;
-    mContentScrollHappend = false;
-  }
 
   mPaintThrottler.TaskComplete(GetFrameTime());
   bool needContentRepaint = false;
