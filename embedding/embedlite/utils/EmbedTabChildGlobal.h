@@ -29,13 +29,16 @@ public:
   NS_FORWARD_SAFE_NSIMESSAGELISTENERMANAGER(mMessageManager)
   NS_FORWARD_SAFE_NSIMESSAGESENDER(mMessageManager)
   NS_IMETHOD SendSyncMessage(const nsAString& aMessageName,
-                             const jsval& aObject,
+                             const JS::Value& aObject,
+                             const JS::Value& aRemote,
                              JSContext* aCx,
                              uint8_t aArgc,
-                             jsval* aRetval) {
+                             JS::Value* aRetval)
+  {
+
     return mMessageManager
-           ? mMessageManager->SendSyncMessage(aMessageName, aObject, aCx, aArgc, aRetval)
-           : NS_ERROR_NULL_POINTER;
+      ? mMessageManager->SendSyncMessage(aMessageName, aObject, aRemote, aCx, aArgc, aRetval)
+      : NS_ERROR_NULL_POINTER;
   }
   NS_IMETHOD GetContent(nsIDOMWindow** aContent);
   NS_IMETHOD GetDocShell(nsIDocShell** aDocShell);

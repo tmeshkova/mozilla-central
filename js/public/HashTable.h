@@ -7,6 +7,7 @@
 #ifndef js_HashTable_h
 #define js_HashTable_h
 
+#include "mozilla/Alignment.h"
 #include "mozilla/Assertions.h"
 #include "mozilla/Attributes.h"
 #include "mozilla/Casting.h"
@@ -15,10 +16,9 @@
 #include "mozilla/Move.h"
 #include "mozilla/PodOperations.h"
 #include "mozilla/ReentrancyGuard.h"
+#include "mozilla/TemplateLib.h"
 #include "mozilla/TypeTraits.h"
-#include "mozilla/Util.h"
 
-#include "js/TemplateLib.h"
 #include "js/Utility.h"
 
 namespace js {
@@ -540,7 +540,7 @@ struct DefaultHasher
 // Specialize hashing policy for pointer types. It assumes that the type is
 // at least word-aligned. For types with smaller size use PointerHasher.
 template <class T>
-struct DefaultHasher<T *> : PointerHasher<T *, tl::FloorLog2<sizeof(void *)>::result>
+struct DefaultHasher<T *> : PointerHasher<T *, mozilla::tl::FloorLog2<sizeof(void *)>::value>
 {};
 
 // For doubles, we can xor the two uint32s.
@@ -890,7 +890,7 @@ class HashTable : private AllocPolicy
     static const unsigned sMinCapacity  = 1 << sMinCapacityLog2;
     static const unsigned sMaxInit      = JS_BIT(23);
     static const unsigned sMaxCapacity  = JS_BIT(24);
-    static const unsigned sHashBits     = tl::BitSize<HashNumber>::result;
+    static const unsigned sHashBits     = mozilla::tl::BitSize<HashNumber>::value;
     static const uint8_t  sMinAlphaFrac = 64;  // (0x100 * .25)
     static const uint8_t  sMaxAlphaFrac = 192; // (0x100 * .75)
     static const uint8_t  sInvMaxAlpha  = 171; // (ceil(0x100 / .75) >> 1)

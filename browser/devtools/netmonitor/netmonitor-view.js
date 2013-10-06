@@ -368,7 +368,7 @@ RequestsMenuView.prototype = Heritage.extend(WidgetMethods, {
   copyUrl: function() {
     let selected = this.selectedItem.attachment;
 
-    clipboardHelper.copyString(selected.url, this.document);
+    clipboardHelper.copyString(selected.url, document);
   },
 
   /**
@@ -1790,7 +1790,7 @@ NetworkDetailsView.prototype = {
           aEditor.setText(aString);
         });
       }
-      window.emit("NetMonitor:ResponsePostParamsAvailable");
+      window.emit(EVENTS.REQUEST_POST_PARAMS_DISPLAYED);
     });
   },
 
@@ -1913,7 +1913,7 @@ NetworkDetailsView.prototype = {
           }
         });
       }
-      window.emit("NetMonitor:ResponseBodyAvailable");
+      window.emit(EVENTS.RESPONSE_BODY_DISPLAYED);
     });
   },
 

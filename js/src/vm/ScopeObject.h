@@ -16,6 +16,8 @@
 
 namespace js {
 
+namespace frontend { struct Definition; }
+
 /*****************************************************************************/
 
 /*
@@ -746,6 +748,11 @@ StaticBlockObject::enclosingBlock() const
     JSObject *obj = getReservedSlot(SCOPE_CHAIN_SLOT).toObjectOrNull();
     return obj && obj->is<StaticBlockObject>() ? &obj->as<StaticBlockObject>() : NULL;
 }
+
+#ifdef DEBUG
+bool
+AnalyzeEntrainedVariables(JSContext *cx, HandleScript script);
+#endif
 
 } // namespace js
 

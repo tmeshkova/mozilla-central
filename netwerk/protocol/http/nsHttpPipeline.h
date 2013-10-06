@@ -19,7 +19,7 @@ class nsHttpPipeline : public nsAHttpConnection
                      , public nsAHttpSegmentReader
 {
 public:
-    NS_DECL_ISUPPORTS
+    NS_DECL_THREADSAFE_ISUPPORTS
     NS_DECL_NSAHTTPCONNECTION(mConnection)
     NS_DECL_NSAHTTPTRANSACTION
     NS_DECL_NSAHTTPSEGMENTREADER
@@ -52,7 +52,7 @@ private:
     // overload of nsAHttpTransaction::QueryPipeline()
     nsHttpPipeline *QueryPipeline();
 
-    nsAHttpConnection            *mConnection;
+    nsRefPtr<nsAHttpConnection>   mConnection;
     nsTArray<nsAHttpTransaction*> mRequestQ;  // array of transactions
     nsTArray<nsAHttpTransaction*> mResponseQ; // array of transactions
     nsresult                      mStatus;

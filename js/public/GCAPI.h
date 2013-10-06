@@ -8,6 +8,7 @@
 #define js_GCAPI_h
 
 #include "js/HeapAPI.h"
+#include "js/RootingAPI.h"
 
 namespace JS {
 
@@ -181,6 +182,9 @@ DisableIncrementalGC(JSRuntime *rt);
 extern JS_FRIEND_API(void)
 DisableGenerationalGC(JSRuntime *rt);
 
+extern JS_FRIEND_API(void)
+EnableGenerationalGC(JSRuntime *rt);
+
 extern JS_FRIEND_API(bool)
 IsIncrementalBarrierNeeded(JSRuntime *rt);
 
@@ -252,7 +256,7 @@ class ObjectPtr
  * Unsets the gray bit for anything reachable from |thing|. |kind| should not be
  * JSTRACE_SHAPE. |thing| should be non-null.
  */
-extern JS_FRIEND_API(void)
+extern JS_FRIEND_API(bool)
 UnmarkGrayGCThingRecursively(void *thing, JSGCTraceKind kind);
 
 /*

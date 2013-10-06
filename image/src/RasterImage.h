@@ -41,6 +41,10 @@
   #include "imgIContainerDebug.h"
 #endif
 
+// This will enable FrameAnimator approach to image animation.  Before doing
+// so, make sure bug 899861 symptoms are gone.
+// #define USE_FRAME_ANIMATOR 1
+
 class nsIInputStream;
 class nsIThreadPool;
 
@@ -120,10 +124,6 @@ class nsIThreadPool;
  * @par
  * The mAnim structure has members only needed for animated images, so
  * it's not allocated until the second frame is added.
- *
- * @note
- * mAnimationMode and mLoopCount are not in the mAnim structure because
- * they have public setters.
  */
 
 class ScaleRequest;
@@ -137,6 +137,7 @@ class Image;
 namespace image {
 
 class Decoder;
+class FrameAnimator;
 
 class RasterImage : public ImageResource
                   , public nsIProperties
@@ -146,7 +147,7 @@ class RasterImage : public ImageResource
 #endif
 {
 public:
-  NS_DECL_ISUPPORTS
+  NS_DECL_THREADSAFE_ISUPPORTS
   NS_DECL_NSIPROPERTIES
   NS_DECL_IMGICONTAINER
 #ifdef DEBUG
@@ -324,6 +325,7 @@ private:
 
   nsresult OnImageDataCompleteCore(nsIRequest* aRequest, nsISupports*, nsresult aStatus);
 
+#ifndef USE_FRAME_ANIMATOR
   struct Anim
   {
     //! Area of the first frame that needs to be redrawn on subsequent loops.
@@ -337,6 +339,7 @@ private:
       currentAnimationFrameIndex(0)
     {}
   };
+#endif
 
   /**
    * Each RasterImage has a pointer to one or zero heap-allocated
@@ -401,7 +404,7 @@ private:
   class DecodePool : public nsIObserver
   {
   public:
-    NS_DECL_ISUPPORTS
+    NS_DECL_THREADSAFE_ISUPPORTS
     NS_DECL_NSIOBSERVER
 
     static DecodePool* Singleton();
@@ -545,6 +548,7 @@ private:
                      uint32_t aFlags,
                      gfxImageSurface **_retval);
 
+#ifndef USE_FRAME_ANIMATOR
   /**
    * Advances the animation. Typically, this will advance a single frame, but it
    * may advance multiple frames. This may happen if we have infrequently
@@ -571,6 +575,7 @@ private:
    * but does not loop, returns 0.
    */
   uint32_t GetSingleLoopTime() const;
+#endif
 
   /**
    * Deletes and nulls out the frame in mFrames[framenum].
@@ -587,11 +592,16 @@ private:
   imgFrame* GetDrawableImgFrame(uint32_t framenum);
   imgFrame* GetCurrentImgFrame();
   uint32_t GetCurrentImgFrameIndex() const;
+#ifndef USE_FRAME_ANIMATOR
   mozilla::TimeStamp GetCurrentImgFrameEndTime() const;
+#endif
 
   size_t SizeOfDecodedWithComputedFallbackIfHeap(gfxASurface::MemoryLocation aLocation,
                                                  mozilla::MallocSizeOf aMallocSizeOf) const;
 
+#ifdef USE_FRAME_ANIMATOR
+  void EnsureAnimExists();
+#else
   inline void EnsureAnimExists()
   {
     if (!mAnim) {
@@ -614,6 +624,7 @@ private:
       CurrentStatusTracker().RecordImageIsAnimated();
     }
   }
+#endif
 
   nsresult InternalAddFrameHelper(uint32_t framenum, imgFrame *frame,
                                   uint8_t **imageData, uint32_t *imageLength,
@@ -671,10 +682,14 @@ private: // data
   // IMPORTANT: if you use mAnim in a method, call EnsureImageIsDecoded() first to ensure
   // that the frames actually exist (they may have been discarded to save memory, or
   // we maybe decoding on draw).
+#ifdef USE_FRAME_ANIMATOR
+  FrameAnimator* mAnim;
+#else
   RasterImage::Anim*        mAnim;
 
   //! # loops remaining before animation stops (-1 no stop)
   int32_t                    mLoopCount;
+#endif
 
   // Discard members
   uint32_t                   mLockCount;
@@ -711,9 +726,9 @@ private: // data
   nsRefPtr<Decoder>          mDecoder;
   nsRefPtr<DecodeRequest>    mDecodeRequest;
   uint32_t                   mBytesDecoded;
-  // END LOCKED MEMBER VARIABLES
 
   bool                       mInDecoder;
+  // END LOCKED MEMBER VARIABLES
 
   // Boolean flags (clustered together to conserve space):
   bool                       mHasSize:1;       // Has SetSize() been called?
@@ -791,9 +806,11 @@ inline NS_IMETHODIMP RasterImage::GetAnimationMode(uint16_t *aAnimationMode) {
   return GetAnimationModeInternal(aAnimationMode);
 }
 
+#ifndef USE_FRAME_ANIMATOR
 inline NS_IMETHODIMP RasterImage::SetAnimationMode(uint16_t aAnimationMode) {
   return SetAnimationModeInternal(aAnimationMode);
 }
+#endif
 
 // Asynchronous Decode Requestor
 //

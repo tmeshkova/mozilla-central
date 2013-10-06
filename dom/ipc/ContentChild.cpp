@@ -30,6 +30,9 @@
 #include "mozilla/layers/PCompositorChild.h"
 #include "mozilla/net/NeckoChild.h"
 #include "mozilla/Preferences.h"
+#ifdef MOZ_CONTENT_SANDBOX
+#include "mozilla/Sandbox.h"
+#endif
 #include "mozilla/unused.h"
 
 #include "nsIMemoryReporter.h"
@@ -321,6 +324,8 @@ ContentChild::Init(MessageLoop* aIOLoop,
 
     SendGetProcessAttributes(&mID, &mIsForApp, &mIsForBrowser);
 
+    GetCPOWManager();
+
     if (mIsForApp && !mIsForBrowser) {
         SetProcessName(NS_LITERAL_STRING("(Preallocated app)"));
     } else {
@@ -340,8 +345,11 @@ ContentChild::SetProcessName(const nsAString& aName)
         printf_stderr("\n\nCHILDCHILDCHILDCHILD\n  [%s] debug me @%d\n\n", name, getpid());
         sleep(30);
 #elif defined(OS_WIN)
-        printf_stderr("\n\nCHILDCHILDCHILDCHILD\n  [%s] debug me @%d\n\n", name, _getpid());
-        Sleep(30000);
+        // Windows has a decent JIT debugging story, so NS_DebugBreak does the
+        // right thing.
+        NS_DebugBreak(NS_DEBUG_BREAK,
+                      "Invoking NS_DebugBreak() to debug child process",
+                      nullptr, __FILE__, __LINE__);
 #endif
     }
 
@@ -544,6 +552,13 @@ ContentChild::RecvSetProcessPrivileges(const ChildPrivileges& aPrivs)
                           aPrivs;
   // If this fails, we die.
   SetCurrentProcessPrivileges(privs);
+#ifdef MOZ_CONTENT_SANDBOX
+  // SetCurrentProcessSandbox should be moved close to process initialization
+  // time if/when possible. SetCurrentProcessPrivileges should probably be
+  // moved as well. Right now this is set ONLY if we receive the
+  // RecvSetProcessPrivileges message. See bug 880808.
+  SetCurrentProcessSandbox();
+#endif
   return true;
 }
 
@@ -589,7 +604,15 @@ ContentChild::AllocPBrowserChild(const IPCTabContext& aContext,
     // check that it's of a certain type for security purposes, because we
     // believe whatever the parent process tells us.
 
-    nsRefPtr<TabChild> child = TabChild::Create(this, TabContext(aContext), aChromeFlags);
+    MaybeInvalidTabContext tc(aContext);
+    if (!tc.IsValid()) {
+        NS_ERROR(nsPrintfCString("Received an invalid TabContext from "
+                                 "the parent process. (%s)  Crashing...",
+                                 tc.GetInvalidReason()).get());
+        MOZ_CRASH("Invalid TabContext received from the parent process.");
+    }
+
+    nsRefPtr<TabChild> child = TabChild::Create(this, tc.GetTabContext(), aChromeFlags);
 
     // The ref here is released in DeallocPBrowserChild.
     return child.forget().get();
@@ -634,7 +657,7 @@ ContentChild::DeallocPBrowserChild(PBrowserChild* iframe)
 PBlobChild*
 ContentChild::AllocPBlobChild(const BlobConstructorParams& aParams)
 {
-  return BlobChild::Create(aParams);
+  return BlobChild::Create(this, aParams);
 }
 
 bool
@@ -721,7 +744,7 @@ ContentChild::GetOrCreateActorForBlob(nsIDOMBlob* aBlob)
     }
     }
 
-  BlobChild* actor = BlobChild::Create(aBlob);
+  BlobChild* actor = BlobChild::Create(this, aBlob);
   NS_ENSURE_TRUE(actor, nullptr);
 
   if (!SendPBlobConstructor(actor, params)) {
@@ -1059,13 +1082,15 @@ ContentChild::RecvNotifyVisited(const URIParams& aURI)
 
 bool
 ContentChild::RecvAsyncMessage(const nsString& aMsg,
-                                     const ClonedMessageData& aData)
+                               const ClonedMessageData& aData,
+                               const InfallibleTArray<CpowEntry>& aCpows)
 {
   nsRefPtr<nsFrameMessageManager> cpm = nsFrameMessageManager::sChildProcessManager;
   if (cpm) {
     StructuredCloneData cloneData = ipc::UnpackClonedMessageDataForChild(aData);
+    CpowIdHolder cpows(GetCPOWManager(), aCpows);
     cpm->ReceiveMessage(static_cast<nsIContentFrameMessageManager*>(cpm.get()),
-                        aMsg, false, &cloneData, JS::NullPtr(), nullptr);
+                        aMsg, false, &cloneData, &cpows, nullptr);
   }
   return true;
 }
@@ -1177,10 +1202,13 @@ PreloadSlowThings()
 }
 
 bool
-ContentChild::RecvAppInfo(const nsCString& version, const nsCString& buildID)
+ContentChild::RecvAppInfo(const nsCString& version, const nsCString& buildID,
+                          const nsCString& name, const nsCString& UAName)
 {
     mAppInfo.version.Assign(version);
     mAppInfo.buildID.Assign(buildID);
+    mAppInfo.name.Assign(name);
+    mAppInfo.UAName.Assign(UAName);
     // If we're part of the mozbrowser machinery, go ahead and start
     // preloading things.  We can only do this for mozbrowser because
     // PreloadSlowThings() may set the docshell of the first TabChild

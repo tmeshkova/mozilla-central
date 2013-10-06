@@ -34,8 +34,7 @@
 #include "mozilla/MemoryReporting.h"
 #include "mozilla/TimeStamp.h"
 #include "prclist.h"
-#include "Layers.h"
-#include "nsRefreshDriver.h"
+#include "nsThreadUtils.h"
 
 #ifdef IBMBIDI
 class nsBidiPresUtils;
@@ -71,10 +70,18 @@ class nsTransitionManager;
 class nsAnimationManager;
 class imgIContainer;
 class nsIDOMMediaQueryList;
+class nsRefreshDriver;
 
 #ifdef MOZ_REFLOW_PERF
 class nsRenderingContext;
 #endif
+
+namespace mozilla {
+class RestyleManager;
+namespace layers {
+class ContainerLayer;
+}
+}
 
 // supported values for cached bool types
 enum nsPresContext_CachedBoolPrefType {
@@ -120,17 +127,6 @@ public:
 
   nsTArray<Request> mRequests;
 };
-
-/**
- * Layer UserData for ContainerLayers that want to be notified
- * of local invalidations of them and their descendant layers.
- * Pass a callback to ComputeDifferences to have these called.
- */
-class ContainerLayerPresContext : public mozilla::layers::LayerUserData {
-public:
-  nsPresContext* mPresContext;
-};
-extern uint8_t gNotifySubDocInvalidationData;
 
 /* Used by nsPresContext::HasAuthorSpecifiedRules */
 #define NS_AUTHOR_SPECIFIED_BACKGROUND      (1 << 0)
@@ -237,16 +233,21 @@ public:
       return mDocument;
   }
 
-#ifdef _IMPL_NS_LAYOUT
+#ifdef MOZILLA_INTERNAL_API
   nsStyleSet* StyleSet() { return GetPresShell()->StyleSet(); }
 
   nsFrameManager* FrameManager()
-    { return GetPresShell()->FrameManager(); }
+    { return PresShell()->FrameManager(); }
+
+  nsCSSFrameConstructor* FrameConstructor()
+    { return PresShell()->FrameConstructor(); }
 
   nsTransitionManager* TransitionManager() { return mTransitionManager; }
   nsAnimationManager* AnimationManager() { return mAnimationManager; }
 
   nsRefreshDriver* RefreshDriver() { return mRefreshDriver; }
+
+  mozilla::RestyleManager* RestyleManager() { return mRestyleManager; }
 #endif
 
   /**
@@ -294,7 +295,7 @@ public:
   uint16_t     ImageAnimationMode() const { return mImageAnimationMode; }
   virtual NS_HIDDEN_(void) SetImageAnimationModeExternal(uint16_t aMode);
   NS_HIDDEN_(void) SetImageAnimationModeInternal(uint16_t aMode);
-#ifdef _IMPL_NS_LAYOUT
+#ifdef MOZILLA_INTERNAL_API
   void SetImageAnimationMode(uint16_t aMode)
   { SetImageAnimationModeInternal(aMode); }
 #else
@@ -305,7 +306,22 @@ public:
   /** 
    * Get medium of presentation
    */
-  nsIAtom* Medium() { return mMedium; }
+  nsIAtom* Medium() {
+    if (!mIsEmulatingMedia)
+      return mMedium;
+    return mMediaEmulated;
+  }
+
+  /*
+   * Render the document as if being viewed on a device with the specified
+   * media type.
+   */
+  void EmulateMedium(const nsAString& aMediaType);
+
+  /*
+   * Restore the viewer's natural medium
+   */
+  void StopEmulatingMedium();
 
   void* AllocateFromShell(size_t aSize)
   {
@@ -407,7 +423,7 @@ public:
 
   virtual NS_HIDDEN_(already_AddRefed<nsISupports>) GetContainerExternal() const;
   NS_HIDDEN_(already_AddRefed<nsISupports>) GetContainerInternal() const;
-#ifdef _IMPL_NS_LAYOUT
+#ifdef MOZILLA_INTERNAL_API
   already_AddRefed<nsISupports> GetContainer() const
   { return GetContainerInternal(); }
 #else
@@ -556,11 +572,11 @@ public:
   static int32_t AppUnitsPerCSSInch() { return nsDeviceContext::AppUnitsPerCSSInch(); }
 
   static nscoord CSSPixelsToAppUnits(int32_t aPixels)
-  { return NSIntPixelsToAppUnits(aPixels,
-                                 nsDeviceContext::AppUnitsPerCSSPixel()); }
+  { return NSToCoordRoundWithClamp(float(aPixels) *
+             float(nsDeviceContext::AppUnitsPerCSSPixel())); }
 
   static nscoord CSSPixelsToAppUnits(float aPixels)
-  { return NSFloatPixelsToAppUnits(aPixels,
+  { return NSToCoordRoundWithClamp(aPixels *
              float(nsDeviceContext::AppUnitsPerCSSPixel())); }
 
   static int32_t AppUnitsToIntCSSPixels(nscoord aAppUnits)
@@ -666,18 +682,10 @@ public:
   /**
    * Getter and setter for OMTA time counters
    */
-  bool ThrottledStyleIsUpToDate() const {
-    return mLastUpdateThrottledStyle == mRefreshDriver->MostRecentRefresh();
-  }
-  void TickLastUpdateThrottledStyle() {
-    mLastUpdateThrottledStyle = mRefreshDriver->MostRecentRefresh();
-  }
-  bool StyleUpdateForAllAnimationsIsUpToDate() const {
-    return mLastStyleUpdateForAllAnimations == mRefreshDriver->MostRecentRefresh();
-  }
-  void TickLastStyleUpdateForAllAnimations() {
-    mLastStyleUpdateForAllAnimations = mRefreshDriver->MostRecentRefresh();
-  }
+  bool ThrottledStyleIsUpToDate() const;
+  void TickLastUpdateThrottledStyle();
+  bool StyleUpdateForAllAnimationsIsUpToDate();
+  void TickLastStyleUpdateForAllAnimations();
 
 #ifdef IBMBIDI
   /**
@@ -687,7 +695,7 @@ public:
    *
    *  @lina 07/12/2000
    */
-#ifdef _IMPL_NS_LAYOUT
+#ifdef MOZILLA_INTERNAL_API
   bool BidiEnabled() const { return BidiEnabledInternal(); }
 #else
   bool BidiEnabled() const { return BidiEnabledExternal(); }
@@ -819,7 +827,7 @@ public:
 
   virtual void InvalidateIsChromeCacheExternal();
   void InvalidateIsChromeCacheInternal() { mIsChromeIsCached = false; }
-#ifdef _IMPL_NS_LAYOUT
+#ifdef MOZILLA_INTERNAL_API
   void InvalidateIsChromeCache()
   { InvalidateIsChromeCacheInternal(); }
 #else
@@ -835,11 +843,21 @@ public:
     return GetCachedBoolPref(kPresContext_UseDocumentColors) || IsChrome();
   }
 
+  // Explicitly enable and disable paint flashing.
+  void SetPaintFlashing(bool aPaintFlashing) {
+    mPaintFlashing = aPaintFlashing;
+    mPaintFlashingInitialized = true;
+  }
+
+  // This method should be used instead of directly accessing mPaintFlashing,
+  // as that value may be out of date when mPaintFlashingInitialized is false.
+  bool GetPaintFlashing() const;
+
   bool             SupressingResizeReflow() const { return mSupressResizeReflow; }
   
   virtual NS_HIDDEN_(gfxUserFontSet*) GetUserFontSetExternal();
   NS_HIDDEN_(gfxUserFontSet*) GetUserFontSetInternal();
-#ifdef _IMPL_NS_LAYOUT
+#ifdef MOZILLA_INTERNAL_API
   gfxUserFontSet* GetUserFontSet() { return GetUserFontSetInternal(); }
 #else
   gfxUserFontSet* GetUserFontSet() { return GetUserFontSetExternal(); }
@@ -871,6 +889,8 @@ public:
   // Passed to LayerProperties::ComputeDifference
   static void NotifySubDocInvalidation(mozilla::layers::ContainerLayer* aContainer,
                                        const nsIntRegion& aRegion);
+  void SetNotifySubDocInvalidationData(mozilla::layers::ContainerLayer* aContainer);
+  static void ClearNotifySubDocInvalidationData(mozilla::layers::ContainerLayer* aContainer);
   bool IsDOMPaintEventPending();
   void ClearMozAfterPaintEvents() {
     mInvalidateRequestsSinceLastPaint.mRequests.Clear();
@@ -1149,8 +1169,10 @@ protected:
   nsRefPtr<nsRefreshDriver> mRefreshDriver;
   nsRefPtr<nsTransitionManager> mTransitionManager;
   nsRefPtr<nsAnimationManager> mAnimationManager;
+  nsRefPtr<mozilla::RestyleManager> mRestyleManager;
   nsIAtom*              mMedium;        // initialized by subclass ctors;
                                         // weak pointer to static atom
+  nsCOMPtr<nsIAtom> mMediaEmulated;
 
   nsILinkHandler*       mLinkHandler;   // [WEAK]
 
@@ -1260,6 +1282,7 @@ protected:
   unsigned              mPendingUIResolutionChanged : 1;
   unsigned              mPendingMediaFeatureValuesChanged : 1;
   unsigned              mPrefChangePendingNeedsReflow : 1;
+  unsigned              mIsEmulatingMedia : 1;
   // True if the requests in mInvalidateRequestsSinceLastPaint cover the
   // entire viewport
   unsigned              mAllInvalidated : 1;
@@ -1298,6 +1321,11 @@ protected:
   // value the slow way.
   mutable unsigned      mIsChromeIsCached : 1;
   mutable unsigned      mIsChrome : 1;
+
+  // Should we paint flash in this context? Do not use this variable directly.
+  // Use GetPaintFlashing() method instead.
+  mutable unsigned mPaintFlashing : 1;
+  mutable unsigned mPaintFlashingInitialized : 1;
 
 #ifdef DEBUG
   bool                  mInitialized;

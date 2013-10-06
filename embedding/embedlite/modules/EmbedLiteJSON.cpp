@@ -12,6 +12,9 @@
 #include "xpcprivate.h"
 #include "XPCQuickStubs.h"
 #include "nsJSUtils.h"
+#include "nsDOMJSUtils.h"
+
+using namespace mozilla;
 
 EmbedLiteJSON::EmbedLiteJSON()
 {
@@ -47,7 +50,7 @@ EmbedLiteJSON::CreateObject(nsIWritablePropertyBag2 * *aObject)
   return CreateObjectStatic(aObject);
 }
 
-static JSBool
+static bool
 JSONCreator(const jschar* aBuf, uint32_t aLen, void* aData)
 {
   nsAString* result = static_cast<nsAString*>(aData);
@@ -86,7 +89,8 @@ ParseObject(JSContext* cx, JSObject* object, nsIWritablePropertyBag2* aBag)
   JS::AutoIdArray props(cx, JS_Enumerate(cx, object));
   for (size_t i = 0; !!props && i < props.length(); ++i) {
     jsid propid = props[i];
-    jsval propname, propval;
+    JS::Value propname;
+    JS::Rooted<JS::Value> propval(cx);
     if (!JS_IdToValue(cx, propid, &propname) ||
         !JS_GetPropertyById(cx, object, propid, &propval)) {
       NS_ERROR("Failed to get property by ID");
@@ -101,8 +105,8 @@ ParseObject(JSContext* cx, JSObject* object, nsIWritablePropertyBag2* aBag)
     }
 
     if (JSVAL_IS_PRIMITIVE(propval)) {
-      nsCOMPtr<nsIWritableVariant> value = do_CreateInstance("@mozilla.org/variant;1");
-      JSValToVariant(cx, propval, value);
+      nsCOMPtr<nsIVariant> value;
+      nsContentUtils::XPConnect()->JSValToVariant(cx, propval.address(), getter_AddRefs(value));
       nsCOMPtr<nsIWritablePropertyBag> bagSimple = do_QueryInterface(aBag);
       bagSimple->SetProperty(pstr, value);
     } else {
@@ -113,14 +117,15 @@ ParseObject(JSContext* cx, JSObject* object, nsIWritablePropertyBag2* aBag)
         if (JS_GetArrayLength(cx, obj, &tmp)) {
           nsTArray<nsCOMPtr<nsIVariant>> childArray;
           for (uint32_t i = 0; i < tmp; i++) {
-            jsval v;
+            JS::Rooted<JS::Value> v(cx);
             if (!JS_GetElement(cx, obj, i, &v))
               continue;
-            nsCOMPtr<nsIWritableVariant> value = do_CreateInstance("@mozilla.org/variant;1");
             if (JSVAL_IS_PRIMITIVE(v)) {
-              JSValToVariant(cx, v, value);
+              nsCOMPtr<nsIVariant> value;
+              nsContentUtils::XPConnect()->JSValToVariant(cx, v.address(), getter_AddRefs(value));
               childArray.AppendElement(value);
             } else {
+              nsCOMPtr<nsIWritableVariant> value = do_CreateInstance("@mozilla.org/variant;1");
               nsCOMPtr<nsIWritablePropertyBag2> contextProps;
               CreateObjectStatic(getter_AddRefs(contextProps));
               JSObject* obj = JSVAL_TO_OBJECT(v);
@@ -153,12 +158,9 @@ ParseObject(JSContext* cx, JSObject* object, nsIWritablePropertyBag2* aBag)
 NS_IMETHODIMP
 EmbedLiteJSON::ParseJSON(nsAString const& aJson, nsIPropertyBag2** aRoot)
 {
-  XPCJSContextStack* stack = XPCJSRuntime::Get()->GetJSContextStack();
-  JSContext* cx = stack->GetSafeJSContext();
-  NS_ENSURE_TRUE(cx, NS_ERROR_FAILURE);
-
-  JSAutoRequest ar(cx);
-  JS::Rooted<JS::Value> json(cx, JS::NullValue());
+  MOZ_ASSERT(NS_IsMainThread());
+  AutoSafeJSContext cx;
+  JS::Rooted<JS::Value> json(cx, JSVAL_NULL);
   if (!JS_ParseJSON(cx,
                     static_cast<const jschar*>(aJson.BeginReading()),
                     aJson.Length(),
@@ -185,7 +187,7 @@ EmbedLiteJSON::ParseJSON(nsAString const& aJson, nsIPropertyBag2** aRoot)
 
 static bool SetPropFromVariant(nsIProperty* aProp, JSContext* aCx, JSObject* aObj)
 {
-  jsval rval = JSVAL_NULL;
+  JS::Value rval = JSVAL_NULL;
   nsString name;
   nsCOMPtr<nsIVariant> aVariant;
   aProp->GetValue(getter_AddRefs(aVariant));
@@ -201,7 +203,8 @@ static bool SetPropFromVariant(nsIProperty* aProp, JSContext* aCx, JSObject* aOb
     return false;
   }
 
-  if (!JS_SetProperty(aCx, aObj, NS_ConvertUTF16toUTF8(name).get(), &rval)) {
+  JS::RootedValue newrval(aCx, rval);
+  if (!JS_SetProperty(aCx, aObj, NS_ConvertUTF16toUTF8(name).get(), newrval)) {
     NS_ERROR("Failed to set js object property");
     return false;
   }
@@ -215,7 +218,7 @@ EmbedLiteJSON::CreateJSON(nsIPropertyBag* aRoot, nsAString& outJson)
   JSContext* cx = stack->GetSafeJSContext();
   NS_ENSURE_TRUE(cx, NS_ERROR_FAILURE);
 
-  JSObject* global = js::GetDefaultGlobalForContext(cx);
+  JSObject* global = js::DefaultObjectForContextOrNull(cx);
   JSAutoCompartment ac(cx, global);
 
   JSAutoRequest ar(cx);

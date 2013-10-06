@@ -163,6 +163,9 @@ var WifiManager = (function() {
   }
 
   var driverLoaded = false;
+
+  manager.getDriverLoaded = function() { return driverLoaded; }
+
   function loadDriver(callback) {
     if (driverLoaded) {
       callback(0);
@@ -843,6 +846,7 @@ var WifiManager = (function() {
     if (ok === 0) {
       // Tell the event worker to start waiting for events.
       retryTimer = null;
+      connectTries = 0;
       didConnectSupplicant(function(){});
       return;
     }
@@ -858,6 +862,7 @@ var WifiManager = (function() {
     }
 
     retryTimer = null;
+    connectTries = 0;
     notify("supplicantlost", { success: false });
   }
 
@@ -1225,35 +1230,44 @@ var WifiManager = (function() {
 
         prepareForStartup(function() {
           loadDriver(function (status) {
-            if (status < 0) {
+            if (status) {
               callback(status);
               manager.state = "UNINITIALIZED";
               return;
             }
+            gNetworkManager.setWifiOperationMode(ifname,
+                                                 WIFI_FIRMWARE_STATION,
+                                                 function (status) {
+              if (status < 0) {
+                callback(status);
+                manager.state = "UNINITIALIZED";
+                return;
+              }
 
-            function doStartSupplicant() {
-              cancelWaitForDriverReadyTimer();
-              startSupplicant(function (status) {
-                if (status < 0) {
-                  unloadDriver(function() {
-                    callback(status);
+              function doStartSupplicant() {
+                cancelWaitForDriverReadyTimer();
+                startSupplicant(function (status) {
+                  if (status < 0) {
+                    unloadDriver(function() {
+                      callback(status);
+                    });
+                    manager.state = "UNINITIALIZED";
+                    return;
+                  }
+
+                  manager.supplicantStarted = true;
+                  enableInterface(ifname, function (ok) {
+                    callback(ok ? 0 : -1);
                   });
-                  manager.state = "UNINITIALIZED";
-                  return;
-                }
-
-                manager.supplicantStarted = true;
-                enableInterface(ifname, function (ok) {
-                  callback(ok ? 0 : -1);
                 });
-              });
-            }
+              }
 
-            // Driver startup on certain platforms takes longer than it takes for us
-            // to return from loadDriver, so wait 2 seconds before starting
-            // the supplicant to give it a chance to start.
-            createWaitForDriverReadyTimer(doStartSupplicant);
-         });
+              // Driver startup on certain platforms takes longer than it takes for us
+              // to return from loadDriver, so wait 2 seconds before starting
+              // the supplicant to give it a chance to start.
+              createWaitForDriverReadyTimer(doStartSupplicant);
+            });
+          });
         });
       });
     } else {
@@ -1340,7 +1354,8 @@ var WifiManager = (function() {
   var networkConfigurationFields = [
     "ssid", "bssid", "psk", "wep_key0", "wep_key1", "wep_key2", "wep_key3",
     "wep_tx_keyidx", "priority", "key_mgmt", "scan_ssid", "disabled",
-    "identity", "password", "auth_alg", "phase1", "phase2", "eap"
+    "identity", "password", "auth_alg", "phase1", "phase2", "eap", "pin",
+    "pcsc"
   ];
 
   manager.getNetworkConfiguration = function(config, callback) {
@@ -1714,6 +1729,7 @@ Network.api = {
   wep: "rw",
   hidden: "rw",
   eap: "rw",
+  pin: "rw",
   phase1: "rw",
   phase2: "rw"
 };
@@ -1975,6 +1991,11 @@ function WifiWorker() {
     if (wep && net.wep && net.wep != '*') {
       configured.wep_key0 = net.wep_key0 = isWepHexKey(net.wep) ? net.wep : quote(net.wep);
       configured.auth_alg = net.auth_alg = "OPEN SHARED";
+    }
+
+    if ("pin" in net) {
+      net.pin = quote(net.pin);
+      net.pcsc = quote("");
     }
 
     if ("phase1" in net)
@@ -2822,6 +2843,7 @@ WifiWorker.prototype = {
 
     // First, notify all of the requests that were trying to make this change.
     let state = this._stateRequests[0].enabled;
+    let driverLoaded = WifiManager.getDriverLoaded();
 
     // It is callback function's responsibility to handle the pending request.
     // So we just return here.
@@ -2830,9 +2852,12 @@ WifiWorker.prototype = {
       return;
     }
 
-    // If the new state is not the same as state, then we weren't processing
-    // the first request (we were racing somehow) so don't notify.
-    if (!success || state === newState) {
+    // If the new state is not the same as state or new state is not the same as
+    // driver loaded state, then we weren't processing the first request (we
+    // were racing somehow) so don't notify.
+    // For newState is false(disable), we expect driverLoaded is false(driver unloaded)
+    // to proceed, and vice versa.
+    if (!success || (newState === driverLoaded && state === newState)) {
       do {
         if (!("callback" in this._stateRequests[0])) {
           this._stateRequests.shift();
@@ -2846,16 +2871,27 @@ WifiWorker.prototype = {
     // If there were requests queued after this one, run them.
     if (this._stateRequests.length > 0) {
       let self = this;
+      let callback = null;
       this._callbackTimer = Cc["@mozilla.org/timer;1"].createInstance(Ci.nsITimer);
-      this._callbackTimer.initWithCallback(function(timer) {
-        if ("callback" in self._stateRequests[0]) {
-          self._stateRequests[0].callback.call(self, self._stateRequests[0].enabled);
-        } else {
-          WifiManager.setWifiEnabled(self._stateRequests[0].enabled,
-                                     self._setWifiEnabledCallback.bind(this));
-        }
-        timer = null;
-      }, 1000, Ci.nsITimer.TYPE_ONE_SHOT);
+      if (newState === driverLoaded) {
+        // Driver status is as same as new state, proceed next request.
+        callback = function(timer) {
+          if ("callback" in self._stateRequests[0]) {
+            self._stateRequests[0].callback.call(self, self._stateRequests[0].enabled);
+          } else {
+            WifiManager.setWifiEnabled(self._stateRequests[0].enabled,
+                                       self._setWifiEnabledCallback.bind(self));
+          }
+          timer = null;
+        };
+      } else {
+        // Driver status is not as same as new state, wait driver.
+        callback = function(timer) {
+          self._notifyAfterStateChange(success, newState);
+          timer = null;
+        };
+      }
+      this._callbackTimer.initWithCallback(callback, 1000, Ci.nsITimer.TYPE_ONE_SHOT);
     }
   },
 
@@ -3205,6 +3241,7 @@ WifiWorker.prototype = {
     // hotspot status. Toggle settings to let gaia know that wifi hotspot
     // is enabled.
     this.tetheringSettings[SETTINGS_WIFI_TETHERING_ENABLED] = true;
+    this._oldWifiTetheringEnabledState = true;
     gSettingsService.createLock().set(
       SETTINGS_WIFI_TETHERING_ENABLED, true, null, "fromInternalSetting");
     // Check for the next request.
@@ -3216,6 +3253,7 @@ WifiWorker.prototype = {
     // hotspot status. Toggle settings to let gaia know that wifi hotspot
     // is disabled.
     this.tetheringSettings[SETTINGS_WIFI_TETHERING_ENABLED] = false;
+    this._oldWifiTetheringEnabledState = false;
     gSettingsService.createLock().set(
       SETTINGS_WIFI_TETHERING_ENABLED, false, null, "fromInternalSetting");
     // Check for the next request.
@@ -3333,6 +3371,7 @@ WifiWorker.prototype = {
           break;
         }
 
+        this._oldWifiTetheringEnabledState = this.tetheringSettings[SETTINGS_WIFI_TETHERING_ENABLED];
         this.handleWifiTetheringEnabled(aResult)
         break;
     };

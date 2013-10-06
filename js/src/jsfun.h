@@ -6,16 +6,21 @@
 
 #ifndef jsfun_h
 #define jsfun_h
+
 /*
  * JS function definitions.
  */
-#include "jsprvtd.h"
+
 #include "jsobj.h"
 #include "jsscript.h"
 
-#include "gc/Barrier.h"
+namespace js {
+class FunctionExtended;
 
-namespace js { class FunctionExtended; }
+typedef JSNative           Native;
+typedef JSParallelNative   ParallelNative;
+typedef JSThreadSafeNative ThreadSafeNative;
+}
 
 class JSFunction : public JSObject
 {
@@ -51,8 +56,8 @@ class JSFunction : public JSObject
 
     static void staticAsserts() {
         JS_STATIC_ASSERT(INTERPRETED == JS_FUNCTION_INTERPRETED_BIT);
-        MOZ_STATIC_ASSERT(sizeof(JSFunction) == sizeof(js::shadow::Function),
-                          "shadow interface must match actual interface");
+        static_assert(sizeof(JSFunction) == sizeof(js::shadow::Function),
+                      "shadow interface must match actual interface");
     }
 
     uint16_t        nargs;        /* maximum number of specified arguments,
@@ -136,6 +141,8 @@ class JSFunction : public JSObject
         return isNative() || isSelfHostedBuiltin();
     }
     bool isInterpretedConstructor() const {
+        // Note: the JITs inline this check, so be careful when making changes
+        // here. See IonMacroAssembler::branchIfNotInterpretedConstructor.
         return isInterpreted() && !isFunctionPrototype() &&
                (!isSelfHostedBuiltin() || isSelfHostedConstructor());
     }
@@ -259,7 +266,7 @@ class JSFunction : public JSObject
 
     JSScript *nonLazyScript() const {
         JS_ASSERT(hasScript());
-        return JS::HandleScript::fromMarkedLocation(&u.i.s.script_);
+        return u.i.s.script_;
     }
 
     js::HeapPtrScript &mutableScript() {
@@ -394,7 +401,7 @@ JSAPIToJSFunctionFlags(unsigned flags)
 
 namespace js {
 
-extern JSBool
+extern bool
 Function(JSContext *cx, unsigned argc, Value *vp);
 
 extern JSFunction *
@@ -408,6 +415,10 @@ DefineFunction(JSContext *cx, HandleObject obj, HandleId id, JSNative native,
                unsigned nargs, unsigned flags,
                gc::AllocKind allocKind = JSFunction::FinalizeKind,
                NewObjectKind newKind = GenericObject);
+
+extern bool
+fun_resolve(JSContext *cx, js::HandleObject obj, js::HandleId id,
+            unsigned flags, js::MutableHandleObject objp);
 
 // ES6 9.2.5 IsConstructor
 bool IsConstructor(const Value &v);
@@ -484,17 +495,17 @@ ReportIncompatibleMethod(JSContext *cx, CallReceiver call, Class *clasp);
 extern void
 ReportIncompatible(JSContext *cx, CallReceiver call);
 
-JSBool
+bool
 CallOrConstructBoundFunction(JSContext *, unsigned, js::Value *);
 
 extern const JSFunctionSpec function_methods[];
 
 } /* namespace js */
 
-extern JSBool
+extern bool
 js_fun_apply(JSContext *cx, unsigned argc, js::Value *vp);
 
-extern JSBool
+extern bool
 js_fun_call(JSContext *cx, unsigned argc, js::Value *vp);
 
 extern JSObject*

@@ -2,19 +2,9 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-// Fired when any context ui is displayed
-const kContextUIShowEvent = "MozContextUIShow";
-// Fired when any context ui is dismissed
-const kContextUIDismissEvent = "MozContextUIDismiss";
 // Fired when the tabtray is displayed
 const kContextUITabsShowEvent = "MozContextUITabsShow";
 // add more as needed...
-
-// delay for ContextUI's dismissTabsWithDelay
-const kHideContextAndTrayDelayMsec = 3000;
-
-// delay when showing the tab bar briefly as a new tab opens
-const kNewTabAnimationDelayMsec = 1000;
 
 /*
  * Manages context UI (navbar, tabbar, appbar) and track visibility. Also
@@ -31,7 +21,6 @@ var ContextUI = {
   init: function init() {
     Elements.browsers.addEventListener("mousedown", this, true);
     Elements.browsers.addEventListener("touchstart", this, true);
-    Elements.browsers.addEventListener("AlertActive", this, true);
 
     Elements.browsers.addEventListener('URLChanged', this, true);
     Elements.tabList.addEventListener('TabSelect', this, true);
@@ -108,6 +97,7 @@ var ContextUI = {
     let shown = false;
 
     if (!this.navbarVisible) {
+      BrowserUI.updateURI();
       this.displayNavbar();
       shown = true;
     }
@@ -119,7 +109,6 @@ var ContextUI = {
 
     if (shown) {
       ContentAreaObserver.update(window.innerWidth, window.innerHeight);
-      this._fire(kContextUIShowEvent);
     }
 
     return shown;
@@ -151,7 +140,6 @@ var ContextUI = {
 
     if (dismissed) {
       ContentAreaObserver.update(window.innerWidth, window.innerHeight);
-      this._fire(kContextUIDismissEvent);
     }
 
     return dismissed;
@@ -160,39 +148,28 @@ var ContextUI = {
   /*
    * Briefly show the tab bar and then hide it. Fires context ui events.
    */
-  peekTabs: function peekTabs() {
-    if (this.tabbarVisible) {
-      setTimeout(function () {
-        ContextUI.dismissTabsWithDelay(kNewTabAnimationDelayMsec);
-      }, 0);
-    } else {
-      BrowserUI.setOnTabAnimationEnd(function () {
-        ContextUI.dismissTabsWithDelay(kNewTabAnimationDelayMsec);
-      });
+  peekTabs: function peekTabs(aDelay) {
+    if (!this.tabbarVisible)
       this.displayTabs();
-    }
+
+    ContextUI.dismissTabsWithDelay(aDelay);
   },
 
   /*
    * Dismiss tab bar after a delay. Fires context ui events.
    */
   dismissTabsWithDelay: function (aDelay) {
-    aDelay = aDelay || kHideContextAndTrayDelayMsec;
+    aDelay = aDelay || kNewTabAnimationDelayMsec;
     this._clearDelayedTimeout();
     this._hidingId = setTimeout(function () {
         ContextUI.dismissTabs();
       }, aDelay);
   },
 
-  // Cancel any pending delayed dismiss
-  cancelDismiss: function cancelDismiss() {
-    this._clearDelayedTimeout();
-  },
-
   // Display the nav bar
   displayNavbar: function () {
-    this._clearDelayedTimeout();
     Elements.navbar.show();
+    ContentAreaObserver.updateContentArea();
   },
 
   // Display the tab tray
@@ -201,15 +178,12 @@ var ContextUI = {
     this._setIsExpanded(true);
   },
 
-  // Display the app bar
-  displayContextAppbar: function () {
-    this._clearDelayedTimeout();
-    Elements.contextappbar.show();
-  },
-
   // Dismiss the navbar if visible.
   dismissNavbar: function dismissNavbar() {
-    Elements.navbar.dismiss();
+    if (!BrowserUI.isStartTabVisible) {
+      Elements.navbar.dismiss();
+      ContentAreaObserver.updateContentArea();
+    }
   },
 
   // Dismiss the tabstray if visible.
@@ -256,17 +230,11 @@ var ContextUI = {
   _onEdgeUIStarted: function(aEvent) {
     this._hasEdgeSwipeStarted = true;
     this._clearDelayedTimeout();
-
-    if (StartUI.hide()) {
-      this.dismiss();
-      return;
-    }
     this.toggleNavUI();
   },
 
   _onEdgeUICanceled: function(aEvent) {
     this._hasEdgeSwipeStarted = false;
-    StartUI.hide();
     this.dismiss();
   },
 
@@ -277,10 +245,6 @@ var ContextUI = {
     }
 
     this._clearDelayedTimeout();
-    if (StartUI.hide()) {
-      this.dismiss();
-      return;
-    }
     this.toggleNavUI();
   },
 
@@ -309,21 +273,22 @@ var ContextUI = {
         this.dismissTabs();
         break;
       case "mousedown":
-        if (aEvent.button == 0 && this.isVisible)
+        if (BrowserUI.isStartTabVisible)
+          break;
+        let box = Browser.getNotificationBox();
+        if (!box.contains(aEvent.target) &&
+            aEvent.button == 0 && this.isVisible) {
           this.dismiss();
+        }
         break;
-      case 'URLChanged':
-        this.dismissTabs();
-        break;
-      case 'TabSelect':
-        this.dismissTabs();
-        break;
-
-      case 'ToolPanelShown':
-      case 'ToolPanelHidden':
-      case "touchstart":
-      case "AlertActive":
+      case "ToolPanelShown":
+      case "ToolPanelHidden":
         this.dismiss();
+        break;
+      case "touchstart":
+        if (!BrowserUI.isStartTabVisible) {
+          this.dismiss();
+        }
         break;
     }
   },

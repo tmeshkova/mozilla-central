@@ -92,6 +92,7 @@
 #endif
 
 #include "AudioStream.h"
+#include "WebAudioUtils.h"
 
 #ifdef MOZ_WIDGET_GONK
 #include "nsVolumeService.h"
@@ -117,8 +118,6 @@ using namespace mozilla::system;
 #include "nsIMEStateManager.h"
 #include "nsDocument.h"
 #include "mozilla/dom/HTMLVideoElement.h"
-
-extern void NS_ShutdownEventTargetChainItemRecyclePool();
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -353,6 +352,7 @@ nsLayoutStatics::Shutdown()
 #endif
 
   AudioStream::ShutdownLibrary();
+  WebAudioUtils::Shutdown();
 
 #ifdef MOZ_WMF
   WMFDecoder::UnloadDLLs();
@@ -375,8 +375,6 @@ nsLayoutStatics::Shutdown()
   nsHtml5Module::ReleaseStatics();
 
   nsRegion::ShutdownStatic();
-
-  NS_ShutdownEventTargetChainItemRecyclePool();
 
   HTMLInputElement::DestroyUploadLastDir();
 

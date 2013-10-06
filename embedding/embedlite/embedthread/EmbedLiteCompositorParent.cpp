@@ -49,24 +49,29 @@ EmbedLiteCompositorParent::~EmbedLiteCompositorParent()
 }
 
 PLayerTransactionParent*
-EmbedLiteCompositorParent::AllocPLayerTransactionParent(const LayersBackend& aBackendHint,
+EmbedLiteCompositorParent::AllocPLayerTransactionParent(const nsTArray<LayersBackend>& aBackendHints,
                                                         const uint64_t& aId,
-                                                        TextureFactoryIdentifier* aTextureFactoryIdentifier)
+                                                        TextureFactoryIdentifier* aTextureFactoryIdentifier,
+                                                        bool *aSuccess)
 {
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
   EmbedLiteViewListener* list = view ? view->GetListener() : nullptr;
   if (list) {
     list->CompositorCreated();
   }
-  return CompositorParent::AllocPLayerTransactionParent(aBackendHint,
+  return CompositorParent::AllocPLayerTransactionParent(aBackendHints,
                                                         aId,
-                                                        aTextureFactoryIdentifier);
+                                                        aTextureFactoryIdentifier,
+                                                        aSuccess);
 }
 
 bool
 EmbedLiteCompositorParent::IsGLBackend()
 {
-  return EmbedLiteApp::GetInstance()->IsAccelerated();
+  LayerManagerComposite* mgr = GetLayerManager();
+  NS_ENSURE_TRUE(mgr, false);
+
+  return mgr->GetCompositor()->GetBackend() == mozilla::layers::LAYERS_OPENGL;
 }
 
 bool EmbedLiteCompositorParent::RenderToContext(gfxContext* aContext)

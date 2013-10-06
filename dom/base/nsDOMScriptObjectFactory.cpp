@@ -20,13 +20,10 @@
  */
 
 #include "nsDOMScriptObjectFactory.h"
-#include "xpcexception.h"
 #include "nsScriptNameSpaceManager.h"
 #include "nsIObserverService.h"
 #include "nsJSEnvironment.h"
-#include "nsJSEventListener.h"
 #include "nsGlobalWindow.h"
-#include "nsISupportsPrimitives.h"
 #include "nsDOMException.h"
 #include "nsCRT.h"
 #ifdef MOZ_XUL
@@ -209,7 +206,7 @@ nsresult NS_GetScriptRuntimeByID(uint32_t aScriptTypeID,
 }
 
 
-NS_IMPL_THREADSAFE_ISUPPORTS1(nsDOMExceptionProvider, nsIExceptionProvider)
+NS_IMPL_ISUPPORTS1(nsDOMExceptionProvider, nsIExceptionProvider)
 
 NS_IMETHODIMP
 nsDOMExceptionProvider::GetException(nsresult result,

@@ -11,14 +11,12 @@
 
 #include "mozilla/MemoryReporting.h"
 
-#include "jsalloc.h"
 #include "jsfriendapi.h"
 
+#include "ds/IdValuePair.h"
 #include "ds/LifoAlloc.h"
 #include "gc/Barrier.h"
-#include "gc/Heap.h"
-#include "js/HashTable.h"
-#include "js/Vector.h"
+#include "js/Utility.h"
 
 class JSScript;
 
@@ -105,7 +103,15 @@ namespace ion {
     struct IonScript;
 }
 
+namespace analyze {
+    class ScriptAnalysis;
+}
+
 namespace types {
+
+class TypeCallsite;
+class TypeCompartment;
+class TypeSet;
 
 /* Type set entry for either a JSObject with singleton type or a non-singleton TypeObject. */
 struct TypeObjectKey {
@@ -287,7 +293,7 @@ enum {
                           TYPE_FLAG_INT32 | TYPE_FLAG_DOUBLE | TYPE_FLAG_STRING,
 
     /* Mask/shift for the number of objects in objectSet */
-    TYPE_FLAG_OBJECT_COUNT_MASK   = 0xff00,
+    TYPE_FLAG_OBJECT_COUNT_MASK   = 0x1f00,
     TYPE_FLAG_OBJECT_COUNT_SHIFT  = 8,
     TYPE_FLAG_OBJECT_COUNT_LIMIT  =
         TYPE_FLAG_OBJECT_COUNT_MASK >> TYPE_FLAG_OBJECT_COUNT_SHIFT,
@@ -529,8 +535,6 @@ class TypeSet
      * This variant doesn't freeze constraints. That variant is called knownSubset
      */
     bool isSubset(TypeSet *other);
-    bool isSubsetIgnorePrimitives(TypeSet *other);
-    bool intersectionEmpty(TypeSet *other);
 
     inline StackTypeSet *toStackTypeSet();
     inline HeapTypeSet *toHeapTypeSet();
@@ -643,12 +647,6 @@ class StackTypeSet : public TypeSet
      * specified type.
      */
     bool filtersType(const StackTypeSet *other, Type type) const;
-
-    /*
-     * Get whether this type only contains non-string primitives:
-     * null/undefined/int/double, or some combination of those.
-     */
-    bool knownNonStringPrimitive();
 
     enum DoubleConversion {
         /* All types in the set should use eager double conversion. */
@@ -972,20 +970,6 @@ struct TypeObject : gc::Cell
     static inline size_t offsetOfFlags() { return offsetof(TypeObject, flags); }
 
     /*
-     * Estimate of the contribution of this object to the type sets it appears in.
-     * This is the sum of the sizes of those sets at the point when the object
-     * was added.
-     *
-     * When the contribution exceeds the CONTRIBUTION_LIMIT, any type sets the
-     * object is added to are instead marked as unknown. If we get to this point
-     * we are probably not adding types which will let us do meaningful optimization
-     * later, and we want to ensure in such cases that our time/space complexity
-     * is linear, not worst-case cubic as it would otherwise be.
-     */
-    uint32_t contribution;
-    static const uint32_t CONTRIBUTION_LIMIT = 2000;
-
-    /*
      * If non-NULL, objects of this type have always been constructed using
      * 'new' on the specified script, which adds some number of properties to
      * the object in a definite order before the object escapes.
@@ -1026,6 +1010,10 @@ struct TypeObject : gc::Cell
 
     /* If this is an interpreted function, the function object. */
     HeapPtrFunction interpretedFunction;
+
+#if JS_BITS_PER_WORD == 32
+    uint32_t padding;
+#endif
 
     inline TypeObject(Class *clasp, TaggedProto proto, bool isFunction, bool unknown);
 
@@ -1379,8 +1367,13 @@ struct TypeCompartment
     ArrayTypeTable *arrayTypeTable;
     ObjectTypeTable *objectTypeTable;
 
+  private:
+    void setTypeToHomogenousArray(JSContext *cx, JSObject *obj, Type type);
+
+  public:
     void fixArrayType(JSContext *cx, JSObject *obj);
     void fixObjectType(JSContext *cx, JSObject *obj);
+    void fixRestArgumentsType(JSContext *cx, JSObject *obj);
 
     JSObject *newTypedObject(JSContext *cx, IdValuePair *properties, size_t nproperties);
 
@@ -1438,10 +1431,10 @@ struct TypeCompartment
     void sweepShapes(FreeOp *fop);
     void sweepCompilerOutputs(FreeOp *fop, bool discardConstraints);
 
-    void maybePurgeAnalysis(JSContext *cx, bool force = false);
-
     void finalizeObjects();
 };
+
+void FixRestArgumentsType(ExclusiveContext *cxArg, JSObject *obj);
 
 struct TypeZone
 {

@@ -11,10 +11,11 @@
  * JS public API typedefs.
  */
 
+#include "mozilla/PodOperations.h"
+
 #include "jsprototypes.h"
 #include "jstypes.h"
-
-#include "mozilla/PodOperations.h"
+#include "jsversion.h"  // #include here so it's seen everywhere
 
 #if defined(JSGC_ROOT_ANALYSIS) || defined(JSGC_USE_EXACT_ROOTING) || defined(DEBUG)
 # define JSGC_TRACK_EXACT_ROOTS
@@ -42,7 +43,7 @@ struct Zone;
  * prevents many bugs from being caught at compile time. E.g.:
  *
  *  jsid id = ...
- *  if (id == JS_TRUE)  // error
+ *  if (id)             // error
  *    ...
  *
  *  size_t n = id;      // error
@@ -200,13 +201,16 @@ class                                       JSStableString;  // long story
 class                                       JSString;
 
 #ifdef JS_THREADSAFE
-typedef struct PRCallOnceType    JSCallOnceType;
+typedef struct PRCallOnceType   JSCallOnceType;
 #else
-typedef JSBool                   JSCallOnceType;
+typedef bool                    JSCallOnceType;
 #endif
-typedef JSBool                 (*JSInitCallback)(void);
+typedef bool                    (*JSInitCallback)(void);
 
 namespace JS {
+
+typedef void (*OffThreadCompileCallback)(JSScript *script, void *callbackData);
+
 namespace shadow {
 
 struct Runtime
@@ -305,7 +309,7 @@ struct ContextFriendFields
     explicit ContextFriendFields(JSRuntime *rt)
       : runtime_(rt), compartment_(NULL), zone_(NULL), autoGCRooters(NULL)
     {
-#if defined(JSGC_ROOT_ANALYSIS) || defined(JSGC_USE_EXACT_ROOTING)
+#ifdef JSGC_TRACK_EXACT_ROOTS
         mozilla::PodArrayZero(thingGCRooters);
 #endif
 #if defined(DEBUG) && defined(JS_GC_ZEAL) && defined(JSGC_ROOT_ANALYSIS) && !defined(JS_THREADSAFE)

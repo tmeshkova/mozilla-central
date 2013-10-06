@@ -42,7 +42,7 @@ class nsHttpTransaction : public nsAHttpTransaction
                         , public nsIOutputStreamCallback
 {
 public:
-    NS_DECL_ISUPPORTS
+    NS_DECL_THREADSAFE_ISUPPORTS
     NS_DECL_NSAHTTPTRANSACTION
     NS_DECL_NSIINPUTSTREAMCALLBACK
     NS_DECL_NSIOUTPUTSTREAMCALLBACK
@@ -180,10 +180,11 @@ private:
     nsCOMPtr<nsIInputStream>        mRequestStream;
     uint64_t                        mRequestSize;
 
-    nsAHttpConnection              *mConnection;      // hard ref
-    nsHttpConnectionInfo           *mConnInfo;        // hard ref
+    nsRefPtr<nsHttpConnectionInfo>  mConnInfo;
+    nsRefPtr<nsAHttpConnection>     mConnection;
+
     nsHttpRequestHead              *mRequestHead;     // weak ref
-    nsHttpResponseHead             *mResponseHead;    // hard ref
+    nsHttpResponseHead             *mResponseHead;    // owning ref
 
     nsAHttpSegmentReader           *mReader;
     nsAHttpSegmentWriter           *mWriter;

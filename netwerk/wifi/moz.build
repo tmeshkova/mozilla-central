@@ -42,7 +42,7 @@ elif CONFIG['OS_ARCH'] == 'SunOS':
     CPP_SOURCES += [
         'nsWifiScannerSolaris.cpp',
     ]
-elif CONFIG['MOZ_ENABLE_DBUS']:
+elif CONFIG['NECKO_WIFI_DBUS']:
     CPP_SOURCES += [
         'nsWifiScannerDBus.cpp',
     ]

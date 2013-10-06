@@ -19,6 +19,7 @@ const STRING_TYPE_NAME       = "type.%ID%.name";
 XPCOMUtils.defineLazyModuleGetter(this, "getFrameWorkerHandle", "resource://gre/modules/FrameWorker.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "WorkerAPI", "resource://gre/modules/WorkerAPI.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "MozSocialAPI", "resource://gre/modules/MozSocialAPI.jsm");
+XPCOMUtils.defineLazyModuleGetter(this, "closeAllChatWindows", "resource://gre/modules/MozSocialAPI.jsm");
 XPCOMUtils.defineLazyModuleGetter(this, "DeferredTask", "resource://gre/modules/DeferredTask.jsm");
 
 XPCOMUtils.defineLazyServiceGetter(this, "etld",
@@ -640,6 +641,36 @@ this.SocialService = {
     }
   },
 
+  /**
+   * updateProvider is used from the worker to self-update.  Since we do not
+   * have knowledge of the currently selected provider here, we will notify
+   * the front end to deal with any reload.
+   */
+  updateProvider: function(aDOMDocument, aManifest, aCallback) {
+    let installOrigin = aDOMDocument.nodePrincipal.origin;
+    let installType = this.getOriginActivationType(installOrigin);
+    // if we get data, we MUST have a valid manifest generated from the data
+    let manifest = this._manifestFromData(installType, aManifest, aDOMDocument.nodePrincipal);
+    if (!manifest)
+      throw new Error("SocialService.installProvider: service configuration is invalid from " + installOrigin);
+
+    // overwrite the preference
+    let string = Cc["@mozilla.org/supports-string;1"].
+                 createInstance(Ci.nsISupportsString);
+    string.data = JSON.stringify(manifest);
+    Services.prefs.setComplexValue(getPrefnameFromOrigin(manifest.origin), Ci.nsISupportsString, string);
+
+    // overwrite the existing provider then notify the front end so it can
+    // handle any reload that might be necessary.
+    if (ActiveProviders.has(manifest.origin)) {
+      let provider = new SocialProvider(manifest);
+      SocialServiceInternal.providers[provider.origin] = provider;
+      // update the cache and ui, reload provider if necessary
+      this._notifyProviderListeners("provider-update", provider);
+    }
+
+  },
+
   uninstallProvider: function(origin) {
     let manifest = SocialServiceInternal.getManifestByOrigin(origin);
     let addon = new AddonWrapper(manifest);
@@ -710,6 +741,10 @@ SocialProvider.prototype = {
     } else {
       this._terminate();
     }
+  },
+
+  get manifest() {
+    return SocialServiceInternal.getManifestByOrigin(this.origin);
   },
 
   // Reference to a workerAPI object for this provider. Null if the provider has
@@ -796,6 +831,7 @@ SocialProvider.prototype = {
   updateUserProfile: function(profile) {
     if (!profile)
       profile = {};
+    let accountChanged = !this.profile || this.profile.userName != profile.userName;
     this.profile = profile;
 
     // Sanitize the portrait from any potential script-injection.
@@ -828,6 +864,8 @@ SocialProvider.prototype = {
     }
 
     Services.obs.notifyObservers(null, "social:profile-changed", this.origin);
+    if (accountChanged)
+      closeAllChatWindows(this);
   },
 
   // Called by the workerAPI to add/update a notification icon.
@@ -853,6 +891,7 @@ SocialProvider.prototype = {
   },
 
   _terminate: function _terminate() {
+    closeAllChatWindows(this);
     if (this.workerURL) {
       try {
         getFrameWorkerHandle(this.workerURL).terminate();

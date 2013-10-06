@@ -465,6 +465,7 @@ static nsExtraMimeTypeEntry extraMimeEntries [] =
   { "application/x-arj", "arj", "ARJ file" },
   { "application/rtf", "rtf", "Rich Text Format File" },
   { APPLICATION_XPINSTALL, "xpi", "XPInstall Install" },
+  { APPLICATION_PDF, "pdf", "Portable Document Format" },
   { APPLICATION_POSTSCRIPT, "ps,eps,ai", "Postscript File" },
   { APPLICATION_XJAVASCRIPT, "js", "Javascript Source File" },
   { APPLICATION_XJAVASCRIPT, "jsm", "Javascript Module Source File" },
@@ -479,9 +480,6 @@ static nsExtraMimeTypeEntry extraMimeEntries [] =
   { IMAGE_PNG, "png", "PNG Image" },
   { IMAGE_TIFF, "tiff,tif", "TIFF Image" },
   { IMAGE_XBM, "xbm", "XBM Image" },
-#ifdef MOZ_WBMP
-  { IMAGE_WBMP, "wbmp", "WBMP Image" },
-#endif
   { "image/svg+xml", "svg", "Scalable Vector Graphics" },
   { MESSAGE_RFC822, "eml", "RFC-822 data" },
   { TEXT_PLAIN, "txt,text", "Text File" },
@@ -963,11 +961,6 @@ nsExternalHelperAppService::DeleteTemporaryPrivateFileWhenPossible(nsIFile* aTem
   return DeleteTemporaryFileHelper(aTemporaryFile, mTemporaryPrivateFilesList);
 }
 
-void nsExternalHelperAppService::FixFilePermissions(nsIFile* aFile)
-{
-  // This space intentionally left blank
-}
-
 void nsExternalHelperAppService::ExpungeTemporaryFilesHelper(nsCOMArray<nsIFile> &fileList)
 {
   int32_t numEntries = fileList.Count();
@@ -1086,8 +1079,8 @@ nsExternalHelperAppService::Observe(nsISupports *aSubject, const char *aTopic, c
 // begin external app handler implementation 
 //////////////////////////////////////////////////////////////////////////////////////////////////////
 
-NS_IMPL_THREADSAFE_ADDREF(nsExternalAppHandler)
-NS_IMPL_THREADSAFE_RELEASE(nsExternalAppHandler)
+NS_IMPL_ADDREF(nsExternalAppHandler)
+NS_IMPL_RELEASE(nsExternalAppHandler)
 
 NS_INTERFACE_MAP_BEGIN(nsExternalAppHandler)
    NS_INTERFACE_MAP_ENTRY_AMBIGUOUS(nsISupports, nsIStreamListener)

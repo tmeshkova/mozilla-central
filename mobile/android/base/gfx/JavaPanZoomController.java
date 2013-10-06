@@ -806,7 +806,11 @@ class JavaPanZoomController
         if (FloatUtils.fuzzyEquals(displacement.x, 0.0f) && FloatUtils.fuzzyEquals(displacement.y, 0.0f)) {
             return;
         }
-        if (! mSubscroller.scrollBy(displacement)) {
+        if (mSubscroller.scrollBy(displacement)) {
+            synchronized (mTarget.getLock()) {
+                mTarget.onSubdocumentScrollBy(displacement.x, displacement.y);
+            }
+        } else {
             synchronized (mTarget.getLock()) {
                 scrollBy(displacement.x, displacement.y);
             }
@@ -1052,6 +1056,12 @@ class JavaPanZoomController
         protected float getPageStart() { return getMetrics().pageRectLeft; }
         @Override
         protected float getPageLength() { return getMetrics().getPageWidthWithMargins(); }
+        @Override
+        protected boolean marginsHidden() {
+            ImmutableViewportMetrics metrics = getMetrics();
+            RectF maxMargins = mTarget.getMaxMargins();
+            return (metrics.marginLeft < maxMargins.left || metrics.marginRight < maxMargins.right);
+        }
     }
 
     private class AxisY extends Axis {
@@ -1064,6 +1074,12 @@ class JavaPanZoomController
         protected float getPageStart() { return getMetrics().pageRectTop; }
         @Override
         protected float getPageLength() { return getMetrics().getPageHeightWithMargins(); }
+        @Override
+        protected boolean marginsHidden() {
+            ImmutableViewportMetrics metrics = getMetrics();
+            RectF maxMargins = mTarget.getMaxMargins();
+            return (metrics.marginTop < maxMargins.top || metrics.marginBottom < maxMargins.bottom);
+        }
     }
 
     /*
@@ -1352,5 +1368,10 @@ class JavaPanZoomController
     @Override
     public int getOverScrollMode() {
         return mX.getOverScrollMode();
+    }
+
+    @Override
+    public void updateScrollOffset(float cssX, float cssY) {
+        // Nothing to update, this class doesn't store the scroll offset locally.
     }
 }
