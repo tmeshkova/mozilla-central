@@ -68,7 +68,10 @@ EmbedLiteCompositorParent::AllocPLayerTransactionParent(const nsTArray<LayersBac
 bool
 EmbedLiteCompositorParent::IsGLBackend()
 {
-  return EmbedLiteApp::GetInstance()->IsAccelerated();
+  LayerManagerComposite* mgr = GetLayerManager();
+  NS_ENSURE_TRUE(mgr, false);
+
+  return mgr->GetCompositor()->GetBackend() == mozilla::layers::LAYERS_OPENGL;
 }
 
 bool EmbedLiteCompositorParent::RenderToContext(gfxContext* aContext)
@@ -92,23 +95,23 @@ bool EmbedLiteCompositorParent::RenderGL(mozilla::embedlite::EmbedLiteRenderTarg
 
   LayerManagerComposite* mgr = GetLayerManager();
 
-  if (mgr && IsGLBackend() && aTarget) {
+  if (IsGLBackend() && aTarget) {
     static_cast<CompositorOGL*>(mgr->GetCompositor())->SetUserRenderTarget(aTarget->GetRenderSurface());
   }
 
-  if (mgr && !mgr->GetRoot()) {
+  if (!mgr->GetRoot()) {
     retval = false;
   }
 
-  if (mgr && IsGLBackend()) {
+  if (IsGLBackend()) {
     mgr->SetWorldTransform(mWorldTransform);
   }
-  if (mgr && !mActiveClipping.IsEmpty() && mgr->GetRoot()) {
+  if (!mActiveClipping.IsEmpty() && mgr->GetRoot()) {
     mgr->GetRoot()->SetClipRect(&mActiveClipping);
   }
   CompositorParent::Composite();
 
-  if (mgr && IsGLBackend() && aTarget) {
+  if (IsGLBackend() && aTarget) {
     static_cast<CompositorOGL*>(mgr->GetCompositor())->SetUserRenderTarget(nullptr);
   }
 
