@@ -250,6 +250,7 @@ EmbedLiteViewThreadParent::UpdateScrollController()
     } else {
       return;
     }
+#warning "Maybe Need to switch to APZCTreeManager"
     mController = new AsyncPanZoomController(0, mGeckoController, type);
     mController->SetCompositorParent(mCompositor);
     mController->UpdateCompositionBounds(ScreenIntRect(0, 0, mViewSize.width, mViewSize.height));
@@ -415,7 +416,6 @@ EmbedLiteViewThreadParent::RecvUpdateZoomConstraints(const bool& val, const floa
 {
   if (mController) {
     mController->UpdateZoomConstraints(val, CSSToScreenScale(min), CSSToScreenScale(max));
-
   }
   return true;
 }
