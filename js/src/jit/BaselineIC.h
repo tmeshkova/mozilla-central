@@ -18,7 +18,7 @@
 #include "jit/BaselineRegisters.h"
 
 namespace js {
-namespace ion {
+namespace jit {
 
 //
 // Baseline Inline Caches are polymorphic caches that aggressively
@@ -1029,6 +1029,7 @@ class ICStubCompiler
         JS_ASSERT(!regs.has(BaselineStackReg));
 #ifdef JS_CPU_ARM
         JS_ASSERT(!regs.has(BaselineTailCallReg));
+        regs.take(BaselineSecondScratchReg);
 #endif
         regs.take(BaselineFrameReg);
         regs.take(BaselineStubReg);
@@ -2787,6 +2788,9 @@ class ICGetElem_Fallback : public ICMonitoredFallbackStub
       : ICMonitoredFallbackStub(ICStub::GetElem_Fallback, stubCode)
     { }
 
+    static const uint16_t EXTRA_NON_NATIVE = 0x1;
+    static const uint16_t EXTRA_NEGATIVE_INDEX = 0x2;
+
   public:
     static const uint32_t MAX_OPTIMIZED_STUBS = 16;
 
@@ -2797,10 +2801,17 @@ class ICGetElem_Fallback : public ICMonitoredFallbackStub
     }
 
     void noteNonNativeAccess() {
-        extra_ = 1;
+        extra_ |= EXTRA_NON_NATIVE;
     }
     bool hasNonNativeAccess() const {
-        return extra_;
+        return extra_ & EXTRA_NON_NATIVE;
+    }
+
+    void noteNegativeIndex() {
+        extra_ |= EXTRA_NEGATIVE_INDEX;
+    }
+    bool hasNegativeIndex() const {
+        return extra_ & EXTRA_NEGATIVE_INDEX;
     }
 
     // Compiler for this stub kind.
@@ -5608,7 +5619,7 @@ class ICRetSub_Resume : public ICStub
     };
 };
 
-} // namespace ion
+} // namespace jit
 } // namespace js
 
 #endif // JS_ION

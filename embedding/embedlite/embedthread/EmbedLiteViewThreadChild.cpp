@@ -20,6 +20,7 @@
 #include "nsIDocShell.h"
 #include "nsIFocusManager.h"
 #include "nsFocusManager.h"
+#include "nsIDOMDocument.h"
 
 #include "nsIDOMWindowUtils.h"
 #include "nsPIDOMWindow.h"
@@ -570,7 +571,7 @@ EmbedLiteViewThreadChild::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
 
   if (sPostAZPCAsJson.viewport) {
     nsString data;
-    mozilla::CSSToScreenScale resolution = aFrameMetrics.CalculateResolution();
+    mozilla::CSSToScreenScale resolution = aFrameMetrics.mZoom;
     data.AppendPrintf("{ \"x\" : %d", NS_lround(aFrameMetrics.mScrollOffset.x));
     data.AppendPrintf(", \"y\" : %d", NS_lround(aFrameMetrics.mScrollOffset.y));
     data.AppendPrintf(", \"viewport\" : ");

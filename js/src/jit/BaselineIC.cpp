@@ -24,7 +24,7 @@
 #include "vm/ScopeObject-inl.h"
 
 namespace js {
-namespace ion {
+namespace jit {
 
 #ifdef DEBUG
 void
@@ -857,7 +857,7 @@ DoUseCountFallback(JSContext *cx, ICUseCount_Fallback *stub, BaselineFrame *fram
     *infoPtr = NULL;
 
     // A TI OOM will disable TI and Ion.
-    if (!ion::IsEnabled(cx))
+    if (!jit::IsIonEnabled(cx))
         return true;
 
     RootedScript script(cx, frame->script());
@@ -3597,6 +3597,12 @@ TryAttachGetElemStub(JSContext *cx, HandleScript script, ICGetElem_Fallback *stu
     // Ion does not generate a cache for this op.
     if (!obj->isNative() && !obj->is<TypedArrayObject>())
         stub->noteNonNativeAccess();
+
+    // GetElem operations which could access negative indexes generally can't
+    // be optimized without the potential for bailouts, as we can't statically
+    // determine that an object has no properties on such indexes.
+    if (rhs.isNumber() && rhs.toNumber() < 0)
+        stub->noteNegativeIndex();
 
     return true;
 }
@@ -8610,5 +8616,5 @@ ICGetProp_DOMProxyShadowed::ICGetProp_DOMProxyShadowed(IonCode *stubCode,
     pcOffset_(pcOffset)
 { }
 
-} // namespace ion
+} // namespace jit
 } // namespace js

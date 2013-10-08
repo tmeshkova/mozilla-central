@@ -4,15 +4,20 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/layers/TextureClient.h"
-#include "mozilla/layers/TextureClientOGL.h"
-
-#include "mozilla/layers/ImageClient.h"
-#include "mozilla/layers/CanvasClient.h"
-#include "mozilla/layers/ContentClient.h"
-#include "mozilla/layers/ShadowLayers.h"
+#include <stdint.h>                     // for uint8_t, uint32_t, etc
+#include "Layers.h"                     // for Layer, etc
+#include "gfxContext.h"                 // for gfxContext, etc
+#include "gfxPlatform.h"                // for gfxPlatform
+#include "gfxPoint.h"                   // for gfxIntSize, gfxSize
+#include "gfxReusableSurfaceWrapper.h"  // for gfxReusableSurfaceWrapper
+#include "mozilla/gfx/BaseSize.h"       // for BaseSize
+#include "mozilla/ipc/SharedMemory.h"   // for SharedMemory, etc
+#include "mozilla/layers/CompositableClient.h"  // for CompositableClient
+#include "mozilla/layers/CompositableForwarder.h"
+#include "mozilla/layers/ISurfaceAllocator.h"
+#include "mozilla/layers/ImageDataSerializer.h"
+#include "mozilla/layers/ShadowLayers.h"  // for ShadowLayerForwarder
 #include "mozilla/layers/SharedPlanarYCbCrImage.h"
-#include "GLContext.h"
-#include "BasicLayers.h" // for PaintContext
 #include "mozilla/layers/YCbCrImageDataSerializer.h"
 #include "gfxReusableSurfaceWrapper.h"
 #include "gfxPlatform.h"
@@ -20,6 +25,15 @@
 #include "gfx2DGlue.h"
 
 #include <stdint.h>
+#include "nsDebug.h"                    // for NS_ASSERTION, NS_WARNING, etc
+#include "nsTraceRefcnt.h"              // for MOZ_COUNT_CTOR, etc
+
+#ifdef MOZ_ANDROID_OMTC
+#  include "gfxReusableImageSurfaceWrapper.h"
+#  include "gfxImageSurface.h"
+#else
+#  include "gfxSharedImageSurface.h"
+#endif
 
 using namespace mozilla::gl;
 
@@ -29,6 +43,7 @@ namespace layers {
 TextureClient::TextureClient(TextureFlags aFlags)
   : mID(0)
   , mFlags(aFlags)
+  , mShared(false)
 {}
 
 TextureClient::~TextureClient()
@@ -37,9 +52,18 @@ TextureClient::~TextureClient()
 bool
 TextureClient::ShouldDeallocateInDestructor() const
 {
-  return IsAllocated() &&
-         !IsSharedWithCompositor() &&
-         !(GetFlags() & (TEXTURE_DEALLOCATE_HOST | TEXTURE_DEALLOCATE_CLIENT));
+  if (!IsAllocated()) {
+    return false;
+  }
+  if (GetFlags() & TEXTURE_DEALLOCATE_CLIENT) {
+    return true;
+  }
+
+  // If we're meant to be deallocated by the host,
+  // but we haven't been shared yet, then we should
+  // deallocate on the client instead.
+  return (GetFlags() & TEXTURE_DEALLOCATE_HOST) &&
+         !IsSharedWithCompositor();
 }
 
 bool
@@ -157,6 +181,7 @@ bool
 BufferTextureClient::UpdateSurface(gfxASurface* aSurface)
 {
   MOZ_ASSERT(aSurface);
+  MOZ_ASSERT(!IsImmutable());
 
   ImageDataSerializer serializer(GetBuffer());
   if (!serializer.IsValid()) {
@@ -173,7 +198,7 @@ BufferTextureClient::UpdateSurface(gfxASurface* aSurface)
   tmpCtx->DrawSurface(aSurface, gfxSize(serializer.GetSize().width,
                                         serializer.GetSize().height));
 
-  if (TextureRequiresLocking(mFlags)) {
+  if (TextureRequiresLocking(mFlags) && !ImplementsLocking()) {
     // We don't have support for proper locking yet, so we'll
     // have to be immutable instead.
     MarkImmutable();

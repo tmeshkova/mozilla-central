@@ -12,6 +12,7 @@
 #include "EmbedTabChildGlobal.h"
 #include "EmbedLiteViewThreadChild.h"
 #include "mozilla/layers/AsyncPanZoomController.h"
+#include "nsIDOMDocument.h"
 
 #include "nsNetUtil.h"
 #include "nsEventListenerManager.h"
@@ -235,7 +236,7 @@ TabChildHelper::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
   utils->SetScrollPositionClampingScrollPortSize(
     cssCompositedRect.width, cssCompositedRect.height);
   ScrollWindowTo(window, aFrameMetrics.mScrollOffset);
-  CSSToScreenScale resolution = aFrameMetrics.CalculateResolution();
+  CSSToScreenScale resolution = aFrameMetrics.mZoom;
   utils->SetResolution(resolution.scale, resolution.scale);
 
   nsCOMPtr<nsIDOMDocument> domDoc;

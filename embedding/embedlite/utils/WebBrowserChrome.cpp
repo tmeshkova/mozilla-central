@@ -28,6 +28,7 @@
 #include "nsIDOMScrollAreaEvent.h"
 #include "nsISerializable.h"
 #include "nsIEmbedBrowserChromeListener.h"
+#include "nsIDOMDocument.h"
 
 #define MOZ_AFTER_PAINT_LITERAL "MozAfterPaint"
 #define MOZ_scroll "scroll"

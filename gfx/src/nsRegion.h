@@ -8,7 +8,7 @@
 
 #include "nsRect.h"
 #include "nsPoint.h"
-#include "nsString.h"
+#include "nsStringGlue.h"
 
 class nsIntRegion;
 

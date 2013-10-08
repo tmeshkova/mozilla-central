@@ -416,7 +416,8 @@ bool
 EmbedLiteViewThreadParent::RecvUpdateZoomConstraints(const bool& val, const float& min, const float& max)
 {
   if (mController) {
-    mController->UpdateZoomConstraints(val, min, max);
+    mController->UpdateZoomConstraints(val, CSSToScreenScale(min), CSSToScreenScale(max));
+
   }
   return true;
 }

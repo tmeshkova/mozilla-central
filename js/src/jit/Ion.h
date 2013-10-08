@@ -18,7 +18,7 @@
 #include "jit/IonCode.h"
 
 namespace js {
-namespace ion {
+namespace jit {
 
 class TempAllocator;
 
@@ -92,11 +92,6 @@ struct IonOptions
     //
     // Default: true
     bool eaa;
-
-    // Toggles whether compilation occurs off the main thread.
-    //
-    // Default: true iff there are at least two CPUs available
-    bool parallelCompilation;
 
 #ifdef CHECK_OSIPOINT_REGISTERS
     // Emit extra code to verify live regs at the start of a VM call
@@ -204,8 +199,6 @@ struct IonOptions
         eagerCompilation = true;
         usesBeforeCompile = 0;
         baselineUsesBeforeCompile = 0;
-
-        parallelCompilation = false;
     }
 
     IonOptions()
@@ -221,7 +214,6 @@ struct IonOptions
         checkRangeAnalysis(false),
         uce(true),
         eaa(true),
-        parallelCompilation(false),
 #ifdef CHECK_OSIPOINT_REGISTERS
         checkOsiPointRegisters(false),
 #endif
@@ -367,7 +359,7 @@ void AttachFinishedCompilations(JSContext *cx);
 void FinishOffThreadBuilder(IonBuilder *builder);
 
 static inline bool
-IsEnabled(JSContext *cx)
+IsIonEnabled(JSContext *cx)
 {
     return cx->hasOption(JSOPTION_ION) &&
         cx->hasOption(JSOPTION_BASELINE) &&
@@ -393,7 +385,7 @@ void TraceIonScripts(JSTracer* trc, JSScript *script);
 
 void TriggerOperationCallbackForIonCode(JSRuntime *rt, JSRuntime::OperationCallbackTrigger trigger);
 
-} // namespace ion
+} // namespace jit
 } // namespace js
 
 #endif // JS_ION

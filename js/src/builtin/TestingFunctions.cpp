@@ -896,7 +896,7 @@ static bool
 EnableOsiPointRegisterChecks(JSContext *, unsigned, jsval *vp)
 {
 #ifdef CHECK_OSIPOINT_REGISTERS
-    ion::js_IonOptions.checkOsiPointRegisters = true;
+    jit::js_IonOptions.checkOsiPointRegisters = true;
 #endif
     JS_SET_RVAL(cx, vp, JSVAL_VOID);
     return true;
@@ -928,15 +928,17 @@ js::testingFunc_inParallelSection(JSContext *cx, unsigned argc, jsval *vp)
     return true;
 }
 
-static JSObject *objectMetadataFunction = NULL;
+static const char *ObjectMetadataPropertyName = "__objectMetadataFunction__";
 
 static bool
 ShellObjectMetadataCallback(JSContext *cx, JSObject **pmetadata)
 {
-    Value thisv = UndefinedValue();
+    RootedValue fun(cx);
+    if (!JS_GetProperty(cx, cx->global(), ObjectMetadataPropertyName, &fun))
+        return false;
 
     RootedValue rval(cx);
-    if (!Invoke(cx, thisv, ObjectValue(*objectMetadataFunction), 0, NULL, &rval))
+    if (!Invoke(cx, UndefinedValue(), fun, 0, NULL, &rval))
         return false;
 
     if (rval.isObject())
@@ -953,17 +955,15 @@ SetObjectMetadataCallback(JSContext *cx, unsigned argc, jsval *vp)
     args.rval().setUndefined();
 
     if (argc == 0 || !args[0].isObject() || !args[0].toObject().is<JSFunction>()) {
-        if (objectMetadataFunction)
-            JS_RemoveObjectRoot(cx, &objectMetadataFunction);
-        objectMetadataFunction = NULL;
+        if (!JS_DeleteProperty(cx, cx->global(), ObjectMetadataPropertyName))
+            return false;
         js::SetObjectMetadataCallback(cx, NULL);
         return true;
     }
 
-    if (!objectMetadataFunction && !JS_AddObjectRoot(cx, &objectMetadataFunction))
+    if (!JS_DefineProperty(cx, cx->global(), ObjectMetadataPropertyName, args[0], NULL, NULL, 0))
         return false;
 
-    objectMetadataFunction = &args[0].toObject();
     js::SetObjectMetadataCallback(cx, ShellObjectMetadataCallback);
     return true;
 }

@@ -35,7 +35,7 @@
 
 using namespace js;
 using namespace js::frontend;
-using namespace js::ion;
+using namespace js::jit;
 
 using mozilla::AddToHash;
 using mozilla::ArrayLength;
@@ -1276,6 +1276,8 @@ class MOZ_STACK_CLASS ModuleCompiler
     }
 
     bool failName(ParseNode *pn, const char *fmt, PropertyName *name) {
+        // This function is invoked without the caller properly rooting its locals.
+        gc::AutoSuppressGC suppress(cx_);
         JSAutoByteString bytes;
         if (AtomToPrintableString(cx_, name, &bytes))
             failf(pn, fmt, bytes.ptr());
@@ -2575,8 +2577,6 @@ CheckFunctionHead(ModuleCompiler &m, ParseNode *fn)
     JSFunction *fun = FunctionObject(fn);
     if (fun->hasRest())
         return m.fail(fn, "rest args not allowed");
-    if (fun->hasDefaults())
-        return m.fail(fn, "default args not allowed");
     if (fun->isExprClosure())
         return m.fail(fn, "expression closures not allowed");
     if (fn->pn_funbox->hasDestructuringArgs)
@@ -2590,7 +2590,7 @@ CheckArgument(ModuleCompiler &m, ParseNode *arg, PropertyName **name)
     if (!IsDefinition(arg))
         return m.fail(arg, "duplicate argument name not allowed");
 
-    if (MaybeDefinitionInitializer(arg))
+    if (arg->pn_dflags & PND_DEFAULT)
         return m.fail(arg, "default arguments not allowed");
 
     if (!CheckIdentifier(m, arg, arg->name()))
@@ -4607,7 +4607,7 @@ ParseFunction(ModuleCompiler &m, ParseNode **fnOut)
     AsmJSParseContext *outerpc = m.parser().pc;
 
     Directives directives(outerpc);
-    FunctionBox *funbox = m.parser().newFunctionBox(fn, fun, outerpc, directives);
+    FunctionBox *funbox = m.parser().newFunctionBox(fn, fun, outerpc, directives, NotGenerator);
     if (!funbox)
         return false;
 
@@ -4702,14 +4702,14 @@ GenerateCode(ModuleCompiler &m, ModuleCompiler::Func &func, MIRGenerator &mir, L
 
     m.masm().bind(func.code());
 
-    ScopedJSDeletePtr<CodeGenerator> codegen(ion::GenerateCode(&mir, &lir, &m.masm()));
+    ScopedJSDeletePtr<CodeGenerator> codegen(jit::GenerateCode(&mir, &lir, &m.masm()));
     if (!codegen)
         return m.fail(NULL, "internal codegen failure (probably out of memory)");
 
     if (!m.collectAccesses(mir))
         return false;
 
-    ion::IonScriptCounts *counts = codegen->extractUnassociatedScriptCounts();
+    jit::IonScriptCounts *counts = codegen->extractUnassociatedScriptCounts();
     if (counts && !m.addFunctionCounts(counts)) {
         js_delete(counts);
         return false;
@@ -4819,7 +4819,7 @@ ParallelCompilationEnabled(ExclusiveContext *cx)
     if (!cx->isJSContext())
         return cx->workerThreadState()->numThreads > 1;
 
-    return OffThreadCompilationEnabled(cx->asJSContext());
+    return OffThreadIonCompilationEnabled(cx->asJSContext()->runtime());
 }
 
 // State of compilation as tracked and updated by the main thread.
@@ -5378,7 +5378,7 @@ GenerateEntry(ModuleCompiler &m, const AsmJSModule::ExportedFunction &exportedFu
     masm.reserveStack(stackDec);
     //JS_ASSERT(masm.framePushed() % 8 == 0);
     if(getenv("GDB_BREAK")) {
-        masm.breakpoint(js::ion::Assembler::Always);
+        masm.breakpoint(js::jit::Assembler::Always);
     }
     // Copy parameters out of argv into the registers/stack-slots specified by
     // the system ABI.

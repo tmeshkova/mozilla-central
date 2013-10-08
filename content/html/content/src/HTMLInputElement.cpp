@@ -3,9 +3,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
-#include "mozilla/DebugOnly.h"
-
 #include "mozilla/dom/HTMLInputElement.h"
+
+#include "mozilla/DebugOnly.h"
+#include "mozilla/dom/Date.h"
 #include "mozilla/dom/HTMLInputElementBinding.h"
 #include "nsAsyncDOMEvent.h"
 #include "nsAttrValueInlines.h"
@@ -98,6 +99,7 @@
 
 #include "nsIColorPicker.h"
 #include "nsIStringEnumerator.h"
+#include "HTMLSplitOnSpacesTokenizer.h"
 
 // input type=date
 #include "js/Date.h"
@@ -1396,6 +1398,9 @@ HTMLInputElement::TabIndexDefault()
 uint32_t
 HTMLInputElement::Height()
 {
+  if (mType != NS_FORM_INPUT_IMAGE) {
+    return 0;
+  }
   return GetWidthHeightForImage(mCurrentRequest).height;
 }
 
@@ -1447,6 +1452,9 @@ HTMLInputElement::SetIndeterminate(bool aValue)
 uint32_t
 HTMLInputElement::Width()
 {
+  if (mType != NS_FORM_INPUT_IMAGE) {
+    return 0;
+  }
   return GetWidthHeightForImage(mCurrentRequest).width;
 }
 

@@ -1012,7 +1012,9 @@ RenderFrameParent::ContentReceivedTouch(bool aPreventDefault)
 }
 
 void
-RenderFrameParent::UpdateZoomConstraints(bool aAllowZoom, float aMinZoom, float aMaxZoom)
+RenderFrameParent::UpdateZoomConstraints(bool aAllowZoom,
+                                         const CSSToScreenScale& aMinZoom,
+                                         const CSSToScreenScale& aMaxZoom)
 {
   if (GetApzcTreeManager()) {
     GetApzcTreeManager()->UpdateZoomConstraints(ScrollableLayerGuid(mLayersId),
