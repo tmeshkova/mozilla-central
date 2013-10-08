@@ -88,8 +88,6 @@ static FT_Library gPlatformFTLibrary = nullptr;
 
 gfxQtPlatform::gfxQtPlatform()
 {
-    mPrefFonts.Init(50);
-
     if (!sFontconfigUtils)
         sFontconfigUtils = gfxFontconfigUtils::GetFontconfigUtils();
 

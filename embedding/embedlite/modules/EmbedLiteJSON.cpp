@@ -34,11 +34,6 @@ CreateObjectStatic(nsIWritablePropertyBag2 * *aObject)
     return NS_ERROR_OUT_OF_MEMORY;
   }
 
-  nsresult rv = hpb->Init();
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
-
   *aObject = hpb.forget().get();
   return NS_OK;
 }

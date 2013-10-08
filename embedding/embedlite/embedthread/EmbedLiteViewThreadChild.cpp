@@ -93,7 +93,6 @@ EmbedLiteViewThreadChild::EmbedLiteViewThreadChild(const uint32_t& aId, const ui
   mInitWindowTask = NewRunnableMethod(this,
                                       &EmbedLiteViewThreadChild::InitGeckoWindow, parentId);
   MessageLoop::current()->PostTask(FROM_HERE, mInitWindowTask);
-  mRegisteredMessages.Init();
 }
 
 EmbedLiteViewThreadChild::~EmbedLiteViewThreadChild()

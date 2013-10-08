@@ -63,7 +63,6 @@ EmbedLiteAppService::EmbedLiteAppService()
   : mPushedSomething(0)
   , mHandlingMessages(false)
 {
-  mMessageListeners.Init();
 }
 
 EmbedLiteAppService::~EmbedLiteAppService()
