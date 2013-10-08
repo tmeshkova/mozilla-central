@@ -25,10 +25,10 @@ EXPORTS.mozilla.embedlite += [
     'EmbedLiteMessagePump.h',
     'EmbedLiteRenderTarget.h',
     'EmbedLiteView.h',
-    'EmbedLog.h',
+    'utils/EmbedLog.h',
 ]
 
-EXPORTS.ipc = ['InputDataIPC.h']
+EXPORTS.ipc = ['embedhelpers/InputDataIPC.h']
 
 CPP_SOURCES += [
     'DirProvider.cpp',

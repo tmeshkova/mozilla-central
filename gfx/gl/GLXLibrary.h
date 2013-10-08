@@ -7,10 +7,13 @@
 #define GFX_GLXLIBRARY_H
 
 #include "GLContext.h"
+#include "GLContextTypes.h"
 #ifndef GLboolean_defined
 typedef realGLboolean GLboolean;
 #endif
 #include <GL/glx.h>
+
+struct PRLibrary;
 
 namespace mozilla {
 namespace gl {
@@ -101,7 +104,7 @@ public:
     bool SupportsTextureFromPixmap(gfxASurface* aSurface);
     bool IsATI() { return mIsATI; }
     bool GLXVersionCheck(int aMajor, int aMinor);
-    static LibraryType SelectLibrary(const GLContext::ContextFlags& aFlags);
+    static LibraryType SelectLibrary(const ContextFlags& aFlags);
 
 private:
     

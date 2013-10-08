@@ -9,6 +9,8 @@
 #include "EmbedLiteViewThreadParent.h"
 #include "EmbedLiteApp.h"
 #include "EmbedLiteView.h"
+#include "gfxImageSurface.h"
+#include "gfxContext.h"
 
 #include "EmbedLiteCompositorParent.h"
 #include "EmbedLiteRenderTarget.h"
