@@ -361,7 +361,6 @@ webidl_files = \
   TextDecoder.webidl \
   TextEncoder.webidl \
   TextTrack.webidl \
-  TextTrackCue.webidl \
   TextTrackCueList.webidl \
   TextTrackList.webidl \
   TimeEvent.webidl \
@@ -377,6 +376,7 @@ webidl_files = \
   URL.webidl \
   URLUtils.webidl \
   URLUtilsReadOnly.webidl \
+  VTTCue.webidl \
   ValidityState.webidl \
   VideoPlaybackQuality.webidl \
   VideoStreamTrack.webidl \
@@ -384,6 +384,7 @@ webidl_files = \
   WebComponents.webidl \
   WebSocket.webidl \
   WheelEvent.webidl \
+  WifiOptions.webidl \
   Window.webidl \
   WorkerLocation.webidl \
   WorkerNavigator.webidl \
@@ -498,6 +499,7 @@ webidl_files += \
   MozCellBroadcast.webidl \
   MozCellBroadcastEvent.webidl \
   MozEmergencyCbModeEvent.webidl \
+  MozOtaStatusEvent.webidl \
   MozVoicemailEvent.webidl \
   MozWifiConnectionInfoEvent.webidl \
   MozWifiStatusChangeEvent.webidl \

@@ -349,18 +349,21 @@ CallAsmJS(JSContext *cx, unsigned argc, Value *vp)
     }
 
     {
+        // Each call into an asm.js module requires an AsmJSActivation record
+        // pushed on a stack maintained by the runtime. This record is used for
+        // to handle a variety of exceptional things that can happen in asm.js
+        // code.
         AsmJSActivation activation(cx, module);
+
+        // Eagerly push an IonContext+JitActivation so that the optimized
+        // asm.js-to-Ion FFI call path (which we want to be very fast) can
+        // avoid doing so.
         jit::IonContext ictx(cx, NULL);
         JitActivation jitActivation(cx, /* firstFrameIsConstructing = */ false, /* active */ false);
 
-        // Call into generated code.
-#ifdef JS_CPU_ARM
-        if (!func.code()(coercedArgs.begin(), module.globalData()))
+        // Call the per-exported-function trampoline created by GenerateEntry.
+        if (!module.entryTrampoline(func)(coercedArgs.begin(), module.globalData()))
             return false;
-#else
-        if (!func.code()(coercedArgs.begin()))
-            return false;
-#endif
     }
 
     switch (func.returnType()) {

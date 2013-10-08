@@ -5,6 +5,11 @@
 
 TOOL_DIRS += ['tests']
 
+MODULE = 'embedlite'
+LIBRARY_NAME = 'embedlite'
+FAIL_ON_WARNINGS = True
+LIBXUL_LIBRARY = True
+
 XPIDL_SOURCES += [
     'modules/nsIEmbedAppService.idl',
     'modules/nsIEmbedLiteJSON.idl',
@@ -12,10 +17,6 @@ XPIDL_SOURCES += [
 ]
 
 XPIDL_MODULE = 'embedLite'
-MODULE = 'embedLite'
-LIBXUL_LIBRARY = True
-
-LIBRARY_NAME = 'embedlite'
 
 EXPORTS.mozilla.embedlite += [
     'EmbedInitGlue.h',

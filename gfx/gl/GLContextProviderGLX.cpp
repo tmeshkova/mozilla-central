@@ -954,7 +954,7 @@ TRY_AGAIN_NO_SHARING:
 
     bool TextureImageSupportsGetBackingSurface()
     {
-        return mGLX->UseTextureFromPixmap();
+        return false;
     }
 
     virtual already_AddRefed<TextureImage>
