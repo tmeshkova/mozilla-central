@@ -10,6 +10,7 @@
 #include "nsDOMEventTargetHelper.h"
 #include "nsIScriptObjectPrincipal.h"
 #include "nsITabChild.h"
+#include "nsEventDispatcher.h"
 
 namespace mozilla {
 namespace embedlite {
@@ -71,11 +72,18 @@ public:
                                                     optional_argc);
   }
 
+  nsresult
+  PreHandleEvent(nsEventChainPreVisitor& aVisitor)
+  {
+    aVisitor.mForceContentDispatch = true;
+    return NS_OK;
+  }
+
   virtual nsIScriptObjectPrincipal* GetObjectPrincipal() {
     return this;
   }
-  virtual JSContext* GetJSContextForEventHandlers();
-  virtual nsIPrincipal* GetPrincipal();
+  virtual JSContext* GetJSContextForEventHandlers() MOZ_OVERRIDE;
+  virtual nsIPrincipal* GetPrincipal() MOZ_OVERRIDE;
 
   TabChildHelper* mTabChild;
   nsRefPtr<nsFrameMessageManager> mMessageManager;
