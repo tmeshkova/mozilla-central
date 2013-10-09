@@ -604,12 +604,11 @@ TabChildHelper::RecvAsyncMessage(const nsAString& aMessage,
                                  const nsAString& aJSONData)
 {
   NS_ENSURE_TRUE(InitTabChildGlobal(), false);
-  MOZ_ASSERT(NS_IsMainThread());
-  AutoSafeJSContext cx;
-  JS::Rooted<JS::Value> json(cx, JSVAL_NULL);
+  JSAutoRequest ar(GetJSContext());
+  JS::Rooted<JS::Value> json(GetJSContext(), JS::NullValue());
   StructuredCloneData cloneData;
   JSAutoStructuredCloneBuffer buffer;
-  if (JS_ParseJSON(cx,
+  if (JS_ParseJSON(GetJSContext(),
                    static_cast<const jschar*>(aJSONData.BeginReading()),
                    aJSONData.Length(),
                    &json)) {
