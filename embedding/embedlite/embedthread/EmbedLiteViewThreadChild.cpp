@@ -20,11 +20,11 @@
 #include "nsIDocShell.h"
 #include "nsIFocusManager.h"
 #include "nsFocusManager.h"
-#include "nsIDOMDocument.h"
 
 #include "nsIDOMWindowUtils.h"
 #include "nsPIDOMWindow.h"
 #include "nsIDocument.h"
+#include "nsIDOMDocument.h"
 #include "nsIPresShell.h"
 #include "mozilla/layers/AsyncPanZoomController.h"
 #include "nsIScriptSecurityManager.h"

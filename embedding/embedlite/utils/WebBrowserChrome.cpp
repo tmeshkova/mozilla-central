@@ -8,6 +8,8 @@
 
 #include "WebBrowserChrome.h"
 #include "nsIDOMWindow.h"
+#include "nsIDOMDocument.h"
+#include "nsIDocument.h"
 #include "nsIDocShellTreeItem.h"
 #include "nsIDocShell.h"
 #include "nsIWebProgress.h"
@@ -28,7 +30,6 @@
 #include "nsIDOMScrollAreaEvent.h"
 #include "nsISerializable.h"
 #include "nsIEmbedBrowserChromeListener.h"
-#include "nsIDOMDocument.h"
 
 #define MOZ_AFTER_PAINT_LITERAL "MozAfterPaint"
 #define MOZ_scroll "scroll"
