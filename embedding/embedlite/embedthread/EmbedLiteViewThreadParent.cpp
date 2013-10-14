@@ -24,12 +24,29 @@ using namespace mozilla::widget;
 namespace mozilla {
 namespace embedlite {
 
+class EmbedAsyncPanZoomController : public AsyncPanZoomController
+{
+  public:
+    EmbedAsyncPanZoomController(uint64_t aLayersId,
+                                APZCTreeManager* aTreeManager,
+                                GeckoContentController* aGeckoContentController,
+                                GestureBehavior aGestures)
+      : AsyncPanZoomController(aLayersId, aTreeManager, aGeckoContentController, aGestures)
+    { }
+
+    void HandlePanEnd() {
+        ScheduleComposite();
+        RequestContentRepaint();
+    }
+};
+
 class EmbedContentController : public GeckoContentController
 {
   public:
     EmbedContentController(EmbedLiteViewThreadParent* aRenderFrame)
       : mUILoop(MessageLoop::current())
       , mRenderFrame(aRenderFrame)
+      , mAsyncPanZoomController(0)
     { }
 
     virtual void RequestContentRepaint(const FrameMetrics& aFrameMetrics) MOZ_OVERRIDE {
@@ -87,6 +104,12 @@ class EmbedContentController : public GeckoContentController
       EmbedLiteViewListener* listener = GetListener();
       if (listener && !listener->HandleLongTap(nsIntPoint(aPoint.x, aPoint.y))) {
         unused << mRenderFrame->SendHandleLongTap(nsIntPoint(aPoint.x, aPoint.y));
+      }
+    }
+
+    virtual void HandlePanEnd() MOZ_OVERRIDE {
+      if (mAsyncPanZoomController) {
+          mAsyncPanZoomController->HandlePanEnd();
       }
     }
 
@@ -151,6 +174,10 @@ class EmbedContentController : public GeckoContentController
       MessageLoop::current()->PostDelayedTask(FROM_HERE, aTask, aDelayMs);
     }
 
+    void SetAsyncPanZoomController(EmbedAsyncPanZoomController* aEmbedAsyncPanZoomController) {
+      mAsyncPanZoomController = aEmbedAsyncPanZoomController;
+    }
+
   private:
     EmbedLiteViewListener* GetListener() {
       return mRenderFrame && mRenderFrame->mView ?
@@ -166,6 +193,7 @@ class EmbedContentController : public GeckoContentController
 
     MessageLoop* mUILoop;
     EmbedLiteViewThreadParent* mRenderFrame;
+    EmbedAsyncPanZoomController* mAsyncPanZoomController;
 };
 
 EmbedLiteViewThreadParent::EmbedLiteViewThreadParent(const uint32_t& id, const uint32_t& parentId)
@@ -193,6 +221,7 @@ EmbedLiteViewThreadParent::~EmbedLiteViewThreadParent()
   bool mHadCompositor = mCompositor.get() != nullptr;
   if (mGeckoController) {
     mGeckoController->ClearRenderFrame();
+    mGeckoController->SetAsyncPanZoomController(0);
   }
   if (mController) {
     mController->SetCompositorParent(nullptr);
@@ -216,6 +245,7 @@ EmbedLiteViewThreadParent::ActorDestroy(ActorDestroyReason aWhy)
   LOGT("reason:%i", aWhy);
   if (mGeckoController) {
     mGeckoController->ClearRenderFrame();
+    mGeckoController->SetAsyncPanZoomController(0);
   }
   if (mController) {
     mController->Destroy();
@@ -251,9 +281,10 @@ EmbedLiteViewThreadParent::UpdateScrollController()
       return;
     }
 #warning "Maybe Need to switch to APZCTreeManager"
-    mController = new AsyncPanZoomController(0, nullptr, mGeckoController, type);
+    mController = new EmbedAsyncPanZoomController(0, nullptr, mGeckoController, type);
     mController->SetCompositorParent(mCompositor);
     mController->UpdateCompositionBounds(ScreenIntRect(0, 0, mViewSize.width, mViewSize.height));
+    mGeckoController->SetAsyncPanZoomController(mController);
   }
 }
 
