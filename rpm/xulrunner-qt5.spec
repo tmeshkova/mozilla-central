@@ -23,6 +23,8 @@ BuildRequires:  pkgconfig(nemo-gstreamer-interfaces-0.10)
 %ifarch %arm
 BuildRequires:  pkgconfig(libresourceqt5)
 %endif
+BuildRequires:  pkgconfig(Qt5Positioning)
+BuildRequires:  pkgconfig(Qt0Feedback)
 BuildRequires:  qt5-qttools
 BuildRequires:  qt5-default
 BuildRequires:  autoconf213
