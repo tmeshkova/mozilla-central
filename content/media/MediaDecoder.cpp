@@ -26,6 +26,9 @@
 #ifdef MOZ_WMF
 #include "WMFDecoder.h"
 #endif
+#ifdef HAS_NEMO_RESOURCE
+#include "NemoResourceHandler.h"
+#endif
 
 using namespace mozilla::layers;
 using namespace mozilla::dom;
@@ -148,6 +151,9 @@ void MediaDecoder::SetDormantIfNecessary(bool aDormant)
 void MediaDecoder::Pause()
 {
   MOZ_ASSERT(NS_IsMainThread());
+#ifdef HAS_NEMO_RESOURCE
+  NemoResourceHandler::ReleaseResources(this);
+#endif
   ReentrantMonitorAutoEnter mon(GetReentrantMonitor());
   if ((mPlayState == PLAY_STATE_LOADING && mIsDormant)  || mPlayState == PLAY_STATE_SEEKING || mPlayState == PLAY_STATE_ENDED) {
     mNextState = PLAY_STATE_PAUSED;
@@ -385,6 +391,9 @@ MediaDecoder::MediaDecoder() :
   MOZ_COUNT_CTOR(MediaDecoder);
   MOZ_ASSERT(NS_IsMainThread());
   MediaMemoryTracker::AddMediaDecoder(this);
+#ifdef HAS_NEMO_RESOURCE
+  NemoResourceHandler::CreatedDecoder(this);
+#endif
 #ifdef PR_LOGGING
   if (!gMediaDecoderLog) {
     gMediaDecoderLog = PR_NewLogModule("MediaDecoder");
@@ -440,6 +449,9 @@ MediaDecoder::~MediaDecoder()
 {
   MOZ_ASSERT(NS_IsMainThread());
   MediaMemoryTracker::RemoveMediaDecoder(this);
+#ifdef HAS_NEMO_RESOURCE
+  NemoResourceHandler::DestroyedDecoder(this);
+#endif
   UnpinForSeek();
   MOZ_COUNT_DTOR(MediaDecoder);
 }
@@ -551,6 +563,9 @@ nsresult MediaDecoder::Play()
   NS_ASSERTION(mDecoderStateMachine != nullptr, "Should have state machine.");
   nsresult res = ScheduleStateMachineThread();
   NS_ENSURE_SUCCESS(res,res);
+#ifdef HAS_NEMO_RESOURCE
+  NemoResourceHandler::AquireResources(this);
+#endif
   if ((mPlayState == PLAY_STATE_LOADING && mIsDormant) || mPlayState == PLAY_STATE_SEEKING) {
     mNextState = PLAY_STATE_PLAYING;
     return NS_OK;
