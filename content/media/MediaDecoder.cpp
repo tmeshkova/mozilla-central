@@ -391,9 +391,6 @@ MediaDecoder::MediaDecoder() :
   MOZ_COUNT_CTOR(MediaDecoder);
   MOZ_ASSERT(NS_IsMainThread());
   MediaMemoryTracker::AddMediaDecoder(this);
-#ifdef HAS_NEMO_RESOURCE
-  NemoResourceHandler::CreatedDecoder(this);
-#endif
 #ifdef PR_LOGGING
   if (!gMediaDecoderLog) {
     gMediaDecoderLog = PR_NewLogModule("MediaDecoder");
@@ -449,9 +446,6 @@ MediaDecoder::~MediaDecoder()
 {
   MOZ_ASSERT(NS_IsMainThread());
   MediaMemoryTracker::RemoveMediaDecoder(this);
-#ifdef HAS_NEMO_RESOURCE
-  NemoResourceHandler::DestroyedDecoder(this);
-#endif
   UnpinForSeek();
   MOZ_COUNT_DTOR(MediaDecoder);
 }
