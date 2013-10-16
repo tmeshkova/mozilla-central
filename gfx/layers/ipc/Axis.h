@@ -81,7 +81,7 @@ public:
    * its amount is written to |aOverscrollAmountOut|.
    * The adjusted displacement is returned.
    */
-  float AdjustDisplacement(float aDisplacement, float& aOverscrollAmountOut, float aScale);
+  float AdjustDisplacement(float aDisplacement, float& aOverscrollAmountOut);
 
   /**
    * Gets the distance between the starting position of the touch supplied in

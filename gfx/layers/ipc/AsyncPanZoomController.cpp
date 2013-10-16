@@ -776,9 +776,8 @@ void AsyncPanZoomController::AttemptScroll(const ScreenPoint& aStartPoint,
     CSSPoint cssDisplacement = displacement / zoom;
 
     CSSPoint cssOverscroll;
-    ScreenToCSSScale inverseResolution = mFrameMetrics.mZoom.Inverse();
-    gfx::Point scrollOffset(mX.AdjustDisplacement(cssDisplacement.x, cssOverscroll.x, inverseResolution.scale),
-                            mY.AdjustDisplacement(cssDisplacement.y, cssOverscroll.y, inverseResolution.scale));
+    gfx::Point scrollOffset(mX.AdjustDisplacement(cssDisplacement.x, cssOverscroll.x),
+                            mY.AdjustDisplacement(cssDisplacement.y, cssOverscroll.y));
     overscroll = cssOverscroll * zoom;
 
     if (fabs(scrollOffset.x) > EPSILON || fabs(scrollOffset.y) > EPSILON) {
@@ -846,10 +845,9 @@ bool AsyncPanZoomController::DoFling(const TimeDuration& aDelta) {
   // Inversely scale the offset by the resolution (when you're zoomed further in,
   // a larger swipe should move you a shorter distance).
   CSSPoint cssOffset = offset / mFrameMetrics.mZoom;
-  ScreenToCSSScale inverseResolution = mFrameMetrics.mZoom.Inverse();
   ScrollBy(CSSPoint::FromUnknownPoint(gfx::Point(
-    mX.AdjustDisplacement(cssOffset.x, overscroll.x, inverseResolution.scale),
-    mY.AdjustDisplacement(cssOffset.y, overscroll.y, inverseResolution.scale)
+    mX.AdjustDisplacement(cssOffset.x, overscroll.x),
+    mY.AdjustDisplacement(cssOffset.y, overscroll.y)
   )));
   TimeDuration timePaintDelta = mPaintThrottler.TimeSinceLastRequest(GetFrameTime());
   if (timePaintDelta.ToMilliseconds() > gFlingRepaintInterval) {
