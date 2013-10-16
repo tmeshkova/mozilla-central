@@ -268,7 +268,7 @@ nsEventStatus GestureEventListener::HandlePinchGestureEvent(const MultiTouchInpu
 
     mAsyncPanZoomController->HandleInputEvent(pinchEvent);
 
-    CancelGesture();
+    mState = GESTURE_NONE;
 
     rv = nsEventStatus_eConsumeNoDefault;
   }
