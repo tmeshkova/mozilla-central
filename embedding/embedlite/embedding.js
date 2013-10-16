@@ -63,6 +63,7 @@ pref("gfx.axis.fling_friction", "0.00345f");
 pref("gfx.azpc.min_skate_speed", "10.0f");
 pref("gfx.azpc.tweak_fling_velocity", false);
 pref("gfx.azpc.vertical_scroll_lock_ratio", "1.2f");
+pref("apzc.axis_lock_mode", 1);
 pref("ui.dragThresholdX", 25);
 pref("ui.dragThresholdY", 25);
 pref("embedlite.dispatch_mouse_events", false); // Will dispatch mouse events if page using them

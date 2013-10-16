@@ -39,6 +39,9 @@ pref("layers.componentalpha.enabled", false);
 pref("gfx.azpc.touch_start_tolerance", "0.1"); // dpi * tolerance = pixel threshold
 pref("gfx.axis.fling_friction", "0.002");
 
+// 0 = free, 1 = standard, 2 = sticky
+pref("apzc.axis_lock_mode", 1);
+
 // Enable Microsoft TSF support by default for imes.
 pref("intl.enable_tsf_support", true);
 
