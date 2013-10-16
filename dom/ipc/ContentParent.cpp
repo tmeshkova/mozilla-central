@@ -502,14 +502,17 @@ PrivilegesForApp(mozIApplication* aApp)
 ContentParent::GetInitialProcessPriority(Element* aFrameElement)
 {
     // Frames with mozapptype == critical which are expecting a system message
-    // get FOREGROUND_HIGH priority.  All other frames get FOREGROUND priority.
+    // get FOREGROUND_HIGH priority.
 
     if (!aFrameElement) {
         return PROCESS_PRIORITY_FOREGROUND;
     }
 
-    if (!aFrameElement->AttrValueIs(kNameSpaceID_None, nsGkAtoms::mozapptype,
-                                    NS_LITERAL_STRING("critical"), eCaseMatters)) {
+    if (aFrameElement->AttrValueIs(kNameSpaceID_None, nsGkAtoms::mozapptype,
+                                   NS_LITERAL_STRING("keyboard"), eCaseMatters)) {
+        return PROCESS_PRIORITY_FOREGROUND_KEYBOARD;
+    } else if (!aFrameElement->AttrValueIs(kNameSpaceID_None, nsGkAtoms::mozapptype,
+                                           NS_LITERAL_STRING("critical"), eCaseMatters)) {
         return PROCESS_PRIORITY_FOREGROUND;
     }
 
@@ -943,6 +946,8 @@ ContentParent::OnChannelConnected(int32_t pid)
         NS_WARNING("Can't open handle to child process.");
     }
     else {
+        // we need to close the existing handle before setting a new one.
+        base::CloseProcessHandle(OtherProcess());
         SetOtherProcess(handle);
 
 #if defined(ANDROID) || defined(LINUX)
@@ -1246,7 +1251,7 @@ ContentParent::ContentParent(mozIApplication* aApp,
 
     mSubprocess->LaunchAndWaitForProcessHandle();
 
-    Open(mSubprocess->GetChannel(), mSubprocess->GetChildProcessHandle());
+    Open(mSubprocess->GetChannel(), mSubprocess->GetOwnedChildProcessHandle());
 
     // Set the subprocess's priority.  We do this early on because we're likely
     // /lowering/ the process's CPU and memory priority, which it has inherited
@@ -2061,6 +2066,9 @@ ContentParent::KillHard()
         NewRunnableMethod(this, &ContentParent::ShutDownProcess,
                           /* closeWithError */ true),
         3000);
+    // We've now closed the OtherProcess() handle, so must set it to null to
+    // prevent our dtor closing it twice.
+    SetOtherProcess(0);
 }
 
 bool

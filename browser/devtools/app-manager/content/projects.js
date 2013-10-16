@@ -39,10 +39,8 @@ let UI = {
     this.template = new Template(document.body, AppProjects.store, Utils.l10n);
     this.template.start();
 
-    AppProjects.store.on("set", (event,path,value) => {
-      if (path == "projects") {
-        AppProjects.store.object.projects.forEach(UI.validate);
-      }
+    AppProjects.load().then(() => {
+      AppProjects.store.object.projects.forEach(UI.validate);
     });
   },
 
@@ -84,6 +82,10 @@ let UI = {
   },
 
   addHosted: function() {
+    let form = document.querySelector("#new-hosted-project-wrapper")
+    if (!form.checkValidity())
+      return;
+
     let urlInput = document.querySelector("#url-input");
     let manifestURL = urlInput.value;
     AppProjects.addHosted(manifestURL)
@@ -210,9 +212,15 @@ let UI = {
   },
 
   install: function(project) {
-    let install;
     if (project.type == "packaged") {
-      install = installPackaged(this.connection.client, this.listTabsResponse.webappsActor, project.location, project.packagedAppOrigin);
+      return installPackaged(this.connection.client, this.listTabsResponse.webappsActor, project.location, project.packagedAppOrigin)
+        .then(({ appId }) => {
+          // If the packaged app specified a custom origin override,
+          // we need to update the local project origin
+          project.packagedAppOrigin = appId;
+          // And ensure the indexed db on disk is also updated
+          AppProjects.update(project);
+        });
     } else {
       let manifestURLObject = Services.io.newURI(project.location, null, null);
       let origin = Services.io.newURI(manifestURLObject.prePath, null, null);
@@ -221,9 +229,8 @@ let UI = {
         origin: origin.spec,
         manifestURL: project.location
       };
-      install = installHosted(this.connection.client, this.listTabsResponse.webappsActor, appId, metadata, project.manifest);
+      return installHosted(this.connection.client, this.listTabsResponse.webappsActor, appId, metadata, project.manifest);
     }
-    return install;
   },
 
   start: function(project) {
@@ -259,50 +266,73 @@ let UI = {
   debug: function(button, location) {
     button.disabled = true;
     let project = AppProjects.get(location);
-    // First try to open the app
-    this.start(project)
-        .then(
-         null,
-         (error) => {
-           // If not installed, install and open it
-           if (error == "NO_SUCH_APP") {
-             return this.install(project)
-                        .then(() => this.start(project));
-           } else {
-             throw error;
-           }
-         })
-        .then(() => {
-           // Finally, when it's finally opened, display the toolbox
-           return this.openToolbox(project)
-        })
-        .then(() => {
-           // And only when the toolbox is opened, release the button
-           button.disabled = false;
-         },
-         (msg) => {
-           button.disabled = false;
-           alert(msg);
-           this.connection.log(msg);
-         });
-  },
 
-  openToolbox: function(project) {
-    let deferred = promise.defer();
-    let manifest = this._getProjectManifestURL(project);
-    getTargetForApp(this.connection.client,
-                    this.listTabsResponse.webappsActor,
-                    manifest).then((target) => {
+    let onFailedToStart = (error) => {
+      // If not installed, install and open it
+      if (error == "NO_SUCH_APP") {
+        return this.install(project);
+      } else {
+        throw error;
+      }
+    };
+    let onStarted = () => {
+      // Once we asked the app to launch, the app isn't necessary completely loaded.
+      // launch request only ask the app to launch and immediatly returns.
+      // We have to keep trying to get app tab actors required to create its target.
+      let deferred = promise.defer();
+      let loop = (count) => {
+        // Ensure not looping for ever
+        if (count >= 100) {
+          deferred.reject("Unable to connect to the app");
+          return;
+        }
+        // Also, in case the app wasn't installed yet, we also have to keep asking the
+        // app to launch, as launch request made right after install may race.
+        this.start(project);
+        getTargetForApp(
+          this.connection.client,
+          this.listTabsResponse.webappsActor,
+          this._getProjectManifestURL(project)).
+            then(deferred.resolve,
+                 (err) => {
+                   if (err == "appNotFound")
+                     setTimeout(loop, 500, count + 1);
+                   else
+                     deferred.reject(err);
+                 });
+      };
+      loop(0);
+      return deferred.promise;
+    };
+    let onTargetReady = (target) => {
+      // Finally, when it's finally opened, display the toolbox
+      let deferred = promise.defer();
       gDevTools.showToolbox(target,
                             null,
                             devtools.Toolbox.HostType.WINDOW).then(toolbox => {
         this.connection.once(Connection.Events.DISCONNECTED, () => {
           toolbox.destroy();
         });
-        deferred.resolve();
+        deferred.resolve(toolbox);
       });
-    }, deferred.reject);
-    return deferred.promise;
+      return deferred.promise;
+    };
+
+    // First try to open the app
+    this.start(project)
+        .then(null, onFailedToStart)
+        .then(onStarted)
+        .then(onTargetReady)
+        .then(() => {
+           // And only when the toolbox is opened, release the button
+           button.disabled = false;
+         },
+         (err) => {
+           button.disabled = false;
+           let message = err.error ? err.error + ": " + err.message : String(err);
+           alert(message);
+           this.connection.log(message);
+         });
   },
 
   reveal: function(location) {

@@ -41,11 +41,11 @@ namespace layers {
 
 class Compositor; 
 
-TemporaryRef<CompositableQuirks>
-CreateCompositableQuirksOGL()
+TemporaryRef<CompositableBackendSpecificData>
+CreateCompositableBackendSpecificDataOGL()
 {
 #ifdef MOZ_WIDGET_GONK
-  return new CompositableQuirksGonkOGL();
+  return new CompositableDataGonkOGL();
 #else
   return nullptr;
 #endif
@@ -166,27 +166,27 @@ WrapMode(gl::GLContext *aGl, bool aAllowRepeat)
   return LOCAL_GL_CLAMP_TO_EDGE;
 }
 
-CompositableQuirksGonkOGL::CompositableQuirksGonkOGL()
+CompositableDataGonkOGL::CompositableDataGonkOGL()
  : mTexture(0)
 {
 }
-CompositableQuirksGonkOGL::~CompositableQuirksGonkOGL()
+CompositableDataGonkOGL::~CompositableDataGonkOGL()
 {
   DeleteTextureIfPresent();
 }
 
 gl::GLContext*
-CompositableQuirksGonkOGL::gl() const
+CompositableDataGonkOGL::gl() const
 {
   return mCompositor ? mCompositor->gl() : nullptr;
 }
 
-void CompositableQuirksGonkOGL::SetCompositor(Compositor* aCompositor)
+void CompositableDataGonkOGL::SetCompositor(Compositor* aCompositor)
 {
   mCompositor = static_cast<CompositorOGL*>(aCompositor);
 }
 
-GLuint CompositableQuirksGonkOGL::GetTexture()
+GLuint CompositableDataGonkOGL::GetTexture()
 {
   if (!mTexture) {
     gl()->MakeCurrent();
@@ -196,7 +196,7 @@ GLuint CompositableQuirksGonkOGL::GetTexture()
 }
 
 void
-CompositableQuirksGonkOGL::DeleteTextureIfPresent()
+CompositableDataGonkOGL::DeleteTextureIfPresent()
 {
   if (mTexture) {
     gl()->MakeCurrent();
@@ -507,7 +507,7 @@ TextureImageDeprecatedTextureHostOGL::UpdateImpl(const SurfaceDescriptor& aImage
   }
 
 #ifdef MOZ_WIDGET_GONK
-  if (mQuirks) {
+  if (mCompositableBackendData) {
     // on gonk, this class is used as a fallback from gralloc buffer.
     // There is a case this class is used with GrallocDeprecatedTextureHostOGL
     // under same CompositableHost. if it happens, a gralloc buffer of
@@ -515,7 +515,7 @@ TextureImageDeprecatedTextureHostOGL::UpdateImpl(const SurfaceDescriptor& aImage
     // when the gralloc buffer is not rendered.
     // Establish the unbound by deleting the texture.
     // See Bug 916264.
-    static_cast<CompositableQuirksGonkOGL*>(mQuirks.get())->DeleteTextureIfPresent();
+    static_cast<CompositableDataGonkOGL*>(mCompositableBackendData.get())->DeleteTextureIfPresent();
   }
 #endif
 
@@ -1146,11 +1146,10 @@ GrallocDeprecatedTextureHostOGL::SwapTexturesImpl(const SurfaceDescriptor& aImag
                                                mIsRBSwapped);
 
   mTextureTarget = TextureTargetForAndroidPixelFormat(mGraphicBuffer->getPixelFormat());
-  mQuirks->SetCompositor(mCompositor);
-  GLuint tex = static_cast<CompositableQuirksGonkOGL*>(mQuirks.get())->GetTexture();
+  GLuint tex = GetGLTexture();
   // delete old EGLImage
   DeleteTextures();
-#if 1
+
   gl()->MakeCurrent();
   gl()->fActiveTexture(LOCAL_GL_TEXTURE0);
   gl()->fBindTexture(mTextureTarget, tex);
@@ -1159,7 +1158,6 @@ GrallocDeprecatedTextureHostOGL::SwapTexturesImpl(const SurfaceDescriptor& aImag
   // during rendering.
   mEGLImage = gl()->CreateEGLImageForNativeBuffer(mGraphicBuffer->getNativeBuffer());
   gl()->fEGLImageTargetTexture2D(mTextureTarget, mEGLImage);
-#endif
 
 }
 
@@ -1186,8 +1184,7 @@ void GrallocDeprecatedTextureHostOGL::BindTexture(GLenum aTextureUnit)
   MOZ_ASSERT(gl());
   gl()->MakeCurrent();
 
-  mQuirks->SetCompositor(mCompositor);
-  GLuint tex = static_cast<CompositableQuirksGonkOGL*>(mQuirks.get())->GetTexture();
+  GLuint tex = GetGLTexture();
 
   gl()->fActiveTexture(aTextureUnit);
   gl()->fBindTexture(mTextureTarget, tex);
@@ -1268,6 +1265,14 @@ GrallocDeprecatedTextureHostOGL::GetRenderState()
 
   return LayerRenderState();
 }
+
+GLuint
+GrallocDeprecatedTextureHostOGL::GetGLTexture()
+{
+  mCompositableBackendData->SetCompositor(mCompositor);
+  return static_cast<CompositableDataGonkOGL*>(mCompositableBackendData.get())->GetTexture();
+}
+
 #endif // MOZ_WIDGET_GONK
 
 already_AddRefed<gfxImageSurface>
@@ -1325,8 +1330,7 @@ already_AddRefed<gfxImageSurface>
 GrallocDeprecatedTextureHostOGL::GetAsSurface() {
   gl()->MakeCurrent();
 
-  mQuirks->SetCompositor(mCompositor);
-  GLuint tex = static_cast<CompositableQuirksGonkOGL*>(mQuirks.get())->GetTexture();
+  GLuint tex = GetGLTexture();
   gl()->fActiveTexture(LOCAL_GL_TEXTURE0);
   gl()->fBindTexture(mTextureTarget, tex);
   if (!mEGLImage) {
