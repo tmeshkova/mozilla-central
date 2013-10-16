@@ -1597,24 +1597,26 @@ ContentParent::RecvAudioChannelGetState(const AudioChannelType& aType,
 }
 
 bool
-ContentParent::RecvAudioChannelRegisterType(const AudioChannelType& aType)
+ContentParent::RecvAudioChannelRegisterType(const AudioChannelType& aType,
+                                            const bool& aWithVideo)
 {
     nsRefPtr<AudioChannelService> service =
         AudioChannelService::GetAudioChannelService();
     if (service) {
-        service->RegisterType(aType, mChildID);
+        service->RegisterType(aType, mChildID, aWithVideo);
     }
     return true;
 }
 
 bool
 ContentParent::RecvAudioChannelUnregisterType(const AudioChannelType& aType,
-                                              const bool& aElementHidden)
+                                              const bool& aElementHidden,
+                                              const bool& aWithVideo)
 {
     nsRefPtr<AudioChannelService> service =
         AudioChannelService::GetAudioChannelService();
     if (service) {
-        service->UnregisterType(aType, aElementHidden, mChildID);
+        service->UnregisterType(aType, aElementHidden, mChildID, aWithVideo);
     }
     return true;
 }
@@ -1930,13 +1932,11 @@ ContentParent::GetOrCreateActorForBlob(nsIDOMBlob* aBlob)
   // If the blob represents a remote blob for this ContentParent then we can
   // simply pass its actor back here.
   if (nsCOMPtr<nsIRemoteBlob> remoteBlob = do_QueryInterface(aBlob)) {
-    BlobParent* actor =
-      static_cast<BlobParent*>(
-        static_cast<PBlobParent*>(remoteBlob->GetPBlob()));
-    MOZ_ASSERT(actor);
-
-    if (static_cast<ContentParent*>(actor->Manager()) == this) {
-      return actor;
+    if (BlobParent* actor = static_cast<BlobParent*>(
+          static_cast<PBlobParent*>(remoteBlob->GetPBlob()))) {
+      if (static_cast<ContentParent*>(actor->Manager()) == this) {
+        return actor;
+      }
     }
   }
 

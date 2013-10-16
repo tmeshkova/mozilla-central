@@ -172,10 +172,7 @@ CompositableQuirksGonkOGL::CompositableQuirksGonkOGL()
 }
 CompositableQuirksGonkOGL::~CompositableQuirksGonkOGL()
 {
-  if (mTexture) {
-    gl()->MakeCurrent();
-    gl()->fDeleteTextures(1, &mTexture);
-  }
+  DeleteTextureIfPresent();
 }
 
 gl::GLContext*
@@ -196,6 +193,15 @@ GLuint CompositableQuirksGonkOGL::GetTexture()
     gl()->fGenTextures(1, &mTexture);
   }
   return mTexture;
+}
+
+void
+CompositableQuirksGonkOGL::DeleteTextureIfPresent()
+{
+  if (mTexture) {
+    gl()->MakeCurrent();
+    gl()->fDeleteTextures(1, &mTexture);
+  }
 }
 
 bool
@@ -499,6 +505,19 @@ TextureImageDeprecatedTextureHostOGL::UpdateImpl(const SurfaceDescriptor& aImage
     NS_WARNING("trying to update TextureImageDeprecatedTextureHostOGL without a compositor?");
     return;
   }
+
+#ifdef MOZ_WIDGET_GONK
+  if (mQuirks) {
+    // on gonk, this class is used as a fallback from gralloc buffer.
+    // There is a case this class is used with GrallocDeprecatedTextureHostOGL
+    // under same CompositableHost. if it happens, a gralloc buffer of
+    // GrallocDeprecatedTextureHostOGL needs to be unbounded from a texture,
+    // when the gralloc buffer is not rendered.
+    // Establish the unbound by deleting the texture.
+    // See Bug 916264.
+    static_cast<CompositableQuirksGonkOGL*>(mQuirks.get())->DeleteTextureIfPresent();
+  }
+#endif
 
   AutoOpenSurface surf(OPEN_READ_ONLY, aImage);
   nsIntSize size = surf.Size();
@@ -1089,11 +1108,20 @@ GrallocDeprecatedTextureHostOGL::DeleteTextures()
 
 // only used for hacky fix in gecko 23 for bug 862324
 static void
-RegisterDeprecatedTextureHostAtGrallocBufferActor(DeprecatedTextureHost* aDeprecatedTextureHost, const SurfaceDescriptor& aSurfaceDescriptor)
+AddDeprecatedTextureHostToGrallocBufferActor(DeprecatedTextureHost* aDeprecatedTextureHost, const SurfaceDescriptor* aSurfaceDescriptor)
 {
-  if (IsSurfaceDescriptorValid(aSurfaceDescriptor)) {
-    GrallocBufferActor* actor = static_cast<GrallocBufferActor*>(aSurfaceDescriptor.get_SurfaceDescriptorGralloc().bufferParent());
-    actor->SetDeprecatedTextureHost(aDeprecatedTextureHost);
+  if (aSurfaceDescriptor && IsSurfaceDescriptorValid(*aSurfaceDescriptor)) {
+    GrallocBufferActor* actor = static_cast<GrallocBufferActor*>(aSurfaceDescriptor->get_SurfaceDescriptorGralloc().bufferParent());
+    actor->AddDeprecatedTextureHost(aDeprecatedTextureHost);
+  }
+}
+
+static void
+RemoveDeprecatedTextureHostFromGrallocBufferActor(DeprecatedTextureHost* aDeprecatedTextureHost, const SurfaceDescriptor* aSurfaceDescriptor)
+{
+  if (aSurfaceDescriptor && IsSurfaceDescriptorValid(*aSurfaceDescriptor)) {
+    GrallocBufferActor* actor = static_cast<GrallocBufferActor*>(aSurfaceDescriptor->get_SurfaceDescriptorGralloc().bufferParent());
+    actor->RemoveDeprecatedTextureHost(aDeprecatedTextureHost);
   }
 }
 
@@ -1110,11 +1138,6 @@ GrallocDeprecatedTextureHostOGL::SwapTexturesImpl(const SurfaceDescriptor& aImag
                                         nsIntRegion*)
 {
   MOZ_ASSERT(aImage.type() == SurfaceDescriptor::TSurfaceDescriptorGralloc);
-
-  if (mBuffer) {
-    // only done for hacky fix in gecko 23 for bug 862324.
-    RegisterDeprecatedTextureHostAtGrallocBufferActor(nullptr, *mBuffer);
-  }
 
   const SurfaceDescriptorGralloc& desc = aImage.get_SurfaceDescriptorGralloc();
   mGraphicBuffer = GrallocBufferActor::GetFrom(desc);
@@ -1182,11 +1205,9 @@ GrallocDeprecatedTextureHostOGL::~GrallocDeprecatedTextureHostOGL()
   DeleteTextures();
 
   // only done for hacky fix in gecko 23 for bug 862324.
-  if (mBuffer) {
-    // make sure that if the GrallocBufferActor survives us, it doesn't keep a dangling
-    // pointer to us.
-    RegisterDeprecatedTextureHostAtGrallocBufferActor(nullptr, *mBuffer);
-  }
+  // make sure that if the GrallocBufferActor survives us, it doesn't keep a dangling
+  // pointer to us.
+  RemoveDeprecatedTextureHostFromGrallocBufferActor(this, mBuffer);
 }
 
 bool
@@ -1206,12 +1227,16 @@ void
 GrallocDeprecatedTextureHostOGL::SetBuffer(SurfaceDescriptor* aBuffer, ISurfaceAllocator* aAllocator)
 {
   MOZ_ASSERT(!mBuffer, "Will leak the old mBuffer");
+
+  if (aBuffer != mBuffer) {
+    // only done for hacky fix in gecko 23 for bug 862324.
+    // Doing this in SwapTextures is not enough, as the crash could occur right after SetBuffer.
+    RemoveDeprecatedTextureHostFromGrallocBufferActor(this, mBuffer);
+    AddDeprecatedTextureHostToGrallocBufferActor(this, aBuffer);
+  }
+
   mBuffer = aBuffer;
   mDeAllocator = aAllocator;
-
-  // only done for hacky fix in gecko 23 for bug 862324.
-  // Doing this in SwapTextures is not enough, as the crash could occur right after SetBuffer.
-  RegisterDeprecatedTextureHostAtGrallocBufferActor(this, *mBuffer);
 }
 
 LayerRenderState
