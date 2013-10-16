@@ -296,7 +296,6 @@ SharedTextureSourceOGL::SharedTextureSourceOGL(CompositorOGL* aCompositor,
   , mShareType(aShareType)
   , mTextureTarget(aTarget)
   , mWrapMode(aWrapMode)
-  , mOwnedTexture(0)
 {}
 
 void
@@ -306,14 +305,7 @@ SharedTextureSourceOGL::BindTexture(GLenum aTextureUnit)
     NS_WARNING("Trying to bind a texture without a GLContext");
     return;
   }
-  GLuint tex = 0;
-  if (gl()->NeedDestroyTempTexture(mShareType, mSharedHandle))
-  {
-    MakeTextureIfNeeded(gl(), mTextureTarget, mOwnedTexture);
-    tex = mOwnedTexture;
-  } else {
-    tex = mCompositor->GetTemporaryTexture(aTextureUnit);
-  }
+  GLuint tex = mCompositor->GetTemporaryTexture(aTextureUnit);
 
   gl()->fActiveTexture(aTextureUnit);
   gl()->fBindTexture(mTextureTarget, tex);
@@ -331,10 +323,6 @@ SharedTextureSourceOGL::DetachSharedHandle()
     return;
   }
   gl()->DetachSharedHandle(mShareType, mSharedHandle);
-  if (mOwnedTexture) {
-    gl()->fDeleteTextures(1, &mOwnedTexture);
-    mOwnedTexture = 0;
-  }
 }
 
 void

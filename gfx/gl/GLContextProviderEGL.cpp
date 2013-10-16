@@ -676,8 +676,6 @@ public:
                                     SharedTextureHandle sharedHandle);
     virtual void DetachSharedHandle(SharedTextureShareType shareType,
                                     SharedTextureHandle sharedHandle);
-    virtual bool NeedDestroyTempTexture(SharedTextureShareType shareType,
-                                        SharedTextureHandle sharedHandle);
 
 protected:
     friend class GLContextProviderEGL;
@@ -1152,28 +1150,6 @@ bool GLContextEGL::AttachSharedHandle(SharedTextureShareType shareType,
     }
 
     return true;
-}
-
-bool
-GLContextEGL::NeedDestroyTempTexture(SharedTextureShareType shareType,
-                                     SharedTextureHandle sharedHandle)
-{
-    if (shareType != SameProcess)
-        return false;
-
-    SharedTextureHandleWrapper* wrapper = reinterpret_cast<SharedTextureHandleWrapper*>(sharedHandle);
-
-    switch (wrapper->Type()) {
-#ifdef HAS_NEMO_INTERFACE
-    case SharedHandleType_GstreamerMagicHandle: {
-        return true;
-    }
-#endif
-    default:
-        return false;
-    }
-
-    return false;
 }
 
 bool
