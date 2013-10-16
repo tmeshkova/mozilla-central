@@ -230,15 +230,15 @@ public:
   void SendAsyncScrollEvent();
 
   /**
+   * Get Difference between layout scroll offset and AZPC layers temp scroll offset
+   */
+  gfxPoint GetTempScrollOffset();
+
+  /**
    * Gets the current frame metrics. This is *not* the Gecko copy stored in the
    * layers code.
    */
   CSSToScreenScale CalculateResolution();
-
-  /**
-   * Get Difference between layout scroll offset and AZPC layers temp scroll offset
-   */
-  gfxPoint GetTempScrollOffset();
 
   /**
    * Handler for events which should not be intercepted by the touch listener.

@@ -1155,17 +1155,6 @@ bool AsyncPanZoomController::SampleContentTransformForFrame(const TimeStamp& aSa
   return requestAnimationFrame;
 }
 
-gfxPoint
-AsyncPanZoomController::GetTempScrollOffset()
-{
-  CSSPoint diff;
-  {
-    ReentrantMonitorAutoEnter lock(mMonitor);
-    diff = mLastContentPaintMetrics.mScrollOffset - mFrameMetrics.mScrollOffset;
-  }
-  return gfxPoint(diff.x, diff.y);
-}
-
 ViewTransform AsyncPanZoomController::GetCurrentAsyncTransform() {
   ReentrantMonitorAutoEnter lock(mMonitor);
 
@@ -1475,6 +1464,17 @@ bool AsyncPanZoomController::Matches(const ScrollableLayerGuid& aGuid)
   // TODO: also check the presShellId, once that is fully propagated
   // everywhere in RenderFrameParent and AndroidJNI.
   return aGuid.mLayersId == mLayersId && aGuid.mScrollId == mFrameMetrics.mScrollId;
+}
+
+gfxPoint
+AsyncPanZoomController::GetTempScrollOffset()
+{
+  CSSPoint diff;
+  {
+    ReentrantMonitorAutoEnter lock(mMonitor);
+    diff = mLastContentPaintMetrics.mScrollOffset - mFrameMetrics.mScrollOffset;
+  }
+  return gfxPoint(diff.x, diff.y);
 }
 
 }

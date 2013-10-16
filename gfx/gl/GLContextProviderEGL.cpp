@@ -346,8 +346,6 @@ public:
         property_get("ro.build.version.sdk", propValue, "0");
         if (atoi(propValue) < 15)
             gUseBackingSurface = false;
-#else
-        gUseBackingSurface = Preferences::GetBool("egl.use_backing_surface", gUseBackingSurface);
 #endif
 
         bool current = MakeCurrent();
