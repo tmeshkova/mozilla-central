@@ -15,6 +15,7 @@
 #include "InputData.h"
 #include "Axis.h"
 #include "TaskThrottler.h"
+#include "mozilla/layers/APZCTreeManager.h"
 #include "gfx3DMatrix.h"
 
 #include "base/message_loop.h"

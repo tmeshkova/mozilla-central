@@ -251,7 +251,7 @@ EmbedLiteViewThreadParent::UpdateScrollController()
       return;
     }
 #warning "Maybe Need to switch to APZCTreeManager"
-    mController = new AsyncPanZoomController(0, mGeckoController, type);
+    mController = new AsyncPanZoomController(0, nullptr, mGeckoController, type);
     mController->SetCompositorParent(mCompositor);
     mController->UpdateCompositionBounds(ScreenIntRect(0, 0, mViewSize.width, mViewSize.height));
   }
