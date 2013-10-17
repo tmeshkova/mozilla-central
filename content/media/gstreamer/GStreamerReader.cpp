@@ -199,15 +199,15 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
 
 void GStreamerReader::Play()
 {
-  if (mPlayBin && mPlayingStartedOnce) {
+  if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
     gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
   }
 }
 
 void GStreamerReader::Pause()
 {
-  if (mPlayBin && mPlayingStartedOnce) {
-      gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
+  if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
+    gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
   }
 }
 
