@@ -267,6 +267,7 @@ EmbedLiteViewThreadParent::ActorDestroy(ActorDestroyReason aWhy)
   }
   if (mController) {
     mController->Destroy();
+    mController = nullptr;
   }
 }
 
