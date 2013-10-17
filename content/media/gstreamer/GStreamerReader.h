@@ -60,6 +60,9 @@ public:
     return mInfo.HasVideo();
   }
 
+  virtual void Play();
+  virtual void Pause();
+
 private:
 
   void ReadAndPushData(guint aLength);
@@ -170,6 +173,7 @@ private:
   int fpsNum;
   int fpsDen;
   GstElement* mPlaySink;
+  bool mPlayingStartedOnce;
 };
 
 } // namespace mozilla
