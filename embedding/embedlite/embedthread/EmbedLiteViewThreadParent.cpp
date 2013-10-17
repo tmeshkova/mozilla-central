@@ -24,6 +24,16 @@ using namespace mozilla::widget;
 namespace mozilla {
 namespace embedlite {
 
+/**
+ * Currently EmbedAsyncPanZoomController is needed because we need to do extra steps when panning ends.
+ * This is not optimal way to implement HandlePanEnd as AsyncPanZoomController
+ * invokes GeckoContentController::HandlePanEnd and overridden EmbedContentController::HandlePanEnd invokes
+ * a method of EmbedAsyncPanZoomController so that we can call protected methods of ASyncPanZoomController.
+ * There could be a virtual method that would allow us to do the same thing.
+ *
+ * Regardless of above, this helps us to keep AsyncPanZoomZontroller clean from
+ * embedlite specifc fixes.
+ */
 class EmbedAsyncPanZoomController : public AsyncPanZoomController
 {
   public:
