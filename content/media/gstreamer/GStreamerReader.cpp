@@ -55,6 +55,8 @@ typedef enum {
   GST_PLAY_FLAG_SOFT_COLORBALANCE = (1 << 10)
 } PlayFlags;
 
+static bool sDroidEGLSinkInUse = false;
+
 GStreamerReader::GStreamerReader(AbstractMediaDecoder* aDecoder)
   : MediaDecoderReader(aDecoder),
   mPlayBin(nullptr),
@@ -105,6 +107,7 @@ GStreamerReader::~GStreamerReader()
     mPlayingStartedOnce = false;
     mPlayBin = nullptr;
     mPlaySink = nullptr;
+    sDroidEGLSinkInUse = false;
     mVideoSink = nullptr;
     mVideoAppSink = nullptr;
     mAudioSink = nullptr;
@@ -129,10 +132,16 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
     return NS_ERROR_FAILURE;
   }
 #ifdef HAS_NEMO_INTERFACE
+  if (sDroidEGLSinkInUse && !Preferences::GetBool("gstreamer.no_hw_decoder_limit", false))
+  {
+    return NS_ERROR_FAILURE;
+  }
   mPlaySink = gst_element_factory_make("droideglsink", nullptr);
   if (!mPlaySink) {
     LOG(PR_LOG_DEBUG, ("could not create egl sink: %p", mPlaySink));
+    return NS_ERROR_FAILURE;
   }
+  sDroidEGLSinkInUse = true;
 #endif
   g_object_set(mPlayBin, "buffer-size", 0, nullptr);
   mBus = gst_pipeline_get_bus(GST_PIPELINE(mPlayBin));
@@ -201,15 +210,15 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
 
 void GStreamerReader::Play()
 {
-  if (mPlayBin && mPlayingStartedOnce) {
+  if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
     gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
   }
 }
 
 void GStreamerReader::Pause()
 {
-  if (mPlayBin && mPlayingStartedOnce) {
-      gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
+  if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
+    gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
   }
 }
 
