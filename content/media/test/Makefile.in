@@ -140,12 +140,14 @@ MOCHITEST_FILES = \
 		$(filter disabled-for-intermittent-failures--bug-608634, test_error_in_video_document.html) \
 		test_texttrack.html \
 		test_texttrackcue.html \
+		test_texttrackregion.html \
 		test_timeupdate_small_files.html \
 		test_unseekable.html \
 		test_VideoPlaybackQuality.html \
 		test_VideoPlaybackQuality_disabled.html \
 		test_webvtt_disabled.html \
 		test_bug895305.html \
+		test_bug895091.html \
 		$(NULL)
 
 # Don't run in suite
@@ -271,6 +273,8 @@ MOCHITEST_FILES += \
 		notags.mp3 \
 		id3tags.mp3 \
 		basic.vtt \
+		region.vtt \
+		long.vtt \
 		$(NULL)
 
 # Wave sample files

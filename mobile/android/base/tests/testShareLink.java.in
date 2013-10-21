@@ -35,6 +35,9 @@ public class testShareLink extends BaseTest {
         ArrayList<String> shareOptions;
         blockForGeckoReady();
 
+        // FIXME: This is a temporary hack workaround for a permissions problem.
+        openAboutHomeTab(AboutHomeTabs.READING_LIST);
+
         inputAndLoadUrl(url);
         waitForText(urlTitle); // Waiting for page title to ensure the page is loaded
         selectMenuItem("Share");
@@ -58,14 +61,11 @@ public class testShareLink extends BaseTest {
         mSolo.clickLongOnText(urlTitle);
         verifySharePopup(shareOptions,"urlbar");
 
-        // Test link Context Menu
-        DisplayMetrics dm = new DisplayMetrics();
-        getActivity().getWindowManager().getDefaultDisplay().getMetrics(dm);
-
         // The link has a 60px height, so let's try to hit the middle
-        float top = mDriver.getGeckoTop() + 30 * dm.density;
+        float top = mDriver.getGeckoTop() + 30 * mDevice.density;
         float left = mDriver.getGeckoLeft() + mDriver.getGeckoWidth() / 2;
         mSolo.clickLongOnScreen(left, top);
+<<<<<<< HEAD
         verifySharePopup(shareOptions,"Link");
 
         /* FIXME: disabled on fig - bug 880060
@@ -102,6 +102,58 @@ public class testShareLink extends BaseTest {
         mSolo.clickLongOnView(history);
         verifySharePopup(shareOptions,"history");
         */
+=======
+        verifySharePopup("Share Link",shareOptions,"Link");
+
+        // Test the share popup in the Bookmarks page
+        openAboutHomeTab(AboutHomeTabs.BOOKMARKS);
+
+        ListView bookmarksList = findListViewWithTag("bookmarks");
+        mAsserter.is(waitForListToLoad(bookmarksList), true, "list is properly loaded");
+
+        View bookmarksItem = bookmarksList.getChildAt(bookmarksList.getHeaderViewsCount());
+        mSolo.clickLongOnView(bookmarksItem);
+        verifySharePopup(shareOptions,"bookmarks");
+
+        // Prepopulate top sites with history items to overflow tiles.
+        // We are trying to move away from using reflection and doing more black-box testing.
+        inputAndLoadUrl(getAbsoluteUrl("/robocop/robocop_blank_01.html"));
+        inputAndLoadUrl(getAbsoluteUrl("/robocop/robocop_blank_02.html"));
+        inputAndLoadUrl(getAbsoluteUrl("/robocop/robocop_blank_03.html"));
+        inputAndLoadUrl(getAbsoluteUrl("/robocop/robocop_blank_04.html"));
+        if (mDevice.type.equals("tablet")) {
+            // Tablets have more tile spaces to fill.
+            inputAndLoadUrl(getAbsoluteUrl("/robocop/robocop_blank_05.html"));
+            inputAndLoadUrl(getAbsoluteUrl("/robocop/robocop_boxes.html"));
+            inputAndLoadUrl(getAbsoluteUrl("/robocop/robocop_search.html"));
+            inputAndLoadUrl(getAbsoluteUrl("/robocop/robocop_text_page.html"));
+        }
+
+        // Test the share popup in Top Sites.
+        openAboutHomeTab(AboutHomeTabs.TOP_SITES);
+
+        // Scroll down a bit so that the top sites list has more items on screen.
+        int width = mDriver.getGeckoWidth();
+        int height = mDriver.getGeckoHeight();
+        mActions.drag(width / 2, width / 2, height - 10, height / 2);
+
+        ListView topSitesList = findListViewWithTag("top_sites");
+        mAsserter.is(waitForListToLoad(topSitesList), true, "list is properly loaded");
+        View mostVisitedItem = topSitesList.getChildAt(topSitesList.getHeaderViewsCount());
+        mSolo.clickLongOnView(mostVisitedItem);
+        verifySharePopup(shareOptions,"top_sites");
+
+        // Test the share popup in the Most Recent tab
+        openAboutHomeTab(AboutHomeTabs.MOST_RECENT);
+
+        ListView mostRecentList = findListViewWithTag("most_recent");
+        mAsserter.is(waitForListToLoad(mostRecentList), true, "list is properly loaded");
+
+        // Getting second child after header views because the first is the "Today" label
+        View mostRecentItem = mostRecentList.getChildAt(mostRecentList.getHeaderViewsCount() + 1);
+        mSolo.clickLongOnView(mostRecentItem);
+        verifySharePopup(shareOptions,"most recent");
+>>>>>>> f6ce542a9836cff0e2a30176ec2ee07fe295693e
     }
 
     public void verifySharePopup(ArrayList<String> shareOptions, String openedFrom) {
