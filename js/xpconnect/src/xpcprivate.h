@@ -86,7 +86,6 @@
 #include "mozilla/Util.h"
 
 #include <math.h>
-#include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -128,7 +127,7 @@
 #include "nsXPIDLString.h"
 #include "nsAutoJSValHolder.h"
 
-#include "nsThreadUtils.h"
+#include "MainThreadUtils.h"
 #include "nsIJSEngineTelemetryStats.h"
 
 #include "nsIConsoleService.h"

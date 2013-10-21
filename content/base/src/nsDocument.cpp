@@ -2681,7 +2681,8 @@ nsDocument::InitCSP(nsIChannel* aChannel)
   if (csp) {
     // Copy into principal
     nsIPrincipal* principal = GetPrincipal();
-    principal->SetCsp(csp);
+    rv = principal->SetCsp(csp);
+    NS_ENSURE_SUCCESS(rv, rv);
 #ifdef PR_LOGGING
     PR_LOG(gCspPRLog, PR_LOG_DEBUG,
            ("Inserted CSP into principal %p", principal));
@@ -6886,7 +6887,8 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
     }
     // Now convert the scale into device pixels per CSS pixel.
     nsIWidget *widget = nsContentUtils::WidgetForDocument(this);
-    CSSToLayoutDeviceScale pixelRatio(widget ? widget->GetDefaultScale() : 1.0f);
+    CSSToLayoutDeviceScale pixelRatio = widget ? widget->GetDefaultScale()
+                                               : CSSToLayoutDeviceScale(1.0f);
     CSSToScreenScale scaleFloat = mScaleFloat * pixelRatio;
     CSSToScreenScale scaleMinFloat = mScaleMinFloat * pixelRatio;
     CSSToScreenScale scaleMaxFloat = mScaleMaxFloat * pixelRatio;
