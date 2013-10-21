@@ -866,8 +866,8 @@ void AsyncPanZoomController::AttemptScroll(const ScreenPoint& aStartPoint,
 }
 
 void AsyncPanZoomController::TrackTouch(const MultiTouchInput& aEvent) {
-  ScreenIntPoint prevTouchPoint(mX.GetPos(), mY.GetPos());
   ScreenIntPoint touchPoint = GetFirstTouchScreenPoint(aEvent);
+  ScreenIntPoint prevTouchPoint(mX.GetPos(), mY.GetPos());
   TimeDuration timeDelta = TimeDuration().FromMilliseconds(aEvent.mTime - mLastEventTime);
 
   // Probably a duplicate event, just throw it away.
