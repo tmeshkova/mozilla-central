@@ -550,18 +550,20 @@ TabChildHelper::DoSendSyncMessage(JSContext* aCx,
   }
 
   NS_ENSURE_TRUE(InitTabChildGlobal(), false);
-  JSAutoRequest ar(GetJSContext());
+  JSContext* cx = GetJSContext();
+  JSAutoRequest ar(cx);
 
   // FIXME: Need callback interface for simple JSON to avoid useless conversion here
   jsval jv = JSVAL_NULL;
   if (aData.mDataLength &&
-      !ReadStructuredClone(GetJSContext(), aData, &jv)) {
-    JS_ClearPendingException(GetJSContext());
+      !ReadStructuredClone(cx, aData, &jv)) {
+    JS_ClearPendingException(cx);
     return false;
   }
 
   nsAutoString json;
-  NS_ENSURE_TRUE(JS_Stringify(GetJSContext(), &jv, nullptr, JSVAL_NULL, JSONCreator, &json), false);
+  JS::Rooted<JS::Value> rval(cx, jv);
+  NS_ENSURE_TRUE(JS_Stringify(cx, &rval, JS::NullPtr(), JS::NullHandleValue, JSONCreator, &json), false);
   NS_ENSURE_TRUE(!json.IsEmpty(), false);
 
   return mView->DoSendSyncMessage(nsString(aMessage).get(), json.get(), aJSONRetVal);
@@ -579,18 +581,20 @@ TabChildHelper::DoSendAsyncMessage(JSContext* aCx,
   }
 
   NS_ENSURE_TRUE(InitTabChildGlobal(), false);
-  JSAutoRequest ar(GetJSContext());
+  JSContext* cx = GetJSContext();
+  JSAutoRequest ar(cx);
 
   // FIXME: Need callback interface for simple JSON to avoid useless conversion here
   jsval jv = JSVAL_NULL;
   if (aData.mDataLength &&
-      !ReadStructuredClone(GetJSContext(), aData, &jv)) {
-    JS_ClearPendingException(GetJSContext());
+      !ReadStructuredClone(cx, aData, &jv)) {
+    JS_ClearPendingException(cx);
     return false;
   }
 
   nsAutoString json;
-  NS_ENSURE_TRUE(JS_Stringify(GetJSContext(), &jv, nullptr, JSVAL_NULL, JSONCreator, &json), false);
+  JS::Rooted<JS::Value> rval(cx, jv);
+  NS_ENSURE_TRUE(JS_Stringify(cx, &rval, JS::NullPtr(), JS::NullHandleValue, JSONCreator, &json), false);
   NS_ENSURE_TRUE(!json.IsEmpty(), false);
 
   return mView->DoSendAsyncMessage(nsString(aMessage).get(), json.get());

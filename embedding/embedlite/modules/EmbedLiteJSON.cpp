@@ -235,9 +235,9 @@ EmbedLiteJSON::CreateJSON(nsIPropertyBag* aRoot, nsAString& outJson)
     }
     windowEnumerator->HasMoreElements(&more);
   }
-  jsval vlt = OBJECT_TO_JSVAL(obj);
-
-  NS_ENSURE_TRUE(JS_Stringify(cx, &vlt, nullptr, JSVAL_NULL, JSONCreator, &outJson), NS_ERROR_FAILURE);
+  // Example from SaveProfileTask.cpp#74
+  JS::Rooted<JS::Value> vlt(cx, OBJECT_TO_JSVAL(obj));
+  NS_ENSURE_TRUE(JS_Stringify(cx, &vlt, JS::NullPtr(), JS::NullHandleValue, JSONCreator, &outJson), NS_ERROR_FAILURE);
   NS_ENSURE_TRUE(!outJson.IsEmpty(), NS_ERROR_FAILURE);
 
   return NS_OK;
