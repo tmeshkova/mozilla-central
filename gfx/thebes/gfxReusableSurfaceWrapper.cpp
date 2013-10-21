@@ -4,6 +4,7 @@
 
 #include "gfxReusableSurfaceWrapper.h"
 #include "gfxImageSurface.h"
+#include "nsThreadUtils.h"
 
 gfxReusableSurfaceWrapper::gfxReusableSurfaceWrapper(gfxImageSurface* aSurface)
   : mSurface(aSurface)

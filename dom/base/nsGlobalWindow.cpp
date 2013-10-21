@@ -2877,8 +2877,8 @@ nsGlobalWindow::PreHandleEvent(nsEventChainPreVisitor& aVisitor)
   // Handle 'active' event.
   if (!mIdleObservers.IsEmpty() &&
       aVisitor.mEvent->mFlags.mIsTrusted &&
-      (NS_IS_MOUSE_EVENT(aVisitor.mEvent) ||
-       NS_IS_DRAG_EVENT(aVisitor.mEvent))) {
+      (aVisitor.mEvent->HasMouseEventMessage() ||
+       aVisitor.mEvent->HasDragEventMessage())) {
     mAddActiveEventFuzzTime = false;
   }
 
@@ -8097,7 +8097,7 @@ nsGlobalWindow::AddEventListener(const nsAString& aType,
 
 void
 nsGlobalWindow::AddEventListener(const nsAString& aType,
-                                 nsIDOMEventListener* aListener,
+                                 EventListener* aListener,
                                  bool aUseCapture,
                                  const Nullable<bool>& aWantsUntrusted,
                                  ErrorResult& aRv)

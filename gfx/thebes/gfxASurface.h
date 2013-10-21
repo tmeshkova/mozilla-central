@@ -12,10 +12,14 @@
 
 #include "mozilla/MemoryReporting.h"
 #include "gfxTypes.h"
-#include "gfxRect.h"
-#include "nsAutoPtr.h"
-#include "nsAutoRef.h"
-#include "nsThreadUtils.h"
+#include "mozilla/Scoped.h"
+#include "nscore.h"
+
+#ifdef MOZILLA_INTERNAL_API
+#include "nsStringFwd.h"
+#else
+#include "nsStringAPI.h"
+#endif
 
 typedef struct _cairo_surface cairo_surface_t;
 typedef struct _cairo_user_data_key cairo_user_data_key_t;
@@ -25,6 +29,12 @@ typedef void (*thebes_destroy_func_t) (void *data);
 class gfxImageSurface;
 struct nsIntPoint;
 struct nsIntRect;
+struct gfxRect;
+struct gfxPoint;
+struct nsIntSize;
+
+template <typename T>
+struct already_AddRefed;
 
 /**
  * A surface is something you can draw on. Instantiate a subclass of this
@@ -37,14 +47,8 @@ public:
     nsrefcnt Release(void);
 
     // These functions exist so that browsercomps can refcount a gfxASurface
-    virtual nsrefcnt AddRefExternal(void)
-    {
-      return AddRef();
-    }
-    virtual nsrefcnt ReleaseExternal(void)
-    {
-      return Release();
-    }
+    virtual nsrefcnt AddRefExternal(void);
+    virtual nsrefcnt ReleaseExternal(void);
 #else
     virtual nsrefcnt AddRef(void);
     virtual nsrefcnt Release(void);
@@ -107,7 +111,6 @@ public:
 
     /*** this DOES NOT addref the surface */
     cairo_surface_t *CairoSurface() {
-        NS_ASSERTION(mSurface != nullptr, "gfxASurface::CairoSurface called with mSurface == nullptr!");
         return mSurface;
     }
 
@@ -144,17 +147,14 @@ public:
      * Returns null on error.
      */
     virtual already_AddRefed<gfxASurface> CreateSimilarSurface(gfxContentType aType,
-                                                               const gfxIntSize& aSize);
+                                                               const nsIntSize& aSize);
 
     /**
      * Returns an image surface for this surface, or nullptr if not supported.
      * This will not copy image data, just wraps an image surface around
      * pixel data already available in memory.
      */
-    virtual already_AddRefed<gfxImageSurface> GetAsImageSurface()
-    {
-      return nullptr;
-    }
+    virtual already_AddRefed<gfxImageSurface> GetAsImageSurface();
 
     /**
      * Returns a read-only ARGB32 image surface for this surface. If this is an
@@ -175,7 +175,7 @@ public:
      * using 4 bytes per pixel; optionally, make sure that either dimension
      * doesn't exceed the given limit.
      */
-    static bool CheckSurfaceSize(const gfxIntSize& sz, int32_t limit = 0);
+    static bool CheckSurfaceSize(const nsIntSize& sz, int32_t limit = 0);
 
     /* Provide a stride value that will respect all alignment requirements of
      * the accelerated image-rendering code.
@@ -241,7 +241,7 @@ public:
 
     static int32_t BytePerPixelFromFormat(gfxImageFormat format);
 
-    virtual const gfxIntSize GetSize() const { return gfxIntSize(-1, -1); }
+    virtual const nsIntSize GetSize() const;
 
     /**
      * Debug functions to encode the current image as a PNG and export it.
@@ -266,23 +266,15 @@ public:
      * Copy a PNG encoded Data URL to the clipboard.
      */
     void CopyAsDataURL();
-    
+
     void WriteAsPNG_internal(FILE* aFile, bool aBinary);
 
-    void SetOpaqueRect(const gfxRect& aRect) {
-        if (aRect.IsEmpty()) {
-            mOpaqueRect = nullptr;
-        } else if (mOpaqueRect) {
-            *mOpaqueRect = aRect;
-        } else {
-            mOpaqueRect = new gfxRect(aRect);
-        }
-    }
+    void SetOpaqueRect(const gfxRect& aRect);
+
     const gfxRect& GetOpaqueRect() {
-        if (mOpaqueRect)
+        if (!!mOpaqueRect)
             return *mOpaqueRect;
-        static const gfxRect empty(0, 0, 0, 0);
-        return empty;
+        return GetEmptyOpaqueRect();
     }
 
     /**
@@ -307,11 +299,7 @@ public:
     static uint8_t BytesPerPixel(gfxImageFormat aImageFormat);
 
 protected:
-    gfxASurface() : mSurface(nullptr), mFloatingRefs(0), mBytesRecorded(0),
-                    mSurfaceValid(false), mAllowUseAsSource(true)
-    {
-        MOZ_COUNT_CTOR(gfxASurface);
-    }
+    gfxASurface();
 
     static gfxASurface* GetSurfaceWrapper(cairo_surface_t *csurf);
     static void SetSurfaceWrapper(cairo_surface_t *csurf, gfxASurface *asurf);
@@ -329,15 +317,14 @@ protected:
     // leaks and use-after-frees are possible.
     void Init(cairo_surface_t *surface, bool existingSurface = false);
 
-    virtual ~gfxASurface()
-    {
-        RecordMemoryFreed();
+    // out-of-line helper to allow GetOpaqueRect() to be inlined
+    // without including gfxRect.h here
+    static const gfxRect& GetEmptyOpaqueRect();
 
-        MOZ_COUNT_DTOR(gfxASurface);
-    }
+    virtual ~gfxASurface();
 
     cairo_surface_t *mSurface;
-    nsAutoPtr<gfxRect> mOpaqueRect;
+    mozilla::ScopedDeletePtr<gfxRect> mOpaqueRect;
 
 private:
     static void SurfaceDestroyFunc(void *data);
@@ -362,56 +349,4 @@ public:
     virtual ~gfxUnknownSurface() { }
 };
 
-#ifndef XPCOM_GLUE_AVOID_NSPR
-/**
- * We need to be able to hold a reference to a gfxASurface from Image
- * subclasses. This is potentially a problem since Images can be addrefed
- * or released off the main thread. We can ensure that we never AddRef
- * a gfxASurface off the main thread, but we might want to Release due
- * to an Image being destroyed off the main thread.
- * 
- * We use nsCountedRef<nsMainThreadSurfaceRef> to reference the
- * gfxASurface. When AddRefing, we assert that we're on the main thread.
- * When Releasing, if we're not on the main thread, we post an event to
- * the main thread to do the actual release.
- */
-class nsMainThreadSurfaceRef;
-
-template <>
-class nsAutoRefTraits<nsMainThreadSurfaceRef> {
-public:
-  typedef gfxASurface* RawRef;
-
-  /**
-   * The XPCOM event that will do the actual release on the main thread.
-   */
-  class SurfaceReleaser : public nsRunnable {
-  public:
-    SurfaceReleaser(RawRef aRef) : mRef(aRef) {}
-    NS_IMETHOD Run() {
-      mRef->Release();
-      return NS_OK;
-    }
-    RawRef mRef;
-  };
-
-  static RawRef Void() { return nullptr; }
-  static void Release(RawRef aRawRef)
-  {
-    if (NS_IsMainThread()) {
-      aRawRef->Release();
-      return;
-    }
-    nsCOMPtr<nsIRunnable> runnable = new SurfaceReleaser(aRawRef);
-    NS_DispatchToMainThread(runnable);
-  }
-  static void AddRef(RawRef aRawRef)
-  {
-    NS_ASSERTION(NS_IsMainThread(),
-                 "Can only add a reference on the main thread");
-    aRawRef->AddRef();
-  }
-};
-
-#endif
 #endif /* GFX_ASURFACE_H */
