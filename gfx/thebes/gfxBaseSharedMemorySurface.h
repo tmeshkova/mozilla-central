@@ -55,7 +55,7 @@ public:
     static already_AddRefed<Sub>
     Create(ShmemAllocator* aAllocator,
            const gfxIntSize& aSize,
-           gfxASurface::gfxImageFormat aFormat,
+           gfxImageFormat aFormat,
            SharedMemory::SharedMemoryType aShmType = SharedMemory::TYPE_BASIC)
     {
         return Create<ShmemAllocator, false>(aAllocator, aSize, aFormat, aShmType);
@@ -75,7 +75,7 @@ public:
         if (!gfxASurface::CheckSurfaceSize(size))
             return nullptr;
        
-        gfxASurface::gfxImageFormat format = (gfxASurface::gfxImageFormat)shmInfo->format;
+        gfxImageFormat format = (gfxImageFormat)shmInfo->format;
         long stride = gfxImageSurface::ComputeStride(size, format);
 
         nsRefPtr<Sub> s =
@@ -91,7 +91,7 @@ public:
     static already_AddRefed<Sub>
     CreateUnsafe(ShmemAllocator* aAllocator,
                  const gfxIntSize& aSize,
-                 gfxASurface::gfxImageFormat aFormat,
+                 gfxImageFormat aFormat,
                  SharedMemory::SharedMemoryType aShmType = SharedMemory::TYPE_BASIC)
     {
         return Create<ShmemAllocator, true>(aAllocator, aSize, aFormat, aShmType);
@@ -102,13 +102,13 @@ public:
     static bool IsSharedImage(gfxASurface *aSurface)
     {
         return (aSurface
-                && aSurface->GetType() == gfxASurface::SurfaceTypeImage
+                && aSurface->GetType() == gfxSurfaceTypeImage
                 && aSurface->GetData(&SHM_KEY));
     }
 
 protected:
     gfxBaseSharedMemorySurface(const gfxIntSize& aSize, long aStride, 
-                               gfxASurface::gfxImageFormat aFormat, 
+                               gfxImageFormat aFormat, 
                                const Shmem& aShmem)
       : Base(aShmem.get<unsigned char>(), aSize, aStride, aFormat)
     {
@@ -137,7 +137,7 @@ private:
     static already_AddRefed<Sub>
     Create(ShmemAllocator* aAllocator,
            const gfxIntSize& aSize,
-           gfxASurface::gfxImageFormat aFormat,
+           gfxImageFormat aFormat,
            SharedMemory::SharedMemoryType aShmType)
     {
         if (!gfxASurface::CheckSurfaceSize(aSize))

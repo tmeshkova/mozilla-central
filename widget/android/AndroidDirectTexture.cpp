@@ -8,8 +8,6 @@
 #include "AndroidDirectTexture.h"
 #include "nsRect.h"
 
-typedef gfxASurface::gfxImageFormat gfxImageFormat;
-
 namespace mozilla {
 
 AndroidDirectTexture::AndroidDirectTexture(uint32_t width, uint32_t height, uint32_t usage,
@@ -92,7 +90,7 @@ AndroidDirectTexture::Reallocate(uint32_t aWidth, uint32_t aHeight) {
 }
 
 bool
-AndroidDirectTexture::Reallocate(uint32_t aWidth, uint32_t aHeight, gfxASurface::gfxImageFormat aFormat)
+AndroidDirectTexture::Reallocate(uint32_t aWidth, uint32_t aHeight, gfxImageFormat aFormat)
 {
   MutexAutoLock lock(mLock);
 

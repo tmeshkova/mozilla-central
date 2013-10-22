@@ -616,18 +616,18 @@ EmbedLiteViewThreadParent::RecvSyncMessage(const nsString& aMessage,
   return true;
 }
 
-static inline gfxASurface::gfxImageFormat
+static inline gfxImageFormat
 _depth_to_gfxformat(int depth)
 {
   switch (depth) {
     case 32:
-      return gfxASurface::ImageFormatARGB32;
+      return gfxImageFormatARGB32;
     case 24:
-      return gfxASurface::ImageFormatRGB24;
+      return gfxImageFormatRGB24;
     case 16:
-      return gfxASurface::ImageFormatRGB16_565;
+      return gfxImageFormatRGB16_565;
     default:
-      return gfxASurface::ImageFormatUnknown;
+      return gfxImageFormatUnknown;
   }
 }
 

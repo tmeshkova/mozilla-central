@@ -23,6 +23,7 @@
 #include "nsISupportsImpl.h"            // for gfxContext::AddRef, etc
 #include "nsSize.h"                     // for nsIntSize
 #include "nsMathUtils.h"               // for NS_roundf
+#include "gfxImageSurface.h"
 
 #ifdef GFX_TILEDLAYER_DEBUG_OVERLAY
 #include "cairo.h"
@@ -118,13 +119,13 @@ BasicTiledLayerBuffer::HasFormatChanged() const
 }
 
 
-gfxASurface::gfxContentType
+gfxContentType
 BasicTiledLayerBuffer::GetContentType() const
 {
   if (mThebesLayer->CanUseOpaqueSurface()) {
-    return gfxASurface::CONTENT_COLOR;
+    return GFX_CONTENT_COLOR;
   } else {
-    return gfxASurface::CONTENT_COLOR_ALPHA;
+    return GFX_CONTENT_COLOR_ALPHA;
   }
 }
 
@@ -165,7 +166,7 @@ BasicTiledLayerBuffer::PaintThebes(const nsIntRegion& aNewValidRegion,
     const nsIntRect bounds = aPaintRegion.GetBounds();
     {
       PROFILER_LABEL("BasicTiledLayerBuffer", "PaintThebesSingleBufferAlloc");
-      gfxASurface::gfxImageFormat format =
+      gfxImageFormat format =
         gfxPlatform::GetPlatform()->OptimalFormatForContent(
           GetContentType());
 

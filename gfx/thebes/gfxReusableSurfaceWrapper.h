@@ -45,7 +45,10 @@ public:
     return mSurfaceData;
   }
 
-  const gfxASurface::gfxImageFormat& Format() { return mFormat; }
+  /**
+   * Returns the image surface format.
+   */
+  virtual gfxImageFormat Format() { return mFormat; }
 
   /**
    * Get a writable copy of the image.
@@ -65,7 +68,7 @@ public:
 private:
   NS_DECL_OWNINGTHREAD
   nsRefPtr<gfxImageSurface>         mSurface;
-  const gfxASurface::gfxImageFormat mFormat;
+  const gfxImageFormat              mFormat;
   const unsigned char*              mSurfaceData;
   mozilla::Atomic<int32_t>                           mReadCount;
 };

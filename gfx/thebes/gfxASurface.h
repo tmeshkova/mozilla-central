@@ -21,11 +21,6 @@
 #include "nsStringAPI.h"
 #endif
 
-typedef struct _cairo_surface cairo_surface_t;
-typedef struct _cairo_user_data_key cairo_user_data_key_t;
-
-typedef void (*thebes_destroy_func_t) (void *data);
-
 class gfxImageSurface;
 struct nsIntPoint;
 struct nsIntRect;
@@ -55,54 +50,6 @@ public:
 #endif
 
 public:
-    /**
-     * The format for an image surface. For all formats with alpha data, 0
-     * means transparent, 1 or 255 means fully opaque.
-     */
-    typedef enum {
-        ImageFormatARGB32, ///< ARGB data in native endianness, using premultiplied alpha
-        ImageFormatRGB24,  ///< xRGB data in native endianness
-        ImageFormatA8,     ///< Only an alpha channel
-        ImageFormatA1,     ///< Packed transparency information (one byte refers to 8 pixels)
-        ImageFormatRGB16_565,  ///< RGB_565 data in native endianness
-        ImageFormatUnknown
-    } gfxImageFormat;
-
-    typedef enum {
-        SurfaceTypeImage,
-        SurfaceTypePDF,
-        SurfaceTypePS,
-        SurfaceTypeXlib,
-        SurfaceTypeXcb,
-        SurfaceTypeGlitz,           // unused, but needed for cairo parity
-        SurfaceTypeQuartz,
-        SurfaceTypeWin32,
-        SurfaceTypeBeOS,
-        SurfaceTypeDirectFB,        // unused, but needed for cairo parity
-        SurfaceTypeSVG,
-        SurfaceTypeOS2,
-        SurfaceTypeWin32Printing,
-        SurfaceTypeQuartzImage,
-        SurfaceTypeScript,
-        SurfaceTypeQPainter,
-        SurfaceTypeRecording,
-        SurfaceTypeVG,
-        SurfaceTypeGL,
-        SurfaceTypeDRM,
-        SurfaceTypeTee,
-        SurfaceTypeXML,
-        SurfaceTypeSkia,
-        SurfaceTypeSubsurface,
-        SurfaceTypeD2D,
-        SurfaceTypeMax
-    } gfxSurfaceType;
-
-    typedef enum {
-        CONTENT_COLOR       = 0x1000,
-        CONTENT_ALPHA       = 0x2000,
-        CONTENT_COLOR_ALPHA = 0x3000,
-        CONTENT_SENTINEL    = 0xffff
-    } gfxContentType;
 
     /** Wrap the given cairo surface and return a gfxASurface for it.
      * This adds a reference to csurf (owned by the returned gfxASurface).
@@ -197,7 +144,7 @@ public:
      * Record number of bytes for given surface type.  Use positive bytes
      * for allocations and negative bytes for deallocations.
      */
-    static void RecordMemoryUsedForSurfaceType(gfxASurface::gfxSurfaceType aType,
+    static void RecordMemoryUsedForSurfaceType(gfxSurfaceType aType,
                                                int32_t aBytes);
 
     /**
@@ -223,21 +170,10 @@ public:
     virtual bool SizeOfIsMeasured() const { return false; }
 
     /**
-     * The memory used by this surface (as reported by KnownMemoryUsed()) can
-     * either live in this process's heap, in this process but outside the
-     * heap, or in another process altogether.
-     */
-    enum MemoryLocation {
-      MEMORY_IN_PROCESS_HEAP,
-      MEMORY_IN_PROCESS_NONHEAP,
-      MEMORY_OUT_OF_PROCESS
-    };
-
-    /**
      * Where does this surface's memory live?  By default, we say it's in this
      * process's heap.
      */
-    virtual MemoryLocation GetMemoryLocation() const;
+    virtual gfxMemoryLocation GetMemoryLocation() const;
 
     static int32_t BytePerPixelFromFormat(gfxImageFormat format);
 

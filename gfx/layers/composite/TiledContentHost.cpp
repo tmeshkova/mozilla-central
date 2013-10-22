@@ -15,6 +15,7 @@
 #include "nsPrintfCString.h"            // for nsPrintfCString
 #include "nsRect.h"                     // for nsIntRect
 #include "nsSize.h"                     // for nsIntSize
+#include "gfxImageSurface.h"
 
 class gfxReusableSurfaceWrapper;
 
