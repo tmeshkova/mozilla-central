@@ -27,6 +27,7 @@
 #include <stdint.h>
 #include "nsDebug.h"                    // for NS_ASSERTION, NS_WARNING, etc
 #include "nsTraceRefcnt.h"              // for MOZ_COUNT_CTOR, etc
+#include "ImageContainer.h"             // for PlanarYCbCrImage, etc
 
 #ifdef MOZ_ANDROID_OMTC
 #  include "gfxReusableImageSurfaceWrapper.h"
@@ -315,7 +316,7 @@ BufferTextureClient::AllocateForSurface(gfx::IntSize aSize)
 }
 
 bool
-BufferTextureClient::UpdateYCbCr(const PlanarYCbCrImage::Data& aData)
+BufferTextureClient::UpdateYCbCr(const PlanarYCbCrData& aData)
 {
   MOZ_ASSERT(mFormat == gfx::FORMAT_YUV, "This textureClient can only use YCbCr data");
   MOZ_ASSERT(!IsImmutable());
@@ -650,7 +651,7 @@ AutoLockYCbCrClient::Update(PlanarYCbCrImage* aImage)
   MOZ_ASSERT(aImage);
   MOZ_ASSERT(mDescriptor);
 
-  const PlanarYCbCrImage::Data *data = aImage->GetData();
+  const PlanarYCbCrData *data = aImage->GetData();
   NS_ASSERTION(data, "Must be able to retrieve yuv data from image!");
   if (!data) {
     return false;
@@ -680,7 +681,7 @@ bool AutoLockYCbCrClient::EnsureDeprecatedTextureClient(PlanarYCbCrImage* aImage
     return false;
   }
 
-  const PlanarYCbCrImage::Data *data = aImage->GetData();
+  const PlanarYCbCrData *data = aImage->GetData();
   NS_ASSERTION(data, "Must be able to retrieve yuv data from image!");
   if (!data) {
     return false;

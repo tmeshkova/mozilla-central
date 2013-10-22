@@ -910,6 +910,7 @@ void MediaDecoder::PlaybackEnded()
 
   PlaybackPositionChanged();
   ChangeState(PLAY_STATE_ENDED);
+  InvalidateWithFlags(VideoFrameContainer::INVALIDATE_FORCE);
 
   UpdateReadyStateForData();
   if (mOwner)  {
@@ -1473,6 +1474,13 @@ ReentrantMonitor& MediaDecoder::GetReentrantMonitor() {
 ImageContainer* MediaDecoder::GetImageContainer()
 {
   return mVideoFrameContainer ? mVideoFrameContainer->GetImageContainer() : nullptr;
+}
+
+void MediaDecoder::InvalidateWithFlags(uint32_t aFlags)
+{
+  if (mVideoFrameContainer) {
+    mVideoFrameContainer->InvalidateWithFlags(aFlags);
+  }
 }
 
 void MediaDecoder::Invalidate()

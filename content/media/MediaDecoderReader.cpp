@@ -23,6 +23,7 @@ namespace mozilla {
 
 using layers::ImageContainer;
 using layers::PlanarYCbCrImage;
+using layers::PlanarYCbCrData;
 using layers::SharedTextureImage;
 
 // Verify these values are sane. Once we've checked the frame sizes, we then
@@ -231,7 +232,7 @@ VideoData* VideoData::Create(VideoInfo& aInfo,
                "Wrong format?");
   PlanarYCbCrImage* videoImage = static_cast<PlanarYCbCrImage*>(v->mImage.get());
 
-  PlanarYCbCrImage::Data data;
+  PlanarYCbCrData data;
   data.mYChannel = Y.mData + Y.mOffset;
   data.mYSize = gfxIntSize(Y.mWidth, Y.mHeight);
   data.mYStride = Y.mStride;

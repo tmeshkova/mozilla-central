@@ -47,10 +47,10 @@
 #include "mozilla/dom/HTMLCanvasElement.h"
 #include "nsICanvasRenderingContextInternal.h"
 #include "gfxPlatform.h"
-#include "nsClientRect.h"
 #include <algorithm>
 #include "mozilla/dom/HTMLVideoElement.h"
 #include "mozilla/dom/HTMLImageElement.h"
+#include "mozilla/dom/DOMRect.h"
 #include "imgIRequest.h"
 #include "nsIImageLoadingContent.h"
 #include "nsCOMPtr.h"
@@ -69,6 +69,7 @@
 #include "nsStyleStructInlines.h"
 #include "nsStyleTransformMatrix.h"
 #include "nsIFrameInlines.h"
+#include "ImageContainer.h"
 
 #include "mozilla/Preferences.h"
 
@@ -1294,7 +1295,7 @@ nsLayoutUtils::GetEventCoordinatesRelativeTo(const nsEvent* aEvent, nsIFrame* aF
                   aEvent->eventStructType != NS_QUERY_CONTENT_EVENT))
     return nsPoint(NS_UNCONSTRAINEDSIZE, NS_UNCONSTRAINEDSIZE);
 
-  const nsGUIEvent* GUIEvent = static_cast<const nsGUIEvent*>(aEvent);
+  const WidgetGUIEvent* GUIEvent = static_cast<const WidgetGUIEvent*>(aEvent);
   return GetEventCoordinatesRelativeTo(aEvent,
                                        LayoutDeviceIntPoint::ToUntyped(GUIEvent->refPoint),
                                        aFrame);
@@ -1309,7 +1310,7 @@ nsLayoutUtils::GetEventCoordinatesRelativeTo(const nsEvent* aEvent,
     return nsPoint(NS_UNCONSTRAINEDSIZE, NS_UNCONSTRAINEDSIZE);
   }
 
-  const nsGUIEvent* GUIEvent = static_cast<const nsGUIEvent*>(aEvent);
+  const WidgetGUIEvent* GUIEvent = static_cast<const WidgetGUIEvent*>(aEvent);
   nsIWidget* widget = GUIEvent->widget;
   if (!widget) {
     return nsPoint(NS_UNCONSTRAINEDSIZE, NS_UNCONSTRAINEDSIZE);
@@ -2354,13 +2355,13 @@ void nsLayoutUtils::RectAccumulator::AddRect(const nsRect& aRect) {
   }
 }
 
-nsLayoutUtils::RectListBuilder::RectListBuilder(nsClientRectList* aList)
+nsLayoutUtils::RectListBuilder::RectListBuilder(DOMRectList* aList)
   : mRectList(aList)
 {
 }
 
 void nsLayoutUtils::RectListBuilder::AddRect(const nsRect& aRect) {
-  nsRefPtr<nsClientRect> rect = new nsClientRect(mRectList);
+  nsRefPtr<DOMRect> rect = new DOMRect(mRectList);
 
   rect->SetLayoutRect(aRect);
   mRectList->Append(rect);

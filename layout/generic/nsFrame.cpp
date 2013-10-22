@@ -2346,8 +2346,8 @@ nsFrame::FireDOMEvent(const nsAString& aDOMEventName, nsIContent *aContent)
 
 NS_IMETHODIMP
 nsFrame::HandleEvent(nsPresContext* aPresContext, 
-                     nsGUIEvent*     aEvent,
-                     nsEventStatus*  aEventStatus)
+                     WidgetGUIEvent* aEvent,
+                     nsEventStatus* aEventStatus)
 {
 
   if (aEvent->message == NS_MOUSE_MOVE) {
@@ -2556,8 +2556,8 @@ nsFrame::IsSelectable(bool* aSelectable, uint8_t* aSelectStyle) const
  */
 NS_IMETHODIMP
 nsFrame::HandlePress(nsPresContext* aPresContext, 
-                     nsGUIEvent*     aEvent,
-                     nsEventStatus*  aEventStatus)
+                     WidgetGUIEvent* aEvent,
+                     nsEventStatus* aEventStatus)
 {
   NS_ENSURE_ARG_POINTER(aEventStatus);
   if (nsEventStatus_eConsumeNoDefault == *aEventStatus) {
@@ -2824,9 +2824,9 @@ nsFrame::SelectByTypeAtPoint(nsPresContext* aPresContext,
  */
 NS_IMETHODIMP
 nsFrame::HandleMultiplePress(nsPresContext* aPresContext,
-                             nsGUIEvent*    aEvent,
+                             WidgetGUIEvent* aEvent,
                              nsEventStatus* aEventStatus,
-                             bool           aControlHeld)
+                             bool aControlHeld)
 {
   NS_ENSURE_ARG_POINTER(aEvent);
   NS_ENSURE_ARG_POINTER(aEventStatus);
@@ -2942,8 +2942,8 @@ nsFrame::PeekBackwardAndForward(nsSelectionAmount aAmountBack,
 }
 
 NS_IMETHODIMP nsFrame::HandleDrag(nsPresContext* aPresContext, 
-                                  nsGUIEvent*     aEvent,
-                                  nsEventStatus*  aEventStatus)
+                                  WidgetGUIEvent* aEvent,
+                                  nsEventStatus* aEventStatus)
 {
   MOZ_ASSERT(aEvent->eventStructType == NS_MOUSE_EVENT, "HandleDrag can only handle mouse event");
 
@@ -3020,7 +3020,7 @@ HandleFrameSelection(nsFrameSelection*         aFrameSelection,
                      int32_t                   aContentOffsetForTableSel,
                      int32_t                   aTargetForTableSel,
                      nsIContent*               aParentContentForTableSel,
-                     nsGUIEvent*               aEvent,
+                     WidgetGUIEvent*           aEvent,
                      nsEventStatus*            aEventStatus)
 {
   if (!aFrameSelection) {
@@ -3075,7 +3075,7 @@ HandleFrameSelection(nsFrameSelection*         aFrameSelection,
 }
 
 NS_IMETHODIMP nsFrame::HandleRelease(nsPresContext* aPresContext,
-                                     nsGUIEvent*    aEvent,
+                                     WidgetGUIEvent* aEvent,
                                      nsEventStatus* aEventStatus)
 {
   if (aEvent->eventStructType != NS_MOUSE_EVENT) {
@@ -4995,11 +4995,21 @@ nsIFrame::SchedulePaint(uint32_t aFlags)
 }
 
 Layer*
-nsIFrame::InvalidateLayer(uint32_t aDisplayItemKey, const nsIntRect* aDamageRect)
+nsIFrame::InvalidateLayer(uint32_t aDisplayItemKey,
+                          const nsIntRect* aDamageRect,
+                          uint32_t aFlags /* = 0 */)
 {
   NS_ASSERTION(aDisplayItemKey > 0, "Need a key");
 
   Layer* layer = FrameLayerBuilder::GetDedicatedLayer(this, aDisplayItemKey);
+
+  // If the layer is being updated asynchronously, and it's being forwarded
+  // to a compositor, then we don't need to invalidate.
+  if ((aFlags & UPDATE_IS_ASYNC) && layer &&
+      layer->Manager()->GetBackendType() == LAYERS_CLIENT) {
+    return layer;
+  }
+
   if (aDamageRect && aDamageRect->IsEmpty()) {
     return layer;
   }
