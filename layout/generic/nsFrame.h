@@ -165,7 +165,7 @@ public:
   NS_IMETHOD  HandleEvent(nsPresContext* aPresContext, 
                           mozilla::WidgetGUIEvent* aEvent,
                           nsEventStatus* aEventStatus) MOZ_OVERRIDE;
-  NS_IMETHOD  GetContentForEvent(nsEvent* aEvent,
+  NS_IMETHOD  GetContentForEvent(mozilla::WidgetEvent* aEvent,
                                  nsIContent** aContent) MOZ_OVERRIDE;
   NS_IMETHOD  GetCursor(const nsPoint&    aPoint,
                         nsIFrame::Cursor& aCursor) MOZ_OVERRIDE;
@@ -618,10 +618,12 @@ protected:
   //   of the enclosing cell or table (if not inside a cell)
   //  aTarget tells us what table element to select (currently only cell and table supported)
   //  (enums for this are defined in nsIFrame.h)
-  NS_IMETHOD GetDataForTableSelection(const nsFrameSelection *aFrameSelection,
-                                      nsIPresShell *aPresShell, nsMouseEvent *aMouseEvent, 
-                                      nsIContent **aParentContent, int32_t *aContentOffset, 
-                                      int32_t *aTarget);
+  NS_IMETHOD GetDataForTableSelection(const nsFrameSelection* aFrameSelection,
+                                      nsIPresShell* aPresShell,
+                                      mozilla::WidgetMouseEvent* aMouseEvent,
+                                      nsIContent** aParentContent,
+                                      int32_t* aContentOffset,
+                                      int32_t* aTarget);
 
   // Fills aCursor with the appropriate information from ui
   static void FillCursorInformationFromStyle(const nsStyleUserInterface* ui,

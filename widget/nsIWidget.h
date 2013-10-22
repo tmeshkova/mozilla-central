@@ -51,7 +51,7 @@ class DrawTarget;
 /**
  * Callback function that processes events.
  *
- * The argument is actually a subtype (subclass) of nsEvent which carries
+ * The argument is actually a subtype (subclass) of WidgetEvent which carries
  * platform specific information about the event. Platform specific code
  * knows how to deal with it.
  *
@@ -1444,7 +1444,7 @@ class nsIWidget : public nsISupports {
     /**
      * Begin a window moving drag, based on the event passed in.
      */
-    NS_IMETHOD BeginMoveDrag(nsMouseEvent* aEvent) = 0;
+    NS_IMETHOD BeginMoveDrag(mozilla::WidgetMouseEvent* aEvent) = 0;
 
     enum Modifiers {
         CAPS_LOCK = 0x01, // when CapsLock is active

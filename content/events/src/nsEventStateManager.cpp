@@ -132,11 +132,12 @@ RoundDown(double aDouble)
 }
 
 static inline bool
-IsMouseEventReal(nsEvent* aEvent)
+IsMouseEventReal(WidgetEvent* aEvent)
 {
   NS_ABORT_IF_FALSE(aEvent->IsMouseDerivedEvent(), "Not a mouse event");
   // Return true if not synthesized.
-  return static_cast<nsMouseEvent*>(aEvent)->reason == nsMouseEvent::eReal;
+  return static_cast<WidgetMouseEvent*>(aEvent)->reason ==
+           WidgetMouseEvent::eReal;
 }
 
 #ifdef DEBUG_DOCSHELL_FOCUS
@@ -277,7 +278,7 @@ public:
   // frame might be destroyed in the event handler.
   static bool UpdateTransaction(WheelEvent* aEvent);
   static void EndTransaction();
-  static void OnEvent(nsEvent* aEvent);
+  static void OnEvent(WidgetEvent* aEvent);
   static void Shutdown();
   static uint32_t GetTimeoutTime();
 
@@ -375,7 +376,7 @@ nsMouseWheelTransaction::UpdateTransaction(WheelEvent* aEvent)
     sScrollSeriesCounter = 0;
   sScrollSeriesCounter++;
 
-  // We should use current time instead of nsEvent.time.
+  // We should use current time instead of WidgetEvent.time.
   // 1. Some events doesn't have the correct creation time.
   // 2. If the computer runs slowly by other processes eating the CPU resource,
   //    the event creation time doesn't keep real time.
@@ -394,7 +395,7 @@ nsMouseWheelTransaction::EndTransaction()
 }
 
 void
-nsMouseWheelTransaction::OnEvent(nsEvent* aEvent)
+nsMouseWheelTransaction::OnEvent(WidgetEvent* aEvent)
 {
   if (!sTargetFrame)
     return;
@@ -780,7 +781,7 @@ NS_IMPL_CYCLE_COLLECTION_17(nsEventStateManager,
 
 nsresult
 nsEventStateManager::PreHandleEvent(nsPresContext* aPresContext,
-                                    nsEvent *aEvent,
+                                    WidgetEvent* aEvent,
                                     nsIFrame* aTargetFrame,
                                     nsEventStatus* aStatus)
 {
@@ -842,31 +843,38 @@ nsEventStateManager::PreHandleEvent(nsPresContext* aPresContext,
 
   switch (aEvent->message) {
   case NS_MOUSE_BUTTON_DOWN:
-    switch (static_cast<nsMouseEvent*>(aEvent)->button) {
-    case nsMouseEvent::eLeftButton:
+    switch (static_cast<WidgetMouseEvent*>(aEvent)->button) {
+    case WidgetMouseEvent::eLeftButton:
 #ifndef XP_OS2
-      BeginTrackingDragGesture(aPresContext, (nsMouseEvent*)aEvent, aTargetFrame);
+      BeginTrackingDragGesture(aPresContext,
+                               static_cast<WidgetMouseEvent*>(aEvent),
+                               aTargetFrame);
 #endif
-      mLClickCount = ((nsMouseEvent*)aEvent)->clickCount;
-      SetClickCount(aPresContext, (nsMouseEvent*)aEvent, aStatus);
+      mLClickCount = static_cast<WidgetMouseEvent*>(aEvent)->clickCount;
+      SetClickCount(aPresContext, static_cast<WidgetMouseEvent*>(aEvent),
+                    aStatus);
       sNormalLMouseEventInProcess = true;
       break;
-    case nsMouseEvent::eMiddleButton:
-      mMClickCount = ((nsMouseEvent*)aEvent)->clickCount;
-      SetClickCount(aPresContext, (nsMouseEvent*)aEvent, aStatus);
+    case WidgetMouseEvent::eMiddleButton:
+      mMClickCount = static_cast<WidgetMouseEvent*>(aEvent)->clickCount;
+      SetClickCount(aPresContext, static_cast<WidgetMouseEvent*>(aEvent),
+                    aStatus);
       break;
-    case nsMouseEvent::eRightButton:
+    case WidgetMouseEvent::eRightButton:
 #ifdef XP_OS2
-      BeginTrackingDragGesture(aPresContext, (nsMouseEvent*)aEvent, aTargetFrame);
+      BeginTrackingDragGesture(aPresContext,
+                               static_cast<WidgetMouseEvent*>(aEvent),
+                               aTargetFrame);
 #endif
-      mRClickCount = ((nsMouseEvent*)aEvent)->clickCount;
-      SetClickCount(aPresContext, (nsMouseEvent*)aEvent, aStatus);
+      mRClickCount = static_cast<WidgetMouseEvent*>(aEvent)->clickCount;
+      SetClickCount(aPresContext, static_cast<WidgetMouseEvent*>(aEvent),
+                    aStatus);
       break;
     }
     break;
   case NS_MOUSE_BUTTON_UP:
-    switch (static_cast<nsMouseEvent*>(aEvent)->button) {
-      case nsMouseEvent::eLeftButton:
+    switch (static_cast<WidgetMouseEvent*>(aEvent)->button) {
+      case WidgetMouseEvent::eLeftButton:
         if (Prefs::ClickHoldContextMenu()) {
           KillClickHoldTimer();
         }
@@ -875,13 +883,14 @@ nsEventStateManager::PreHandleEvent(nsPresContext* aPresContext,
 #endif
         sNormalLMouseEventInProcess = false;
         // then fall through...
-      case nsMouseEvent::eRightButton:
+      case WidgetMouseEvent::eRightButton:
 #ifdef XP_OS2
         StopTrackingDragGesture();
 #endif
         // then fall through...
-      case nsMouseEvent::eMiddleButton:
-        SetClickCount(aPresContext, (nsMouseEvent*)aEvent, aStatus);
+      case WidgetMouseEvent::eMiddleButton:
+        SetClickCount(aPresContext, static_cast<WidgetMouseEvent*>(aEvent),
+                      aStatus);
         break;
     }
     break;
@@ -890,13 +899,13 @@ nsEventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     // really an exit --- we may have traversed widget boundaries but
     // we're still in our toplevel window.
     {
-      nsMouseEvent* mouseEvent = static_cast<nsMouseEvent*>(aEvent);
-      if (mouseEvent->exit != nsMouseEvent::eTopLevel) {
+      WidgetMouseEvent* mouseEvent = static_cast<WidgetMouseEvent*>(aEvent);
+      if (mouseEvent->exit != WidgetMouseEvent::eTopLevel) {
         // Treat it as a synthetic move so we don't generate spurious
         // "exit" or "move" events.  Any necessary "out" or "over" events
         // will be generated by GenerateMouseEnterExit
         mouseEvent->message = NS_MOUSE_MOVE;
-        mouseEvent->reason = nsMouseEvent::eSynthesized;
+        mouseEvent->reason = WidgetMouseEvent::eSynthesized;
         // then fall through...
       } else {
         GenerateMouseEnterExit(static_cast<WidgetGUIEvent*>(aEvent));
@@ -912,7 +921,7 @@ nsEventStateManager::PreHandleEvent(nsPresContext* aPresContext,
     // that ClearFrameRefs() has been called and it cleared out
     // |mCurrentTarget|. As a result, we should pass |mCurrentTarget|
     // into UpdateCursor().
-    GenerateDragGesture(aPresContext, (nsMouseEvent*)aEvent);
+    GenerateDragGesture(aPresContext, static_cast<WidgetMouseEvent*>(aEvent));
     UpdateCursor(aPresContext, aEvent, mCurrentTarget, aStatus);
     GenerateMouseEnterExit(static_cast<WidgetGUIEvent*>(aEvent));
     // Flush pending layout changes, so that later mouse move events
@@ -1377,7 +1386,7 @@ nsEventStateManager::HandleAccessKey(nsPresContext* aPresContext,
 }// end of HandleAccessKey
 
 bool
-nsEventStateManager::DispatchCrossProcessEvent(nsEvent* aEvent,
+nsEventStateManager::DispatchCrossProcessEvent(WidgetEvent* aEvent,
                                                nsFrameLoader* aFrameLoader,
                                                nsEventStatus *aStatus) {
   PBrowserParent* remoteBrowser = aFrameLoader->GetRemoteBrowser();
@@ -1388,7 +1397,7 @@ nsEventStateManager::DispatchCrossProcessEvent(nsEvent* aEvent,
 
   switch (aEvent->eventStructType) {
   case NS_MOUSE_EVENT: {
-    nsMouseEvent* mouseEvent = static_cast<nsMouseEvent*>(aEvent);
+    WidgetMouseEvent* mouseEvent = static_cast<WidgetMouseEvent*>(aEvent);
     return remote->SendRealMouseEvent(*mouseEvent);
   }
   case NS_KEY_EVENT: {
@@ -1438,7 +1447,7 @@ nsEventStateManager::IsRemoteTarget(nsIContent* target) {
 
 /*static*/ LayoutDeviceIntPoint
 nsEventStateManager::GetChildProcessOffset(nsFrameLoader* aFrameLoader,
-                                           const nsEvent& aEvent)
+                                           const WidgetEvent& aEvent)
 {
   // The "toplevel widget" in child processes is always at position
   // 0,0.  Map the event coordinates to match that.
@@ -1455,7 +1464,7 @@ nsEventStateManager::GetChildProcessOffset(nsFrameLoader* aFrameLoader,
 }
 
 bool
-CrossProcessSafeEvent(const nsEvent& aEvent)
+CrossProcessSafeEvent(const WidgetEvent& aEvent)
 {
   switch (aEvent.eventStructType) {
   case NS_KEY_EVENT:
@@ -1487,7 +1496,7 @@ CrossProcessSafeEvent(const nsEvent& aEvent)
 }
 
 bool
-nsEventStateManager::HandleCrossProcessEvent(nsEvent *aEvent,
+nsEventStateManager::HandleCrossProcessEvent(WidgetEvent* aEvent,
                                              nsIFrame* aTargetFrame,
                                              nsEventStatus *aStatus) {
   if (*aStatus == nsEventStatus_eConsumeNoDefault ||
@@ -1735,9 +1744,8 @@ nsEventStateManager::FireContextClick()
 
     if (allowedToDispatch) {
       // init the event while mCurrentTarget is still good
-      nsMouseEvent event(true, NS_CONTEXTMENU,
-                         targetWidget,
-                         nsMouseEvent::eReal);
+      WidgetMouseEvent event(true, NS_CONTEXTMENU, targetWidget,
+                             WidgetMouseEvent::eReal);
       event.clickCount = 1;
       FillInEventFromGestureDown(&event);
         
@@ -1792,7 +1800,7 @@ nsEventStateManager::FireContextClick()
 //
 void
 nsEventStateManager::BeginTrackingDragGesture(nsPresContext* aPresContext,
-                                              nsMouseEvent* inDownEvent,
+                                              WidgetMouseEvent* inDownEvent,
                                               nsIFrame* inDownFrame)
 {
   if (!inDownEvent->widget)
@@ -1831,7 +1839,7 @@ nsEventStateManager::StopTrackingDragGesture()
 }
 
 void
-nsEventStateManager::FillInEventFromGestureDown(nsMouseEvent* aEvent)
+nsEventStateManager::FillInEventFromGestureDown(WidgetMouseEvent* aEvent)
 {
   NS_ASSERTION(aEvent->widget == mCurrentTarget->GetNearestWidget(),
                "Incorrect widget in event");
@@ -1853,7 +1861,7 @@ nsEventStateManager::FillInEventFromGestureDown(nsMouseEvent* aEvent)
 // the mouse down, then fire off a drag gesture event.
 void
 nsEventStateManager::GenerateDragGesture(nsPresContext* aPresContext,
-                                         nsMouseEvent *aEvent)
+                                         WidgetMouseEvent* aEvent)
 {
   NS_ASSERTION(aPresContext, "This shouldn't happen.");
   if (IsTrackingDragGesture()) {
@@ -2933,7 +2941,7 @@ NodeAllowsClickThrough(nsINode* aNode)
 
 nsresult
 nsEventStateManager::PostHandleEvent(nsPresContext* aPresContext,
-                                     nsEvent *aEvent,
+                                     WidgetEvent* aEvent,
                                      nsIFrame* aTargetFrame,
                                      nsEventStatus* aStatus)
 {
@@ -2961,7 +2969,8 @@ nsEventStateManager::PostHandleEvent(nsPresContext* aPresContext,
   switch (aEvent->message) {
   case NS_MOUSE_BUTTON_DOWN:
     {
-      if (static_cast<nsMouseEvent*>(aEvent)->button == nsMouseEvent::eLeftButton &&
+      if (static_cast<WidgetMouseEvent*>(aEvent)->button ==
+            WidgetMouseEvent::eLeftButton &&
           !sNormalLMouseEventInProcess) {
         // We got a mouseup event while a mousedown event was being processed.
         // Make sure that the capturing content is cleared.
@@ -3090,8 +3099,8 @@ nsEventStateManager::PostHandleEvent(nsPresContext* aPresContext,
         }
 
         // The rest is left button-specific.
-        if (static_cast<nsMouseEvent*>(aEvent)->button !=
-            nsMouseEvent::eLeftButton)
+        if (static_cast<WidgetMouseEvent*>(aEvent)->button !=
+              WidgetMouseEvent::eLeftButton)
           break;
 
         if (activeContent) {
@@ -3149,7 +3158,8 @@ nsEventStateManager::PostHandleEvent(nsPresContext* aPresContext,
         }
         // Make sure to dispatch the click even if there is no frame for
         // the current target element. This is required for Web compatibility.
-        ret = CheckForAndDispatchClick(presContext, (nsMouseEvent*)aEvent,
+        ret = CheckForAndDispatchClick(presContext,
+                                       static_cast<WidgetMouseEvent*>(aEvent),
                                        aStatus);
       }
 
@@ -3352,7 +3362,7 @@ nsEventStateManager::PostHandleEvent(nsPresContext* aPresContext,
         WidgetDragEvent event(aEvent->mFlags.mIsTrusted,
                               NS_DRAGDROP_DRAGDROP, widget);
 
-        nsMouseEvent* mouseEvent = static_cast<nsMouseEvent*>(aEvent);
+        WidgetMouseEvent* mouseEvent = static_cast<WidgetMouseEvent*>(aEvent);
         event.refPoint = mouseEvent->refPoint;
         if (mouseEvent->widget) {
           event.refPoint += LayoutDeviceIntPoint::FromUntyped(mouseEvent->widget->WidgetToScreenOffset());
@@ -3450,7 +3460,7 @@ nsEventStateManager::PostHandleEvent(nsPresContext* aPresContext,
 }
 
 bool
-nsEventStateManager::RemoteQueryContentEvent(nsEvent *aEvent)
+nsEventStateManager::RemoteQueryContentEvent(WidgetEvent* aEvent)
 {
   WidgetQueryContentEvent *queryEvent =
       static_cast<WidgetQueryContentEvent*>(aEvent);
@@ -3508,7 +3518,8 @@ nsEventStateManager::ClearFrameRefs(nsIFrame* aFrame)
 
 void
 nsEventStateManager::UpdateCursor(nsPresContext* aPresContext,
-                                  nsEvent* aEvent, nsIFrame* aTargetFrame,
+                                  WidgetEvent* aEvent,
+                                  nsIFrame* aTargetFrame,
                                   nsEventStatus* aStatus)
 {
   if (aTargetFrame && IsRemoteTarget(aTargetFrame->GetContent())) {
@@ -3805,14 +3816,14 @@ nsEventStateManager::DispatchMouseEvent(WidgetGUIEvent* aEvent,
 
   PROFILER_LABEL("Input", "DispatchMouseEvent");
   nsEventStatus status = nsEventStatus_eIgnore;
-  nsMouseEvent event(aEvent->mFlags.mIsTrusted, aMessage, aEvent->widget,
-                     nsMouseEvent::eReal);
+  WidgetMouseEvent event(aEvent->mFlags.mIsTrusted, aMessage, aEvent->widget,
+                         WidgetMouseEvent::eReal);
   event.refPoint = aEvent->refPoint;
-  event.modifiers = ((nsMouseEvent*)aEvent)->modifiers;
-  event.buttons = ((nsMouseEvent*)aEvent)->buttons;
-  event.pluginEvent = ((nsMouseEvent*)aEvent)->pluginEvent;
+  event.modifiers = static_cast<WidgetMouseEvent*>(aEvent)->modifiers;
+  event.buttons = static_cast<WidgetMouseEvent*>(aEvent)->buttons;
+  event.pluginEvent = static_cast<WidgetMouseEvent*>(aEvent)->pluginEvent;
   event.relatedTarget = aRelatedContent;
-  event.inputSource = static_cast<nsMouseEvent*>(aEvent)->inputSource;
+  event.inputSource = static_cast<WidgetMouseEvent*>(aEvent)->inputSource;
 
   nsWeakFrame previousTarget = mCurrentTarget;
 
@@ -4282,10 +4293,10 @@ nsEventStateManager::FireDragEnterOrExit(nsPresContext* aPresContext,
   nsEventStatus status = nsEventStatus_eIgnore;
   WidgetDragEvent event(aEvent->mFlags.mIsTrusted, aMsg, aEvent->widget);
   event.refPoint = aEvent->refPoint;
-  event.modifiers = ((nsMouseEvent*)aEvent)->modifiers;
-  event.buttons = ((nsMouseEvent*)aEvent)->buttons;
+  event.modifiers = static_cast<WidgetMouseEvent*>(aEvent)->modifiers;
+  event.buttons = static_cast<WidgetMouseEvent*>(aEvent)->buttons;
   event.relatedTarget = aRelatedTarget;
-  event.inputSource = static_cast<nsMouseEvent*>(aEvent)->inputSource;
+  event.inputSource = static_cast<WidgetMouseEvent*>(aEvent)->inputSource;
 
   mCurrentTargetContent = aTargetContent;
 
@@ -4337,7 +4348,7 @@ nsEventStateManager::UpdateDragDataTransfer(WidgetDragEvent* dragEvent)
 
 nsresult
 nsEventStateManager::SetClickCount(nsPresContext* aPresContext,
-                                   nsMouseEvent *aEvent,
+                                   WidgetMouseEvent* aEvent,
                                    nsEventStatus* aStatus)
 {
   nsCOMPtr<nsIContent> mouseContent;
@@ -4353,7 +4364,7 @@ nsEventStateManager::SetClickCount(nsPresContext* aPresContext,
   }
 
   switch (aEvent->button) {
-  case nsMouseEvent::eLeftButton:
+  case WidgetMouseEvent::eLeftButton:
     if (aEvent->message == NS_MOUSE_BUTTON_DOWN) {
       mLastLeftMouseDownContent = mouseContent;
       mLastLeftMouseDownContentParent = mouseContentParent;
@@ -4371,7 +4382,7 @@ nsEventStateManager::SetClickCount(nsPresContext* aPresContext,
     }
     break;
 
-  case nsMouseEvent::eMiddleButton:
+  case WidgetMouseEvent::eMiddleButton:
     if (aEvent->message == NS_MOUSE_BUTTON_DOWN) {
       mLastMiddleMouseDownContent = mouseContent;
       mLastMiddleMouseDownContentParent = mouseContentParent;
@@ -4389,7 +4400,7 @@ nsEventStateManager::SetClickCount(nsPresContext* aPresContext,
     }
     break;
 
-  case nsMouseEvent::eRightButton:
+  case WidgetMouseEvent::eRightButton:
     if (aEvent->message == NS_MOUSE_BUTTON_DOWN) {
       mLastRightMouseDownContent = mouseContent;
       mLastRightMouseDownContentParent = mouseContentParent;
@@ -4413,7 +4424,7 @@ nsEventStateManager::SetClickCount(nsPresContext* aPresContext,
 
 nsresult
 nsEventStateManager::CheckForAndDispatchClick(nsPresContext* aPresContext,
-                                              nsMouseEvent *aEvent,
+                                              WidgetMouseEvent* aEvent,
                                               nsEventStatus* aStatus)
 {
   nsresult ret = NS_OK;
@@ -4428,11 +4439,11 @@ nsEventStateManager::CheckForAndDispatchClick(nsPresContext* aPresContext,
     }
     //fire click
     bool notDispatchToContents =
-     (aEvent->button == nsMouseEvent::eMiddleButton ||
-      aEvent->button == nsMouseEvent::eRightButton);
+     (aEvent->button == WidgetMouseEvent::eMiddleButton ||
+      aEvent->button == WidgetMouseEvent::eRightButton);
 
-    nsMouseEvent event(aEvent->mFlags.mIsTrusted, NS_MOUSE_CLICK,
-                       aEvent->widget, nsMouseEvent::eReal);
+    WidgetMouseEvent event(aEvent->mFlags.mIsTrusted, NS_MOUSE_CLICK,
+                           aEvent->widget, WidgetMouseEvent::eReal);
     event.refPoint = aEvent->refPoint;
     event.clickCount = aEvent->clickCount;
     event.modifiers = aEvent->modifiers;
@@ -4455,8 +4466,8 @@ nsEventStateManager::CheckForAndDispatchClick(nsPresContext* aPresContext,
                                              mouseContent, aStatus);
       if (NS_SUCCEEDED(ret) && aEvent->clickCount == 2) {
         //fire double click
-        nsMouseEvent event2(aEvent->mFlags.mIsTrusted, NS_MOUSE_DOUBLECLICK,
-                            aEvent->widget, nsMouseEvent::eReal);
+        WidgetMouseEvent event2(aEvent->mFlags.mIsTrusted, NS_MOUSE_DOUBLECLICK,
+                                aEvent->widget, WidgetMouseEvent::eReal);
         event2.refPoint = aEvent->refPoint;
         event2.clickCount = aEvent->clickCount;
         event2.modifiers = aEvent->modifiers;
@@ -4495,7 +4506,7 @@ nsEventStateManager::GetEventTarget()
 }
 
 already_AddRefed<nsIContent>
-nsEventStateManager::GetEventTargetContent(nsEvent* aEvent)
+nsEventStateManager::GetEventTargetContent(WidgetEvent* aEvent)
 {
   if (aEvent &&
       (aEvent->message == NS_FOCUS_CONTENT ||
@@ -4846,8 +4857,9 @@ bool
 nsEventStateManager::EventStatusOK(WidgetGUIEvent* aEvent)
 {
   return !(aEvent->message == NS_MOUSE_BUTTON_DOWN &&
-      static_cast<nsMouseEvent*>(aEvent)->button == nsMouseEvent::eLeftButton  && 
-      !sNormalLMouseEventInProcess);
+           static_cast<WidgetMouseEvent*>(aEvent)->button ==
+             WidgetMouseEvent::eLeftButton &&
+           !sNormalLMouseEventInProcess);
 }
 
 //-------------------------------------------

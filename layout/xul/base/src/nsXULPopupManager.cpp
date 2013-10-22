@@ -478,7 +478,7 @@ nsXULPopupManager::InitTriggerEvent(nsIDOMEvent* aEvent, nsIContent* aPopup,
     // get the event coordinates relative to the root frame of the document
     // containing the popup.
     NS_ASSERTION(aPopup, "Expected a popup node");
-    nsEvent* event = aEvent->GetInternalNSEvent();
+    WidgetEvent* event = aEvent->GetInternalNSEvent();
     if (event) {
       if (event->eventStructType == NS_MOUSE_EVENT ||
           event->eventStructType == NS_KEY_EVENT) {
@@ -941,9 +941,11 @@ nsXULPopupManager::HidePopupCallback(nsIContent* aPopup,
   aPopupFrame->HidePopup(aDeselectMenu, ePopupClosed);
   ENSURE_TRUE(weakFrame.IsAlive());
 
-  // send the popuphidden event synchronously. This event has no default behaviour.
+  // send the popuphidden event synchronously. This event has no default
+  // behaviour.
   nsEventStatus status = nsEventStatus_eIgnore;
-  nsMouseEvent event(true, NS_XUL_POPUP_HIDDEN, nullptr, nsMouseEvent::eReal);
+  WidgetMouseEvent event(true, NS_XUL_POPUP_HIDDEN, nullptr,
+                         WidgetMouseEvent::eReal);
   nsEventDispatcher::Dispatch(aPopup, aPopupFrame->PresContext(),
                               &event, nullptr, &status);
   ENSURE_TRUE(weakFrame.IsAlive());
@@ -1179,7 +1181,8 @@ nsXULPopupManager::FirePopupShowingEvent(nsIContent* aPopup,
   mOpeningPopup = aPopup;
 
   nsEventStatus status = nsEventStatus_eIgnore;
-  nsMouseEvent event(true, NS_XUL_POPUP_SHOWING, nullptr, nsMouseEvent::eReal);
+  WidgetMouseEvent event(true, NS_XUL_POPUP_SHOWING, nullptr,
+                         WidgetMouseEvent::eReal);
 
   // coordinates are relative to the root widget
   nsPresContext* rootPresContext =
@@ -1257,7 +1260,8 @@ nsXULPopupManager::FirePopupHidingEvent(nsIContent* aPopup,
   nsCOMPtr<nsIPresShell> presShell = aPresContext->PresShell();
 
   nsEventStatus status = nsEventStatus_eIgnore;
-  nsMouseEvent event(true, NS_XUL_POPUP_HIDING, nullptr, nsMouseEvent::eReal);
+  WidgetMouseEvent event(true, NS_XUL_POPUP_HIDING, nullptr,
+                         WidgetMouseEvent::eReal);
   nsEventDispatcher::Dispatch(aPopup, aPresContext, &event, nullptr, &status);
 
   // when a panel is closed, blur whatever has focus inside the popup
@@ -1768,7 +1772,7 @@ nsXULPopupManager::CancelMenuTimer(nsMenuParent* aMenuParent)
 static WidgetGUIEvent*
 DOMKeyEventToGUIEvent(nsIDOMEvent* aEvent)
 {
-  nsEvent* evt = aEvent ? aEvent->GetInternalNSEvent() : nullptr;
+  WidgetEvent* evt = aEvent ? aEvent->GetInternalNSEvent() : nullptr;
   return evt && evt->eventStructType == NS_KEY_EVENT ?
          static_cast<WidgetGUIEvent*>(evt) : nullptr;
 }
