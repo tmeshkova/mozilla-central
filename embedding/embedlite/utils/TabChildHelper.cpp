@@ -745,7 +745,7 @@ TabChildHelper::GetPresContext()
 }
 
 void
-TabChildHelper::InitEvent(nsGUIEvent& event, nsIntPoint* aPoint)
+TabChildHelper::InitEvent(WidgetGUIEvent& event, nsIntPoint* aPoint)
 {
   if (aPoint) {
     event.refPoint.x = aPoint->x;
@@ -759,7 +759,7 @@ TabChildHelper::InitEvent(nsGUIEvent& event, nsIntPoint* aPoint)
 }
 
 nsEventStatus
-TabChildHelper::DispatchWidgetEvent(nsGUIEvent& event)
+TabChildHelper::DispatchWidgetEvent(WidgetGUIEvent& event)
 {
   if (!mView->mWidget || !event.widget) {
     return nsEventStatus_eConsumeNoDefault;
@@ -801,7 +801,7 @@ TabChildHelper::DispatchSynthesizedMouseEvent(const WidgetTouchEvent& aEvent)
     return nsEventStatus_eIgnore;
   }
 
-  nsMouseEvent event(true, msg, widget, nsMouseEvent::eReal, nsMouseEvent::eNormal);
+  WidgetMouseEvent event(true, msg, widget, WidgetMouseEvent::eReal, WidgetMouseEvent::eNormal);
 
   event.widget = widget;
   if (msg != NS_MOUSE_MOVE) {
@@ -839,12 +839,12 @@ TabChildHelper::DispatchSynthesizedMouseEvent(uint32_t aMsg, uint64_t aTime,
   MOZ_ASSERT(aMsg == NS_MOUSE_MOVE || aMsg == NS_MOUSE_BUTTON_DOWN ||
              aMsg == NS_MOUSE_BUTTON_UP);
 
-  nsMouseEvent event(true, aMsg, NULL,
-                     nsMouseEvent::eReal, nsMouseEvent::eNormal);
+  WidgetMouseEvent event(true, aMsg, NULL,
+                     WidgetMouseEvent::eReal, WidgetMouseEvent::eNormal);
   event.refPoint.x = aRefPoint.x;
   event.refPoint.y = aRefPoint.y;
   event.time = aTime;
-  event.button = nsMouseEvent::eLeftButton;
+  event.button = WidgetMouseEvent::eLeftButton;
   if (aMsg != NS_MOUSE_MOVE) {
     event.clickCount = 1;
   }

@@ -301,7 +301,7 @@ EmbedLitePuppetWidget::GetNativeData(uint32_t aDataType)
 }
 
 NS_IMETHODIMP
-EmbedLitePuppetWidget::DispatchEvent(nsGUIEvent* event, nsEventStatus& aStatus)
+EmbedLitePuppetWidget::DispatchEvent(WidgetGUIEvent* event, nsEventStatus& aStatus)
 {
   NS_ABORT_IF_FALSE(!mChild || mChild->mWindowType == eWindowType_popup,
                     "Unexpected event dispatch!");

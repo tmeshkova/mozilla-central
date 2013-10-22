@@ -115,7 +115,7 @@ public:
     LOGF();
     return nsIntPoint(0, 0);
   }
-  NS_IMETHOD DispatchEvent(nsGUIEvent* event, nsEventStatus& aStatus);
+  NS_IMETHOD DispatchEvent(WidgetGUIEvent* event, nsEventStatus& aStatus);
   NS_IMETHOD CaptureRollupEvents(nsIRollupListener* aListener,
                                  bool aDoCapture) {
     LOGNI();
