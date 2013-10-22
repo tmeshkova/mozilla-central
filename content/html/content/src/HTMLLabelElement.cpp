@@ -10,7 +10,7 @@
 #include "mozilla/dom/HTMLLabelElementBinding.h"
 #include "nsEventDispatcher.h"
 #include "nsFocusManager.h"
-#include "nsGUIEvent.h"
+#include "mozilla/MouseEvents.h"
 #include "nsIDOMMouseEvent.h"
 
 // construction, destruction
@@ -197,7 +197,7 @@ HTMLLabelElement::PostHandleEvent(nsEventChainPostVisitor& aVisitor)
           EventFlags eventFlags;
           eventFlags.mMultipleActionsPrevented = true;
           DispatchClickEvent(aVisitor.mPresContext,
-                             static_cast<nsInputEvent*>(aVisitor.mEvent),
+                             static_cast<WidgetInputEvent*>(aVisitor.mEvent),
                              content, false, &eventFlags, &status);
           // Do we care about the status this returned?  I don't think we do...
           // Don't run another <label> off of this click

@@ -646,7 +646,7 @@ ToWidgetPoint(float aX, float aY, const nsPoint& aOffset,
 bool
 TabChildHelper::ConvertMutiTouchInputToEvent(const mozilla::MultiTouchInput& aData,
                                              const gfxSize& res, const gfxPoint& diff,
-                                             nsTouchEvent& aEvent)
+                                             WidgetTouchEvent& aEvent)
 {
   uint32_t msg = NS_USER_DEFINED_EVENT;
   switch (aData.mType) {
@@ -774,7 +774,7 @@ TabChildHelper::DispatchWidgetEvent(nsGUIEvent& event)
 }
 
 nsEventStatus
-TabChildHelper::DispatchSynthesizedMouseEvent(const nsTouchEvent& aEvent)
+TabChildHelper::DispatchSynthesizedMouseEvent(const WidgetTouchEvent& aEvent)
 {
   // Synthesize a phony mouse event.
   uint32_t msg;

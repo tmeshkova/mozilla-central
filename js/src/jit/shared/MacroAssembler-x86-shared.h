@@ -417,6 +417,9 @@ class MacroAssemblerX86Shared : public Assembler
     void storeFloat(FloatRegister src, const BaseIndex &dest) {
         movss(src, Operand(dest));
     }
+    void storeFloat(FloatRegister src, const Operand &dest) {
+        movss(src, dest);
+    }
     void moveFloat(FloatRegister src, FloatRegister dest) {
         movss(src, dest);
     }
@@ -446,6 +449,38 @@ class MacroAssemblerX86Shared : public Assembler
                 // bit 0 = sign of low double
                 // bit 1 = sign of high double
                 movmskpd(src, dest);
+                andl(Imm32(1), dest);
+                j(Assembler::NonZero, fail);
+            }
+
+            bind(&notZero);
+        }
+    }
+
+    // Checks whether a float32 is representable as a 32-bit integer. If so, the
+    // integer is written to the output register. Otherwise, a bailout is taken to
+    // the given snapshot. This function overwrites the scratch float register.
+    void convertFloat32ToInt32(FloatRegister src, Register dest, Label *fail,
+                               bool negativeZeroCheck = true)
+    {
+        cvttss2si(src, dest);
+        convertInt32ToFloat32(dest, ScratchFloatReg);
+        ucomiss(src, ScratchFloatReg);
+        j(Assembler::Parity, fail);
+        j(Assembler::NotEqual, fail);
+
+        // Check for -0
+        if (negativeZeroCheck) {
+            Label notZero;
+            branchTest32(Assembler::NonZero, dest, dest, &notZero);
+
+            if (Assembler::HasSSE41()) {
+                ptest(src, src);
+                j(Assembler::NonZero, fail);
+            } else {
+                // bit 0 = sign of low float
+                // bits 1 to 3 = signs of higher floats
+                movmskps(src, dest);
                 andl(Imm32(1), dest);
                 j(Assembler::NonZero, fail);
             }

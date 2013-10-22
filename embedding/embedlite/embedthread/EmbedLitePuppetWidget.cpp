@@ -18,6 +18,7 @@
 #include "mozilla/Hal.h"
 #include "mozilla/layers/CompositorChild.h"
 #include "mozilla/layers/ImageBridgeChild.h"
+#include "mozilla/ipc/MessageChannel.h"
 #include "EmbedLitePuppetWidget.h"
 #include "nsIWidgetListener.h"
 
@@ -35,7 +36,7 @@ using namespace mozilla::dom;
 using namespace mozilla::hal;
 using namespace mozilla::layers;
 using namespace mozilla::widget;
-using mozilla::ipc::AsyncChannel;
+using namespace mozilla::ipc;
 
 namespace mozilla {
 namespace embedlite {
@@ -330,7 +331,7 @@ EmbedLitePuppetWidget::DispatchEvent(nsGUIEvent* event, nsEventStatus& aStatus)
       break;
     case NS_TEXT_TEXT:
       MOZ_ASSERT(mIMEComposing);
-      mIMEComposingText = static_cast<nsTextEvent*>(event)->theText;
+      mIMEComposingText = static_cast<WidgetTextEvent*>(event)->theText;
       break;
   }
 
@@ -420,13 +421,13 @@ EmbedLitePuppetWidget::RemoveIMEComposition()
 
   nsRefPtr<EmbedLitePuppetWidget> kungFuDeathGrip(this);
 
-  nsTextEvent textEvent(true, NS_TEXT_TEXT, this);
+  WidgetTextEvent textEvent(true, NS_TEXT_TEXT, this);
   textEvent.time = PR_Now() / 1000;
   textEvent.theText = mIMEComposingText;
   nsEventStatus status;
   DispatchEvent(&textEvent, status);
 
-  nsCompositionEvent event(true, NS_COMPOSITION_END, this);
+  WidgetCompositionEvent event(true, NS_COMPOSITION_END, this);
   event.time = PR_Now() / 1000;
   DispatchEvent(&event, status);
 }
@@ -562,13 +563,12 @@ CheckForBasicBackends(nsTArray<LayersBackend>& aHints)
 void EmbedLitePuppetWidget::CreateCompositor(int aWidth, int aHeight)
 {
   mCompositorParent = NewCompositorParent(aWidth, aHeight);
-  AsyncChannel* parentChannel = mCompositorParent->GetIPCChannel();
+  MessageChannel* parentChannel = mCompositorParent->GetIPCChannel();
   LayerManager* lm = new ClientLayerManager(this);
   MessageLoop* childMessageLoop = CompositorParent::CompositorLoop();
   mCompositorChild = new CompositorChild(lm);
-  AsyncChannel::Side childSide = mozilla::ipc::AsyncChannel::Child;
   static_cast<EmbedLiteCompositorParent*>(mCompositorParent.get())->SetChildCompositor(mCompositorChild, MessageLoop::current());
-  mCompositorChild->Open(parentChannel, childMessageLoop, childSide);
+  mCompositorChild->Open(parentChannel, childMessageLoop, ipc::ChildSide);
 
   TextureFactoryIdentifier textureFactoryIdentifier;
   PLayerTransactionChild* shadowManager;
@@ -578,8 +578,10 @@ void EmbedLitePuppetWidget::CreateCompositor(int aWidth, int aHeight)
   CheckForBasicBackends(backendHints);
 
   bool success = false;
-  shadowManager = mCompositorChild->SendPLayerTransactionConstructor(
-   backendHints, 0, &textureFactoryIdentifier, &success);
+  if (!backendHints.IsEmpty()) {
+    shadowManager = mCompositorChild->SendPLayerTransactionConstructor(
+      backendHints, 0, &textureFactoryIdentifier, &success);
+  }
 
   if (success) {
     ShadowLayerForwarder* lf = lm->AsShadowForwarder();

@@ -24,6 +24,7 @@
 #include "nsIObserver.h"
 #include "nsITimer.h"
 #include "nsIPropertyBag2.h"
+#include "nsComponentManagerUtils.h"
 
 #ifdef XP_WIN
 #include <process.h>
@@ -855,7 +856,9 @@ ParticularProcessPriorityManager::ComputePriority()
   }
 
   if (isVisible) {
-    return PROCESS_PRIORITY_FOREGROUND;
+    return HasAppType("keyboard") ?
+      PROCESS_PRIORITY_FOREGROUND_KEYBOARD :
+      PROCESS_PRIORITY_FOREGROUND;
   }
 
   if ((mHoldsCPUWakeLock || mHoldsHighPriorityWakeLock) &&

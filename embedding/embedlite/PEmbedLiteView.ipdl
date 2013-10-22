@@ -24,7 +24,7 @@ using mozilla::CSSIntPoint;
 namespace mozilla {
 namespace embedlite {
 
-rpc protocol PEmbedLiteView {
+intr protocol PEmbedLiteView {
     manager PEmbedLiteApp;
 child:
     async LoadURL(nsString url);

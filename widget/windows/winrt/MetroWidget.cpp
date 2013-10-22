@@ -32,6 +32,8 @@
 #include "UIABridgePrivate.h"
 #include "WinMouseScrollHandler.h"
 #include "InputData.h"
+#include "mozilla/TextEvents.h"
+#include "mozilla/TouchEvents.h"
 
 using namespace Microsoft::WRL;
 using namespace Microsoft::WRL::Wrappers;
@@ -631,9 +633,10 @@ bool
 MetroWidget::DispatchKeyboardEvent(nsGUIEvent* aEvent)
 {
   MOZ_ASSERT(aEvent);
-  nsKeyEvent* oldKeyEvent = static_cast<nsKeyEvent*>(aEvent);
-  nsKeyEvent* keyEvent =
-    new nsKeyEvent(oldKeyEvent->mFlags.mIsTrusted, oldKeyEvent->message, oldKeyEvent->widget);
+  WidgetKeyboardEvent* oldKeyEvent = static_cast<WidgetKeyboardEvent*>(aEvent);
+  WidgetKeyboardEvent* keyEvent =
+    new WidgetKeyboardEvent(oldKeyEvent->mFlags.mIsTrusted,
+                            oldKeyEvent->message, oldKeyEvent->widget);
   // XXX note this leaves pluginEvent null, which is fine for now.
   keyEvent->AssignKeyEventData(*oldKeyEvent, true);
   mKeyEventQueue.Push(keyEvent);
@@ -652,7 +655,7 @@ public:
     mId(aIdToCancel) {
   }
   virtual void* operator() (void* aObject) {
-    nsKeyEvent* event = static_cast<nsKeyEvent*>(aObject);
+    WidgetKeyboardEvent* event = static_cast<WidgetKeyboardEvent*>(aObject);
     if (event->mUniqueId == mId) {
       event->mFlags.mPropagationStopped = true;
     }
@@ -665,7 +668,8 @@ protected:
 void
 MetroWidget::DeliverNextKeyboardEvent()
 {
-  nsKeyEvent* event = static_cast<nsKeyEvent*>(mKeyEventQueue.PopFront());
+  WidgetKeyboardEvent* event =
+    static_cast<WidgetKeyboardEvent*>(mKeyEventQueue.PopFront());
   if (event->mFlags.mPropagationStopped) {
     // This can happen if a keypress was previously cancelled.
     delete event;
@@ -999,17 +1003,39 @@ MetroWidget::ApzContentIgnoringTouch()
   MetroWidget::sAPZC->ContentReceivedTouch(mRootLayerTreeId, false);
 }
 
+bool
+MetroWidget::HitTestAPZC(ScreenPoint& pt)
+{
+  if (!MetroWidget::sAPZC) {
+    return false;
+  }
+  return MetroWidget::sAPZC->HitTestAPZC(pt);
+}
+
 nsEventStatus
-MetroWidget::ApzReceiveInputEvent(nsTouchEvent* aEvent)
+MetroWidget::ApzReceiveInputEvent(WidgetInputEvent* aEvent)
 {
   MOZ_ASSERT(aEvent);
 
   if (!MetroWidget::sAPZC) {
     return nsEventStatus_eIgnore;
   }
+  WidgetInputEvent& event = static_cast<WidgetInputEvent&>(*aEvent);
+  return MetroWidget::sAPZC->ReceiveInputEvent(event);
+}
 
-  MultiTouchInput inputData(*aEvent);
-  return MetroWidget::sAPZC->ReceiveInputEvent(inputData);
+nsEventStatus
+MetroWidget::ApzReceiveInputEvent(WidgetInputEvent* aInEvent,
+                                  WidgetInputEvent* aOutEvent)
+{
+  MOZ_ASSERT(aInEvent);
+  MOZ_ASSERT(aOutEvent);
+
+  if (!MetroWidget::sAPZC) {
+    return nsEventStatus_eIgnore;
+  }
+  WidgetInputEvent& event = static_cast<WidgetInputEvent&>(*aInEvent);
+  return MetroWidget::sAPZC->ReceiveInputEvent(event, aOutEvent);
 }
 
 LayerManager*

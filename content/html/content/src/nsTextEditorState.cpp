@@ -42,6 +42,7 @@
 #include "mozilla/Preferences.h"
 #include "nsTextNode.h"
 #include "nsIController.h"
+#include "mozilla/TextEvents.h"
 
 using namespace mozilla;
 using namespace mozilla::dom;
@@ -851,8 +852,8 @@ nsTextInputListener::HandleEvent(nsIDOMEvent* aEvent)
     return NS_OK;
   }
 
-  nsKeyEvent* keyEvent =
-    static_cast<nsKeyEvent*>(aEvent->GetInternalNSEvent());
+  WidgetKeyboardEvent* keyEvent =
+    static_cast<WidgetKeyboardEvent*>(aEvent->GetInternalNSEvent());
   if (keyEvent->eventStructType != NS_KEY_EVENT) {
     return NS_ERROR_UNEXPECTED;
   }

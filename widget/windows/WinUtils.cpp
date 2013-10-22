@@ -8,7 +8,6 @@
 #include "nsWindow.h"
 #include "nsWindowDefs.h"
 #include "KeyboardLayout.h"
-#include "nsGUIEvent.h"
 #include "nsIDOMMouseEvent.h"
 #include "mozilla/Preferences.h"
 
@@ -28,6 +27,7 @@
 #include "nsIObserver.h"
 #include "imgIEncoder.h"
 #include "nsIThread.h"
+#include "MainThreadUtils.h"
 
 #ifdef NS_ENABLE_TSF
 #include <textstor.h>

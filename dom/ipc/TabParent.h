@@ -10,6 +10,7 @@
 #include "mozilla/dom/PBrowserParent.h"
 #include "mozilla/dom/PContentDialogParent.h"
 #include "mozilla/dom/TabContext.h"
+#include "mozilla/TouchEvents.h"
 #include "nsCOMPtr.h"
 #include "nsIAuthPromptProvider.h"
 #include "nsIBrowserDOMWindow.h"
@@ -144,6 +145,7 @@ public:
                                      const nsString& aActionHint,
                                      const int32_t& aCause,
                                      const int32_t& aFocusChange);
+    virtual bool RecvRequestFocus(const bool& aCanRaise);
     virtual bool RecvSetCursor(const uint32_t& aValue);
     virtual bool RecvSetBackgroundColor(const nscolor& aValue);
     virtual bool RecvSetStatus(const uint32_t& aType, const nsString& aStatus);
@@ -193,8 +195,8 @@ public:
                       bool aPreventDefault);
     bool SendRealMouseEvent(nsMouseEvent& event);
     bool SendMouseWheelEvent(mozilla::WheelEvent& event);
-    bool SendRealKeyEvent(nsKeyEvent& event);
-    bool SendRealTouchEvent(nsTouchEvent& event);
+    bool SendRealKeyEvent(mozilla::WidgetKeyboardEvent& event);
+    bool SendRealTouchEvent(WidgetTouchEvent& event);
 
     virtual PDocumentRendererParent*
     AllocPDocumentRendererParent(const nsRect& documentRect, const gfxMatrix& transform,
@@ -222,10 +224,10 @@ public:
     void HandleDelayedDialogs();
 
     static TabParent *GetIMETabParent() { return mIMETabParent; }
-    bool HandleQueryContentEvent(nsQueryContentEvent& aEvent);
-    bool SendCompositionEvent(nsCompositionEvent& event);
-    bool SendTextEvent(nsTextEvent& event);
-    bool SendSelectionEvent(nsSelectionEvent& event);
+    bool HandleQueryContentEvent(mozilla::WidgetQueryContentEvent& aEvent);
+    bool SendCompositionEvent(mozilla::WidgetCompositionEvent& event);
+    bool SendTextEvent(mozilla::WidgetTextEvent& event);
+    bool SendSelectionEvent(mozilla::WidgetSelectionEvent& event);
 
     static TabParent* GetFrom(nsFrameLoader* aFrameLoader);
     static TabParent* GetFrom(nsIContent* aContent);
@@ -322,8 +324,8 @@ private:
     // to dispatch |aEvent| to our child.  If there's a relevant
     // transform in place, |aOutEvent| is the transformed |aEvent| to
     // dispatch to content.
-    void MaybeForwardEventToRenderFrame(const nsInputEvent& aEvent,
-                                        nsInputEvent* aOutEvent);
+    void MaybeForwardEventToRenderFrame(const WidgetInputEvent& aEvent,
+                                        WidgetInputEvent* aOutEvent);
     // The offset for the child process which is sampled at touch start. This
     // means that the touch events are relative to where the frame was at the
     // start of the touch. We need to look for a better solution to this

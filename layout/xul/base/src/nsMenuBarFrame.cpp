@@ -15,7 +15,6 @@
 #include "nsGkAtoms.h"
 #include "nsMenuFrame.h"
 #include "nsMenuPopupFrame.h"
-#include "nsGUIEvent.h"
 #include "nsUnicharUtils.h"
 #include "nsPIDOMWindow.h"
 #include "nsIInterfaceRequestorUtils.h"
@@ -26,7 +25,9 @@
 #endif
 #include "nsContentUtils.h"
 #include "nsUTF8Utils.h"
+#include "mozilla/TextEvents.h"
 
+using namespace mozilla;
 
 //
 // NS_NewMenuBarFrame
@@ -182,7 +183,8 @@ nsMenuBarFrame::FindMenuWithShortcut(nsIDOMKeyEvent* aKeyEvent)
 
   nsAutoTArray<uint32_t, 10> accessKeys;
   nsEvent* nativeEvent = nsContentUtils::GetNativeEvent(aKeyEvent);
-  nsKeyEvent* nativeKeyEvent = static_cast<nsKeyEvent*>(nativeEvent);
+  WidgetKeyboardEvent* nativeKeyEvent =
+    static_cast<WidgetKeyboardEvent*>(nativeEvent);
   if (nativeKeyEvent)
     nsContentUtils::GetAccessKeyCandidates(nativeKeyEvent, accessKeys);
   if (accessKeys.IsEmpty() && charCode)

@@ -5,6 +5,8 @@
 
 #include "nsRangeFrame.h"
 
+#include "mozilla/TouchEvents.h"
+
 #include "nsContentCreatorFunctions.h"
 #include "nsContentList.h"
 #include "nsContentUtils.h"
@@ -475,10 +477,10 @@ nsRangeFrame::GetValueAtEventPoint(nsGUIEvent* aEvent)
 
   LayoutDeviceIntPoint absPoint;
   if (aEvent->eventStructType == NS_TOUCH_EVENT) {
-    MOZ_ASSERT(static_cast<nsTouchEvent*>(aEvent)->touches.Length() == 1,
+    MOZ_ASSERT(static_cast<WidgetTouchEvent*>(aEvent)->touches.Length() == 1,
                "Unexpected number of touches");
     absPoint = LayoutDeviceIntPoint::FromUntyped(
-      static_cast<nsTouchEvent*>(aEvent)->touches[0]->mRefPoint);
+      static_cast<WidgetTouchEvent*>(aEvent)->touches[0]->mRefPoint);
   } else {
     absPoint = aEvent->refPoint;
   }

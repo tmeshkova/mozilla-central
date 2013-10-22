@@ -80,7 +80,8 @@ bool EmbedLiteCompositorParent::RenderToContext(gfxContext* aContext)
     // Nothing to paint yet, just return silently
     return false;
   }
-  ComposeToTarget(aContext);
+#warning "Switch me to gfx::DrawTarget"
+  //ComposeToTarget(aContext);
   return true;
 }
 

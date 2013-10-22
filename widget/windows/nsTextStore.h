@@ -13,6 +13,7 @@
 #include "nsIWidget.h"
 #include "nsWindowBase.h"
 #include "mozilla/Attributes.h"
+#include "mozilla/TextEvents.h"
 
 #include <msctf.h>
 #include <textstor.h>
@@ -465,7 +466,7 @@ protected:
     // For compositionupdate and compositionend
     nsString mData;
     // For compositionupdate
-    nsTArray<nsTextRange> mRanges;
+    nsTArray<mozilla::TextRange> mRanges;
     // For selectionset
     bool mSelectionReversed;
   };

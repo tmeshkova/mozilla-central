@@ -68,10 +68,10 @@ protected:
   // Sends a simulated mouse event from a touch event for compatibility.
   bool ConvertMutiTouchInputToEvent(const mozilla::MultiTouchInput& aData,
                                     const gfxSize& res, const gfxPoint& diff,
-                                    nsTouchEvent& aEvent);
+                                    WidgetTouchEvent& aEvent);
   void DispatchSynthesizedMouseEvent(uint32_t aMsg, uint64_t aTime,
                                      const nsIntPoint& aRefPoint);
-  nsEventStatus DispatchSynthesizedMouseEvent(const nsTouchEvent& aEvent);
+  nsEventStatus DispatchSynthesizedMouseEvent(const WidgetTouchEvent& aEvent);
 
   void CancelTapTracking();
 

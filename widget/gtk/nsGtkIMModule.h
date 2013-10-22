@@ -14,8 +14,8 @@
 #include "nsString.h"
 #include "nsAutoPtr.h"
 #include "nsTArray.h"
-#include "nsGUIEvent.h"
 #include "nsIWidget.h"
+#include "mozilla/EventForwards.h"
 
 class nsWindow;
 
@@ -259,7 +259,7 @@ protected:
     void GetCompositionString(nsAString &aCompositionString);
 
     // Generates our text range list from current composition string.
-    void SetTextRangeList(nsTArray<nsTextRange> &aTextRangeList);
+    void SetTextRangeList(nsTArray<mozilla::TextRange>& aTextRangeList);
 
     // Sets the offset's cursor position to IME.
     void SetCursorPosition(uint32_t aTargetOffset);

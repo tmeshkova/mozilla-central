@@ -10,6 +10,7 @@
 #include "EmbedLiteApp.h"
 
 #include "mozilla/unused.h"
+#include "nsServiceManagerUtils.h"
 
 #include "EmbedLiteViewThreadParent.h"
 

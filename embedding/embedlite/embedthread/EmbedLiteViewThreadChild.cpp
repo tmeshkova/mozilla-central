@@ -603,7 +603,7 @@ EmbedLiteViewThreadChild::RecvHandleSingleTap(const nsIntPoint& aPoint)
     // this way we can get focus and actual compositing node working properly in future composition
     nsPoint offset;
     nsCOMPtr<nsIWidget> widget = mHelper->GetWidget(&offset);
-    nsCompositionEvent event(true, NS_COMPOSITION_END, widget);
+    WidgetCompositionEvent event(true, NS_COMPOSITION_END, widget);
     mHelper->InitEvent(event, nullptr);
     mHelper->DispatchWidgetEvent(event);
     mIMEComposing = false;
@@ -676,26 +676,26 @@ EmbedLiteViewThreadChild::RecvHandleTextEvent(const nsString& commit, const nsSt
   }
 
   if (StartComposite) {
-    nsCompositionEvent event(true, NS_COMPOSITION_START, widget);
+    WidgetCompositionEvent event(true, NS_COMPOSITION_START, widget);
     mHelper->InitEvent(event, nullptr);
     mHelper->DispatchWidgetEvent(event);
   }
 
   if (StartComposite || UpdateComposite) {
-    nsCompositionEvent event(true, NS_COMPOSITION_UPDATE, widget);
+    WidgetCompositionEvent event(true, NS_COMPOSITION_UPDATE, widget);
     mHelper->InitEvent(event, nullptr);
     mHelper->DispatchWidgetEvent(event);
   }
 
   if (StartComposite || UpdateComposite || EndComposite) {
-    nsTextEvent event(true, NS_TEXT_TEXT, widget);
+    WidgetTextEvent event(true, NS_TEXT_TEXT, widget);
     mHelper->InitEvent(event, nullptr);
     event.theText = pushStr;
     mHelper->DispatchWidgetEvent(event);
   }
 
   if (EndComposite) {
-    nsCompositionEvent event(true, NS_COMPOSITION_END, widget);
+    WidgetCompositionEvent event(true, NS_COMPOSITION_END, widget);
     mHelper->InitEvent(event, nullptr);
     mHelper->DispatchWidgetEvent(event);
   }
@@ -763,7 +763,7 @@ EmbedLiteViewThreadChild::RecvMouseEvent(const nsString& aType,
 bool
 EmbedLiteViewThreadChild::RecvInputDataTouchEvent(const mozilla::MultiTouchInput& aData, const gfxSize& res, const gfxPoint& diff)
 {
-  nsTouchEvent localEvent;
+  WidgetTouchEvent localEvent;
   if (mHelper->ConvertMutiTouchInputToEvent(aData, res, diff, localEvent)) {
     nsEventStatus status =
       mHelper->DispatchWidgetEvent(localEvent);

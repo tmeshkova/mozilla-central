@@ -30,9 +30,9 @@
 #include "imgIContainer.h"
 #include "imgIRequest.h"
 #include "nsRegion.h"
-#include "nsGUIEvent.h"
 #include "nsXULPopupManager.h"
 #include "nsMenuPopupFrame.h"
+#include "mozilla/MouseEvents.h"
 #include "mozilla/Preferences.h"
 
 #include "gfxContext.h"
@@ -370,7 +370,7 @@ nsBaseDragService::FireDragEventAtSource(uint32_t aMsg)
       nsCOMPtr<nsIPresShell> presShell = doc->GetShell();
       if (presShell) {
         nsEventStatus status = nsEventStatus_eIgnore;
-        nsDragEvent event(true, aMsg, nullptr);
+        WidgetDragEvent event(true, aMsg, nullptr);
         event.inputSource = mInputSource;
         if (aMsg == NS_DRAGDROP_END) {
           event.refPoint.x = mEndDragPoint.x;

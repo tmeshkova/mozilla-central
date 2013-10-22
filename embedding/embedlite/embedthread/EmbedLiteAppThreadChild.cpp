@@ -68,9 +68,8 @@ EmbedLiteAppThreadChild::Init(EmbedLiteAppThreadParent* aParent)
 {
   LOGT();
   InitWindowWatcher();
-  AsyncChannel* parentChannel = aParent->GetIPCChannel();
-  AsyncChannel::Side childSide = mozilla::ipc::AsyncChannel::Child;
-  Open(parentChannel, mParentLoop, childSide);
+  MessageChannel* parentChannel = aParent->GetIPCChannel();
+  Open(parentChannel, mParentLoop, ipc::ChildSide);
   RecvSetBoolPref(nsDependentCString("layers.offmainthreadcomposition.enabled"), true);
   mModulesService = new EmbedLiteModulesService();
   mModulesService->Init();
