@@ -4,6 +4,7 @@
 
 EXPORT_LIBRARY = 1
 ifdef MOZ_ENABLE_QT5GEOPOSITION
+CPPSRCS += moc_QTMLocationProvider.cpp
 LOCAL_INCLUDES  += $(MOZ_QT_CFLAGS) \
                    -I$(topsrcdir)/dom/src/geolocation \
                    $(NULL)
