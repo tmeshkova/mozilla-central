@@ -128,7 +128,7 @@ class TreeMetadataEmitter(LoggingMixin):
 
         exclusions = ('ipc/chromium')
 
-        if sandbox['CPP_SOURCES'] and not sandbox['RELATIVEDIR'].startswith(exclusions) and os.path.join('js', 'src') not in sandbox.main_path:
+        if sandbox['CPP_SOURCES'] and not sandbox['RELATIVEDIR'].startswith(exclusions):
             for src in sandbox['CPP_SOURCES']:
                 if not os.path.exists(os.path.join(sandbox['SRCDIR'], src)):
                     raise SandboxValidationError('Reference to a file that '
