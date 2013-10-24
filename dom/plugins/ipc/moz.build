@@ -110,3 +110,5 @@ LIBXUL_LIBRARY = True
 
 LIBRARY_NAME = 'domplugins_s'
 
+EXPORT_LIBRARY = True
+

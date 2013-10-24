@@ -22,3 +22,5 @@ LIBXUL_LIBRARY = True
 
 LIBRARY_NAME = 'domsystemunix_s'
 
+EXPORT_LIBRARY = True
+
