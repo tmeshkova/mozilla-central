@@ -198,7 +198,8 @@ EmbedLitePuppetWidget::Destroy()
 
   Base::OnDestroy();
   Base::Destroy();
-  if (mLayerManager) {
+  nsIWidget* topWidget = GetTopLevelWidget();
+  if (mLayerManager && topWidget == this) {
     mLayerManager->Destroy();
   }
   mParent = nullptr;
