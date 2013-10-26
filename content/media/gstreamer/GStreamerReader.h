@@ -174,6 +174,7 @@ private:
   int fpsDen;
   GstElement* mPlaySink;
   bool mPlayingStartedOnce;
+  bool mDroidEGLSinkInUse;
 };
 
 } // namespace mozilla
