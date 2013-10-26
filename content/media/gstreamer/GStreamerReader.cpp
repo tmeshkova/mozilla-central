@@ -135,6 +135,11 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
     return NS_ERROR_FAILURE;
   }
 #ifdef HAS_NEMO_INTERFACE
+  if (sDroidEGLSinkInUse && !Preferences::GetBool("gstreamer.no_hw_decoder_limit", false))
+  {
+    LOG(PR_LOG_ERROR, ("couldn't start droideglsink because it busy"));
+    return NS_ERROR_FAILURE;
+  }
   mPlaySink = gst_element_factory_make("droideglsink", nullptr);
   if (!mPlaySink) {
     LOG(PR_LOG_DEBUG, ("could not create egl sink: %p", mPlaySink));
