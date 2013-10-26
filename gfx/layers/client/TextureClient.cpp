@@ -405,7 +405,7 @@ DeprecatedTextureClientShmem::ReleaseResources()
     ShadowLayerForwarder::CloseDescriptor(mDescriptor);
   }
 
-  if (mTextureInfo.mTextureFlags & TEXTURE_DEALLOCATE_HOST) {
+  if (!(mTextureInfo.mTextureFlags & TEXTURE_DEALLOCATE_CLIENT)) {
     mDescriptor = SurfaceDescriptor();
     return;
   }

@@ -69,10 +69,11 @@ public:
 
   /**
    * Takes a requested displacement to the position of this axis, and adjusts
-   * it to account for acceleration  (which might increase the displacement)
-   * and overscroll (which might decrease the displacement; this is to prevent
-   * the viewport from overscrolling the page rect). If overscroll ocurred,
-   * its amount is written to |aOverscrollAmountOut|.
+   * it to account for acceleration (which might increase the displacement),
+   * overscroll (which might decrease the displacement; this is to prevent the
+   * viewport from overscrolling the page rect), and axis locking (which might
+   * prevent any displacement from happening). If overscroll ocurred, its amount
+   * is written to |aOverscrollAmountOut|.
    * The adjusted displacement is returned.
    */
   float AdjustDisplacement(float aDisplacement, float& aOverscrollAmountOut);
