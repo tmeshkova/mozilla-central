@@ -225,7 +225,7 @@ NoSuchMethod(JSContext *cx, unsigned argc, Value *vp)
 
 #endif /* JS_HAS_NO_SUCH_METHOD */
 
-inline bool
+static inline bool
 GetPropertyOperation(JSContext *cx, StackFrame *fp, HandleScript script, jsbytecode *pc,
                      MutableHandleValue lval, MutableHandleValue vp)
 {
@@ -316,7 +316,7 @@ NameOperation(JSContext *cx, StackFrame *fp, jsbytecode *pc, MutableHandleValue 
     return FetchName<false>(cx, scopeRoot, pobjRoot, nameRoot, shapeRoot, vp);
 }
 
-inline bool
+static inline bool
 SetPropertyOperation(JSContext *cx, HandleScript script, jsbytecode *pc, HandleValue lval,
                      HandleValue rval)
 {
@@ -330,8 +330,11 @@ SetPropertyOperation(JSContext *cx, HandleScript script, jsbytecode *pc, HandleV
 
     RootedId id(cx, NameToId(script->getName(pc)));
     if (JS_LIKELY(!obj->getOps()->setProperty)) {
-        if (!baseops::SetPropertyHelper(cx, obj, obj, id, 0, &rref, script->strict))
+        if (!baseops::SetPropertyHelper<SequentialExecution>(cx, obj, obj, id, 0,
+                                                             &rref, script->strict))
+        {
             return false;
+        }
     } else {
         if (!JSObject::setGeneric(cx, obj, obj, id, &rref, script->strict))
             return false;
@@ -1058,7 +1061,7 @@ FrameGuard::~FrameGuard()
  * We set *vp to undefined early to reduce code size and bias this code for the
  * common and future-friendly cases.
  */
-inline bool
+static inline bool
 ComputeImplicitThis(JSContext *cx, HandleObject obj, MutableHandleValue vp)
 {
     vp.setUndefined();
@@ -2982,7 +2985,8 @@ BEGIN_CASE(JSOP_INITPROP)
     id = NameToId(name);
 
     if (JS_UNLIKELY(name == cx->names().proto)
-        ? !baseops::SetPropertyHelper(cx, obj, obj, id, 0, &rval, script->strict)
+        ? !baseops::SetPropertyHelper<SequentialExecution>(cx, obj, obj, id, 0, &rval,
+                                                           script->strict)
         : !DefineNativeProperty(cx, obj, id, rval, nullptr, nullptr,
                                 JSPROP_ENUMERATE, 0, 0, 0)) {
         goto error;

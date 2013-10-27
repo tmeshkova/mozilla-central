@@ -24,6 +24,7 @@
 #include "nsSize.h"                     // for nsIntSize
 #include "nsMathUtils.h"               // for NS_roundf
 #include "gfxImageSurface.h"
+#include "gfx2DGlue.h"
 
 #ifdef GFX_TILEDLAYER_DEBUG_OVERLAY
 #include "cairo.h"

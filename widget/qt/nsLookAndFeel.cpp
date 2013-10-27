@@ -9,6 +9,9 @@
 #include <QFont>
 #include <QPalette>
 #include <QStyle>
+#include "nsStyleConsts.h"
+#include "gfxFontConstants.h"
+#include "mozilla/gfx/2D.h"
 
 #undef NS_LOOKANDFEEL_DEBUG
 #ifdef NS_LOOKANDFEEL_DEBUG
@@ -451,10 +454,10 @@ nsLookAndFeel::GetFontImpl(FontID aID, nsString& aFontName,
                            gfxFontStyle& aFontStyle,
                            float aDevPixPerCSSPixel)
 {
-  const char *className = NULL;
-  nsString *cachedFontName = NULL;
-  gfxFontStyle *cachedFontStyle = NULL;
-  bool *isCached = NULL;
+  const char *className = nullptr;
+  nsString *cachedFontName = nullptr;
+  gfxFontStyle *cachedFontStyle = nullptr;
+  bool *isCached = nullptr;
 
   switch (aID) {
     case eFont_Menu:         // css2

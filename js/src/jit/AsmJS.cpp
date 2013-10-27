@@ -5081,7 +5081,7 @@ class ParallelCompilationGuard
 {
     WorkerThreadState *parallelState_;
   public:
-    ParallelCompilationGuard() : parallelState_(NULL) {}
+    ParallelCompilationGuard() : parallelState_(nullptr) {}
     ~ParallelCompilationGuard() {
         if (parallelState_) {
             JS_ASSERT(parallelState_->asmJSCompilationInProgress == true);
@@ -6481,6 +6481,9 @@ EstablishPreconditions(ExclusiveContext *cx, AsmJSParser &parser)
 
     if (cx->compartment()->debugMode())
         return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by debugger");
+
+    if (parser.pc->isGenerator())
+        return Warn(parser, JSMSG_USE_ASM_TYPE_FAIL, "Disabled by generator context");
 
 #ifdef JS_WORKER_THREADS
     if (ParallelCompilationEnabled(cx)) {

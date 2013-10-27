@@ -19,6 +19,7 @@
 #include "jsinferinlines.h"
 
 #include "jit/BaselineFrame-inl.h"
+#include "jit/IonFrames-inl.h"
 #include "vm/Interpreter-inl.h"
 #include "vm/StringObject-inl.h"
 
@@ -31,6 +32,13 @@ namespace jit {
 // Don't explicitly initialize, it's not guaranteed that this initializer will
 // run before the constructors for static VMFunctions.
 /* static */ VMFunction *VMFunction::functions;
+
+AutoDetectInvalidation::AutoDetectInvalidation(JSContext *cx, Value *rval, IonScript *ionScript)
+  : cx_(cx),
+    ionScript_(ionScript ? ionScript : GetTopIonJSScript(cx)->ionScript()),
+    rval_(rval),
+    disabled_(false)
+{ }
 
 void
 VMFunction::addToFunctions()
@@ -166,7 +174,7 @@ InitProp(JSContext *cx, HandleObject obj, HandlePropertyName name, HandleValue v
     RootedId id(cx, NameToId(name));
 
     if (name == cx->names().proto)
-        return baseops::SetPropertyHelper(cx, obj, obj, id, 0, &rval, false);
+        return baseops::SetPropertyHelper<SequentialExecution>(cx, obj, obj, id, 0, &rval, false);
     return DefineNativeProperty(cx, obj, id, rval, nullptr, nullptr, JSPROP_ENUMERATE, 0, 0, 0);
 }
 
@@ -438,7 +446,8 @@ SetProperty(JSContext *cx, HandleObject obj, HandlePropertyName name, HandleValu
 
     if (JS_LIKELY(!obj->getOps()->setProperty)) {
         unsigned defineHow = (op == JSOP_SETNAME || op == JSOP_SETGNAME) ? DNP_UNQUALIFIED : 0;
-        return baseops::SetPropertyHelper(cx, obj, obj, id, defineHow, &v, strict);
+        return baseops::SetPropertyHelper<SequentialExecution>(cx, obj, obj, id, defineHow, &v,
+                                                               strict);
     }
 
     return JSObject::setGeneric(cx, obj, obj, id, &v, strict);

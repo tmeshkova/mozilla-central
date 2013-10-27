@@ -123,7 +123,7 @@ class ParallelSafetyVisitor : public MInstructionVisitor
     UNSAFE_OP(DefVar)
     UNSAFE_OP(DefFun)
     UNSAFE_OP(CreateThis)
-    UNSAFE_OP(CreateThisWithTemplate)
+    CUSTOM_OP(CreateThisWithTemplate)
     UNSAFE_OP(CreateThisWithProto)
     UNSAFE_OP(CreateArgumentsObject)
     UNSAFE_OP(GetArgumentsObjectArg)
@@ -201,7 +201,7 @@ class ParallelSafetyVisitor : public MInstructionVisitor
     SAFE_OP(GetPropertyPolymorphic)
     UNSAFE_OP(SetPropertyPolymorphic)
     SAFE_OP(GetElementCache)
-    UNSAFE_OP(SetElementCache)
+    WRITE_GUARDED_OP(SetElementCache, object)
     UNSAFE_OP(BindNameCache)
     SAFE_OP(GuardShape)
     SAFE_OP(GuardObjectType)
@@ -236,12 +236,12 @@ class ParallelSafetyVisitor : public MInstructionVisitor
     UNSAFE_OP(CallGetIntrinsicValue)
     UNSAFE_OP(CallsiteCloneCache)
     UNSAFE_OP(CallGetElement)
-    UNSAFE_OP(CallSetElement)
+    WRITE_GUARDED_OP(CallSetElement, object)
     UNSAFE_OP(CallInitElementArray)
-    UNSAFE_OP(CallSetProperty)
+    WRITE_GUARDED_OP(CallSetProperty, object)
     UNSAFE_OP(DeleteProperty)
     UNSAFE_OP(DeleteElement)
-    UNSAFE_OP(SetPropertyCache)
+    WRITE_GUARDED_OP(SetPropertyCache, object)
     UNSAFE_OP(IteratorStart)
     UNSAFE_OP(IteratorNext)
     UNSAFE_OP(IteratorMore)
@@ -502,10 +502,15 @@ ParallelSafetyVisitor::convertToBailout(MBasicBlock *block, MInstruction *ins)
 // These allocations will take place using per-helper-thread arenas.
 
 bool
+ParallelSafetyVisitor::visitCreateThisWithTemplate(MCreateThisWithTemplate *ins)
+{
+    return replaceWithNewPar(ins, ins->templateObject());
+}
+
+bool
 ParallelSafetyVisitor::visitNewParallelArray(MNewParallelArray *ins)
 {
-    replace(ins, new MNewPar(forkJoinSlice(), ins->templateObject()));
-    return true;
+    return replaceWithNewPar(ins, ins->templateObject());
 }
 
 bool
