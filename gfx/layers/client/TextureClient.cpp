@@ -19,22 +19,16 @@
 #include "mozilla/layers/ShadowLayers.h"  // for ShadowLayerForwarder
 #include "mozilla/layers/SharedPlanarYCbCrImage.h"
 #include "mozilla/layers/YCbCrImageDataSerializer.h"
-#include "gfxReusableSurfaceWrapper.h"
-#include "gfxPlatform.h"
-#include "mozilla/layers/ImageDataSerializer.h"
-#include "gfx2DGlue.h"
-
-#include <stdint.h>
 #include "nsDebug.h"                    // for NS_ASSERTION, NS_WARNING, etc
 #include "nsTraceRefcnt.h"              // for MOZ_COUNT_CTOR, etc
 #include "ImageContainer.h"             // for PlanarYCbCrImage, etc
 
-#ifdef MOZ_ANDROID_OMTC
+#if defined(MOZ_ANDROID_OMTC) || defined(USE_ANDROID_OMTC_HACKS)
 #  include "gfxReusableImageSurfaceWrapper.h"
 #  include "gfxImageSurface.h"
 #else
+#  include "gfxReusableSharedImageSurfaceWrapper.h"
 #  include "gfxSharedImageSurface.h"
-#  include "gfxImageSurface.h"
 #endif
 
 using namespace mozilla::gl;
@@ -575,9 +569,10 @@ DeprecatedTextureClientShmemYCbCr::EnsureAllocated(gfx::IntSize aSize,
 
 
 DeprecatedTextureClientTile::DeprecatedTextureClientTile(CompositableForwarder* aForwarder,
-                                     const TextureInfo& aTextureInfo)
+                                                         const TextureInfo& aTextureInfo,
+                                                         gfxReusableSurfaceWrapper* aSurface)
   : DeprecatedTextureClient(aForwarder, aTextureInfo)
-  , mSurface(nullptr)
+  , mSurface(aSurface)
 {
   mTextureInfo.mDeprecatedTextureHostFlags = TEXTURE_HOST_TILED;
 }
@@ -587,10 +582,21 @@ DeprecatedTextureClientTile::EnsureAllocated(gfx::IntSize aSize, gfxContentType 
 {
   if (!mSurface ||
       mSurface->Format() != gfxPlatform::GetPlatform()->OptimalFormatForContent(aType)) {
+#if defined(MOZ_ANDROID_OMTC) || defined(USE_ANDROID_OMTC_HACKS)
+    // If we're using OMTC, we can save some cycles by not using shared
+    // memory. Using shared memory here is a small, but significant
+    // performance regression.
     gfxImageSurface* tmpTile = new gfxImageSurface(gfxIntSize(aSize.width, aSize.height),
                                                    gfxPlatform::GetPlatform()->OptimalFormatForContent(aType),
                                                    aType != GFX_CONTENT_COLOR);
-    mSurface = new gfxReusableSurfaceWrapper(tmpTile);
+    mSurface = new gfxReusableImageSurfaceWrapper(tmpTile);
+#else
+    nsRefPtr<gfxSharedImageSurface> sharedImage =
+      gfxSharedImageSurface::CreateUnsafe(mForwarder,
+                                          gfxIntSize(aSize.width, aSize.height),
+                                          gfxPlatform::GetPlatform()->OptimalFormatForContent(aType));
+    mSurface = new gfxReusableSharedImageSurfaceWrapper(mForwarder, sharedImage);
+#endif
     mContentType = aType;
   }
   return true;

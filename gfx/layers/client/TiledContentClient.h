@@ -6,9 +6,6 @@
 #ifndef MOZILLA_GFX_TILEDCONTENTCLIENT_H
 #define MOZILLA_GFX_TILEDCONTENTCLIENT_H
 
-#include "mozilla/layers/ContentClient.h"
-#include "TiledLayerBuffer.h"
-#include "gfxPlatform.h"
 #include <stddef.h>                     // for size_t
 #include <stdint.h>                     // for uint16_t
 #include <algorithm>                    // for swap
@@ -38,6 +35,8 @@ class gfxImageSurface;
 namespace mozilla {
 namespace layers {
 
+class BasicTileDescriptor;
+
 /**
  * Represent a single tile in tiled buffer. The buffer keeps tiles,
  * each tile keeps a reference to a texture client. The texture client
@@ -56,6 +55,10 @@ struct BasicTiledLayerTile {
   // Placeholder
   BasicTiledLayerTile()
     : mDeprecatedTextureClient(nullptr)
+  {}
+
+  BasicTiledLayerTile(DeprecatedTextureClientTile* aTextureClient)
+    : mDeprecatedTextureClient(aTextureClient)
   {}
 
   BasicTiledLayerTile(const BasicTiledLayerTile& o) {
@@ -87,6 +90,9 @@ struct BasicTiledLayerTile {
   void ReadLock() {
     GetSurface()->ReadLock();
   }
+
+  TileDescriptor GetTileDescriptor();
+  static BasicTiledLayerTile OpenDescriptor(ISurfaceAllocator *aAllocator, const TileDescriptor& aDesc);
 
   gfxReusableSurfaceWrapper* GetSurface() {
     return mDeprecatedTextureClient->GetReusableSurfaceWrapper();
@@ -132,6 +138,29 @@ public:
     , mLastPaintOpaque(false)
   {}
 
+  BasicTiledLayerBuffer(ISurfaceAllocator* aAllocator,
+                        const nsIntRegion& aValidRegion,
+                        const nsIntRegion& aPaintedRegion,
+                        const InfallibleTArray<TileDescriptor>& aTiles,
+                        int aRetainedWidth,
+                        int aRetainedHeight,
+                        float aResolution)
+  {
+    mValidRegion = aValidRegion;
+    mPaintedRegion = aPaintedRegion;
+    mRetainedWidth = aRetainedWidth;
+    mRetainedHeight = aRetainedHeight;
+    mResolution = aResolution;
+
+    for(size_t i = 0; i < aTiles.Length(); i++) {
+      if (aTiles[i].type() == TileDescriptor::TPlaceholderTileDescriptor) {
+        mRetainedTiles.AppendElement(GetPlaceholderTile());
+      } else {
+        mRetainedTiles.AppendElement(BasicTiledLayerTile::OpenDescriptor(aAllocator, aTiles[i]));
+      }
+    }
+  }
+
   void PaintThebes(const nsIntRegion& aNewValidRegion,
                    const nsIntRegion& aPaintRegion,
                    LayerManager::DrawThebesLayerCallback aCallback,
@@ -167,14 +196,10 @@ public:
                          LayerManager::DrawThebesLayerCallback aCallback,
                          void* aCallbackData);
 
-  /**
-   * Copy this buffer duplicating the texture hosts under the tiles
-   * XXX This should go. It is a hack because we need to keep the
-   * surface wrappers alive whilst they are locked by the compositor.
-   * Once we properly implement the texture host/client architecture
-   * for tiled layers we shouldn't need this.
-   */
-  BasicTiledLayerBuffer DeepCopy() const;
+  SurfaceDescriptorTiles GetSurfaceDescriptorTiles();
+
+  static BasicTiledLayerBuffer OpenDescriptor(ISurfaceAllocator* aAllocator,
+                                              const SurfaceDescriptorTiles& aDescriptor);
 
 protected:
   BasicTiledLayerTile ValidateTile(BasicTiledLayerTile aTile,
