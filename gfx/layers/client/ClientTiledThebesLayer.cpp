@@ -17,7 +17,6 @@
 #include "mozilla/mozalloc.h"           // for operator delete, etc
 #include "nsRect.h"                     // for nsIntRect
 #include "nsTraceRefcnt.h"              // for MOZ_COUNT_CTOR, etc
-#include "gfxImageSurface.h"
 
 namespace mozilla {
 namespace layers {

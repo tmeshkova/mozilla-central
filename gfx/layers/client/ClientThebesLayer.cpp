@@ -9,7 +9,6 @@
 #include "GeckoProfiler.h"              // for PROFILER_LABEL
 #include "client/ClientLayerManager.h"  // for ClientLayerManager, etc
 #include "gfxASurface.h"                // for gfxASurface, etc
-#include "gfxImageSurface.h"
 #include "gfxContext.h"                 // for gfxContext
 #include "gfxRect.h"                    // for gfxRect
 #include "mozilla/Assertions.h"         // for MOZ_ASSERT, etc

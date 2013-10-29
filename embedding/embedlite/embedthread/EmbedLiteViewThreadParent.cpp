@@ -40,7 +40,7 @@ class EmbedAsyncPanZoomController : public AsyncPanZoomController
     EmbedAsyncPanZoomController(uint64_t aLayersId,
                                 GeckoContentController* aGeckoContentController,
                                 GestureBehavior aGestures)
-      : AsyncPanZoomController(aLayersId, aGeckoContentController, aGestures)
+      : AsyncPanZoomController(aLayersId, nullptr, aGeckoContentController, aGestures)
     { }
 
     void HandlePanEnd() {

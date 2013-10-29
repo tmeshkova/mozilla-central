@@ -821,32 +821,6 @@ void AsyncPanZoomController::UpdateWithTouchAtDevicePoint(const MultiTouchInput&
     return;
   }
 
-  // If we're axis-locked, check if the user is trying to break the lock
-  if (GetAxisLockMode() == STICKY) {
-    ScreenIntPoint point = GetFirstTouchScreenPoint(aEvent);
-    float dx = mX.PanDistance(point.x);
-    float dy = mY.PanDistance(point.y);
-
-    double angle = atan2(dy, dx); // range [-pi, pi]
-    angle = fabs(angle); // range [0, pi]
-
-    float breakThreshold = AXIS_BREAKOUT_THRESHOLD * APZCTreeManager::GetDPI();
-
-    if (fabs(dx) > breakThreshold || fabs(dy) > breakThreshold) {
-      if (mState == PANNING_LOCKED_X) {
-        if (!IsCloseToHorizontal(angle, AXIS_BREAKOUT_ANGLE)) {
-          mY.SetScrollingDisabled(false);
-          SetState(PANNING);
-        }
-      } else if (mState == PANNING_LOCKED_Y) {
-        if (!IsCloseToVertical(angle, AXIS_BREAKOUT_ANGLE)) {
-          mX.SetScrollingDisabled(false);
-          SetState(PANNING);
-        }
-      }
-    }
-  }
-
   mX.UpdateWithTouchAtDevicePoint(point.x, timeDelta);
   mY.UpdateWithTouchAtDevicePoint(point.y, timeDelta);
 }

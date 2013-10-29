@@ -491,8 +491,6 @@ nsresult GStreamerReader::ResetDecode()
   mVideoSinkBufferCount = 0;
   mAudioSinkBufferCount = 0;
   mReachedEos = false;
-  mLastReportedByteOffset = 0;
-  mByteOffset = 0;
   if (mDroidEGLSinkInUse)
   {
     sDroidEGLSinkInUse--;
