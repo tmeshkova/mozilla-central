@@ -43,7 +43,6 @@ if CONFIG['MOZ_ENABLE_CONTENTMANAGER']:
 
 if CONFIG['MOZ_ENABLE_QTMOBILITY']:
     SOURCES += [
-        'moc_mozqorientationsensorfilter.cpp',
         'mozqorientationsensorfilter.cpp',
     ]
 

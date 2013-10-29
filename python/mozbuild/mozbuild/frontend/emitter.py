@@ -129,15 +129,12 @@ class TreeMetadataEmitter(LoggingMixin):
             yield XPIDLFile(sandbox, mozpath.join(sandbox['SRCDIR'], idl),
                 xpidl_module)
 
-        exclusions = ('ipc/chromium')
-
-        if not sandbox['RELATIVEDIR'].startswith(exclusions):
-            for symbol in ('SOURCES', 'GTEST_SOURCES', 'HOST_SOURCES'):
-                for src in (sandbox[symbol] or []):
-                    if not os.path.exists(os.path.join(sandbox['SRCDIR'], src)):
-                        raise SandboxValidationError('Reference to a file that '
-                            'doesn\'t exist in %s (%s) in %s'
-                            % (symbol, src, sandbox['RELATIVEDIR']))
+        for symbol in ('SOURCES', 'GTEST_SOURCES', 'HOST_SOURCES'):
+            for src in (sandbox[symbol] or []):
+                if not os.path.exists(os.path.join(sandbox['SRCDIR'], src)):
+                    raise SandboxValidationError('Reference to a file that '
+                        'doesn\'t exist in %s (%s) in %s'
+                        % (symbol, src, sandbox['RELATIVEDIR']))
 
         # Proxy some variables as-is until we have richer classes to represent
         # them. We should aim to keep this set small because it violates the
