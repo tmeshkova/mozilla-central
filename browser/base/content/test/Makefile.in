@@ -185,6 +185,7 @@ MOCHITEST_BROWSER_FILES = \
                  browser_bug887515.js \
                  browser_canonizeURL.js \
                  browser_mixedcontent_securityflags.js \
+                 browser_no_mcb_on_http_site.js \
                  browser_clearplugindata_noage.html \
                  browser_clearplugindata.html \
                  browser_clearplugindata.js \
@@ -192,7 +193,6 @@ MOCHITEST_BROWSER_FILES = \
                  browser_contextSearchTabPosition.js \
                  browser_CTP_drag_drop.js \
                  browser_CTP_data_urls.js \
-                 browser_CTP_iframe.js \
                  browser_CTP_nonplugins.js \
                  browser_CTP_resize.js \
                  browser_ctrlTab.js \
@@ -320,7 +320,6 @@ MOCHITEST_BROWSER_FILES = \
                  plugin_clickToPlayAllow.html \
                  plugin_clickToPlayDeny.html \
                  plugin_hidden_to_visible.html \
-                 plugin_iframe.html \
                  plugin_small.html \
                  plugin_test.html \
                  plugin_test2.html \
@@ -337,6 +336,12 @@ MOCHITEST_BROWSER_FILES = \
                  test_bug839103.html \
                  test_wyciwyg_copying.html \
                  test-mixedcontent-securityerrors.html \
+                 test_no_mcb_on_http_site_img.html \
+                 test_no_mcb_on_http_site_img.css \
+                 test_no_mcb_on_http_site_font.html \
+                 test_no_mcb_on_http_site_font.css \
+                 test_no_mcb_on_http_site_font2.html \
+                 test_no_mcb_on_http_site_font2.css \
                  title_test.svg \
                  video.ogg \
                  zoom_test.html \
