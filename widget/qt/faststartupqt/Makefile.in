@@ -14,8 +14,6 @@ EXTRA_DSO_LDOPTS = \
 CPPSRCS += \
 	moc_moziqwidget.cpp \
 	moc_nsFastStartupQt.cpp \
-	mozqglwidgetwrapper.cpp \
-	nsQAppInstance.cpp \
 	$(NULL)
 
 LOCAL_INCLUDES += \
@@ -26,9 +24,7 @@ LOCAL_INCLUDES += \
 EXPORT_SOURCES = \
 	$(topsrcdir)/widget/qt/moziqwidget.h \
 	$(topsrcdir)/toolkit/xre/nsQAppInstance.h \
-	$(topsrcdir)/toolkit/xre/nsQAppInstance.cpp \
-	$(topsrcdir)/widget/qt/mozqglwidgetwrapper.h \
-	$(topsrcdir)/widget/qt/mozqglwidgetwrapper.cpp
+	$(topsrcdir)/widget/qt/mozqglwidgetwrapper.h
 
 GARBAGE += $(EXPORT_SOURCES)
 export:: $(EXPORT_SOURCES)

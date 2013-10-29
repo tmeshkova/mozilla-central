@@ -7,6 +7,8 @@
 MODULE = 'faststartupqt'
 
 SOURCES += [
+    '../../../toolkit/xre/nsQAppInstance.cpp',
+    '../mozqglwidgetwrapper.cpp',
     'mozqwidgetfast.cpp',
     'nsFastStartupQt.cpp',
 ]
