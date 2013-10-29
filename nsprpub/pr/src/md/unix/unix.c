@@ -16,9 +16,6 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <sys/utsname.h>
-#if defined(HAVE_CLOCK_MONOTONIC)
-#include <time.h>
-#endif
 
 #ifdef _PR_POLL_AVAILABLE
 #include <poll.h>
