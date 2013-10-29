@@ -41,6 +41,12 @@ if CONFIG['MOZ_ENABLE_CONTENTMANAGER']:
         'nsMFilePicker.cpp',
     ]
 
+if CONFIG['MOZ_ENABLE_QTMOBILITY']:
+    CPP_SOURCES += [
+        'moc_mozqorientationsensorfilter.cpp',
+        'mozqorientationsensorfilter.cpp',
+    ]
+
 LIBXUL_LIBRARY = True
 
 LIBRARY_NAME = 'widget_qt'
