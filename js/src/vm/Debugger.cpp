@@ -6,7 +6,6 @@
 
 #include "vm/Debugger-inl.h"
 
-#include "jsapi.h"
 #include "jscntxt.h"
 #include "jscompartment.h"
 #include "jsnum.h"
@@ -2087,7 +2086,7 @@ Debugger::construct(JSContext *cx, unsigned argc, Value *vp)
     /* Get Debugger.prototype. */
     RootedValue v(cx);
     RootedObject callee(cx, &args.callee());
-    if (!JSObject::getProperty(cx, callee, callee, cx->names().classPrototype, &v))
+    if (!JSObject::getProperty(cx, callee, callee, cx->names().prototype, &v))
         return false;
     RootedObject proto(cx, &v.toObject());
     JS_ASSERT(proto->getClass() == &Debugger::jsclass);

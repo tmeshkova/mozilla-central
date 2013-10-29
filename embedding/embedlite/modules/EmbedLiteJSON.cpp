@@ -183,7 +183,7 @@ EmbedLiteJSON::ParseJSON(nsAString const& aJson, nsIPropertyBag2** aRoot)
 
 static bool SetPropFromVariant(nsIProperty* aProp, JSContext* aCx, JSObject* aObj)
 {
-  JS::Value rval = JSVAL_NULL;
+  JS::Rooted<JS::Value> rval(aCx, JS::NullValue());
   nsString name;
   nsCOMPtr<nsIVariant> aVariant;
   aProp->GetValue(getter_AddRefs(aVariant));
@@ -199,8 +199,7 @@ static bool SetPropFromVariant(nsIProperty* aProp, JSContext* aCx, JSObject* aOb
     return false;
   }
 
-  JS::RootedValue newrval(aCx, rval);
-  if (!JS_SetProperty(aCx, aObj, NS_ConvertUTF16toUTF8(name).get(), newrval)) {
+  if (!JS_SetProperty(aCx, aObj, NS_ConvertUTF16toUTF8(name).get(), rval)) {
     NS_ERROR("Failed to set js object property");
     return false;
   }

@@ -15,6 +15,7 @@
 #include "jit/UnreachableCodeElimination.h"
 
 #include "jsinferinlines.h"
+#include "jsobjinlines.h"
 
 using namespace js;
 using namespace jit;
@@ -117,6 +118,7 @@ class ParallelSafetyVisitor : public MInstructionVisitor
     SAFE_OP(Beta)
     UNSAFE_OP(OsrValue)
     UNSAFE_OP(OsrScopeChain)
+    UNSAFE_OP(OsrReturnValue)
     UNSAFE_OP(OsrArgumentsObject)
     UNSAFE_OP(ReturnFromCtor)
     CUSTOM_OP(CheckOverRecursed)
@@ -136,7 +138,7 @@ class ParallelSafetyVisitor : public MInstructionVisitor
     UNSAFE_OP(Bail)
     UNSAFE_OP(AssertFloat32)
     UNSAFE_OP(GetDynamicName)
-    UNSAFE_OP(FilterArguments)
+    UNSAFE_OP(FilterArgumentsOrEval)
     UNSAFE_OP(CallDirectEval)
     SAFE_OP(BitNot)
     UNSAFE_OP(TypeOf)
@@ -286,6 +288,7 @@ class ParallelSafetyVisitor : public MInstructionVisitor
     SAFE_OP(HaveSameClass)
     UNSAFE_OP(EffectiveAddress)
     UNSAFE_OP(AsmJSUnsignedToDouble)
+    UNSAFE_OP(AsmJSUnsignedToFloat32)
     UNSAFE_OP(AsmJSNeg)
     UNSAFE_OP(AsmJSUDiv)
     UNSAFE_OP(AsmJSUMod)

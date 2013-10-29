@@ -8,6 +8,7 @@
 #include "mozilla/dom/CrashReporterChild.h"
 #include "mozilla/Services.h"
 #include "nsIObserverService.h"
+#include "mozilla/unused.h"
 #include "mozilla/Util.h"
 
 #include "nsThreadUtils.h"
@@ -220,6 +221,11 @@ static const int kAvailablePhysicalMemoryParameterLen =
 static const char kIsGarbageCollectingParameter[] = "IsGarbageCollecting=";
 static const int kIsGarbageCollectingParameterLen =
   sizeof(kIsGarbageCollectingParameter)-1;
+
+#ifdef XP_WIN
+static const char kBlockedDllsParameter[] = "BlockedDllList=";
+static const int kBlockedDllsParameterLen = sizeof(kBlockedDllsParameter) - 1;
+#endif
 
 // this holds additional data sent via the API
 static Mutex* crashReporterAPILock;
@@ -453,8 +459,7 @@ bool MinidumpCallback(
                       O_WRONLY | O_CREAT | O_TRUNC,
                       0600);
     if (fd != -1) {
-      ssize_t ignored = sys_write(fd, minidumpPath, my_strlen(minidumpPath));
-      (void)ignored;
+      unused << sys_write(fd, minidumpPath, my_strlen(minidumpPath));
       sys_close(fd);
     }
 #endif
@@ -507,8 +512,7 @@ bool MinidumpCallback(
                       O_WRONLY | O_CREAT | O_TRUNC,
                       0600);
     if (fd != -1) {
-      ssize_t ignored = sys_write(fd, crashTimeString, crashTimeStringLen);
-      (void)ignored;
+      unused << sys_write(fd, crashTimeString, crashTimeStringLen);
       sys_close(fd);
     }
 #endif
@@ -541,6 +545,9 @@ bool MinidumpCallback(
         WriteFile(hFile, isGarbageCollecting ? "1" : "0", 1, &nBytes, nullptr);
         WriteFile(hFile, "\n", 1, &nBytes, nullptr);
       }
+      WriteFile(hFile, kBlockedDllsParameter, kBlockedDllsParameterLen, &nBytes, nullptr);
+      WriteBlockedDlls(hFile);
+      WriteFile(hFile, "\n", 1, &nBytes, nullptr);
 
       // Try to get some information about memory.
       MEMORYSTATUSEX statex;
@@ -614,29 +621,30 @@ bool MinidumpCallback(
 
     if (fd != -1) {
       // not much we can do in case of error
-      ssize_t ignored = sys_write(fd, crashReporterAPIData->get(),
+      unused << sys_write(fd, crashReporterAPIData->get(),
                                   crashReporterAPIData->Length());
-      ignored = sys_write(fd, kCrashTimeParameter, kCrashTimeParameterLen);
-      ignored = sys_write(fd, crashTimeString, crashTimeStringLen);
-      ignored = sys_write(fd, "\n", 1);
+      unused << sys_write(fd, kCrashTimeParameter, kCrashTimeParameterLen);
+      unused << sys_write(fd, crashTimeString, crashTimeStringLen);
+      unused << sys_write(fd, "\n", 1);
       if (timeSinceLastCrash != 0) {
-        ignored = sys_write(fd, kTimeSinceLastCrashParameter,
+        unused << sys_write(fd, kTimeSinceLastCrashParameter,
                         kTimeSinceLastCrashParameterLen);
-        ignored = sys_write(fd, timeSinceLastCrashString,
+        unused << sys_write(fd, timeSinceLastCrashString,
                         timeSinceLastCrashStringLen);
-        ignored = sys_write(fd, "\n", 1);
+        unused << sys_write(fd, "\n", 1);
       }
       if (isGarbageCollecting) {
-        ignored = sys_write(fd, kIsGarbageCollectingParameter, kIsGarbageCollectingParameterLen);
-        ignored = sys_write(fd, isGarbageCollecting ? "1" : "0", 1);
-        ignored = sys_write(fd, "\n", 1);
+        unused << sys_write(fd, kIsGarbageCollectingParameter, kIsGarbageCollectingParameterLen);
+        unused << sys_write(fd, isGarbageCollecting ? "1" : "0", 1);
+        unused << sys_write(fd, "\n", 1);
       }
       if (oomAllocationSizeBufferLen) {
-        sys_write(fd, kOOMAllocationSizeParameter,
-                  kOOMAllocationSizeParameterLen);
-        sys_write(fd, oomAllocationSizeBuffer, oomAllocationSizeBufferLen);
-        sys_write(fd, "\n", 1);
-      }        
+        unused << sys_write(fd, kOOMAllocationSizeParameter,
+                            kOOMAllocationSizeParameterLen);
+        unused << sys_write(fd, oomAllocationSizeBuffer,
+                            oomAllocationSizeBufferLen);
+        unused << sys_write(fd, "\n", 1);
+      }
       sys_close(fd);
     }
   }
@@ -676,27 +684,27 @@ bool MinidumpCallback(
     // need to clobber this, as libcurl might load NSS,
     // and we want it to load the system NSS.
     unsetenv("LD_LIBRARY_PATH");
-    (void) execl(crashReporterPath,
-                 crashReporterPath, minidumpPath, (char*)0);
+    unused << execl(crashReporterPath,
+                    crashReporterPath, minidumpPath, (char*)0);
 #else
     // Invoke the reportCrash activity using am
     if (androidUserSerial) {
-      (void) execlp("/system/bin/am",
-                    "/system/bin/am",
-                    "start",
-                    "--user", androidUserSerial,
-                    "-a", "org.mozilla.gecko.reportCrash",
-                    "-n", crashReporterPath,
-                    "--es", "minidumpPath", minidumpPath,
-                    (char*)0);
+      unused << execlp("/system/bin/am",
+                       "/system/bin/am",
+                       "start",
+                       "--user", androidUserSerial,
+                       "-a", "org.mozilla.gecko.reportCrash",
+                       "-n", crashReporterPath,
+                       "--es", "minidumpPath", minidumpPath,
+                       (char*)0);
     } else {
-      (void) execlp("/system/bin/am",
-                    "/system/bin/am",
-                    "start",
-                    "-a", "org.mozilla.gecko.reportCrash",
-                    "-n", crashReporterPath,
-                    "--es", "minidumpPath", minidumpPath,
-                    (char*)0);
+      unused << execlp("/system/bin/am",
+                       "/system/bin/am",
+                       "start",
+                       "-a", "org.mozilla.gecko.reportCrash",
+                       "-n", crashReporterPath,
+                       "--es", "minidumpPath", minidumpPath,
+                       (char*)0);
     }
 #endif
     _exit(1);

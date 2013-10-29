@@ -1185,20 +1185,8 @@ void MediaDecoder::ChangeState(PlayState aState)
     }
   }
   mPlayState = aState;
-  if (mDecoderStateMachine) {
-    switch (aState) {
-    case PLAY_STATE_PLAYING:
-      mDecoderStateMachine->Play();
-      break;
-    case PLAY_STATE_SEEKING:
-      mDecoderStateMachine->Seek(mRequestedSeekTime);
-      mRequestedSeekTime = -1.0;
-      break;
-    default:
-      /* No action needed */
-      break;
-    }
-  }
+
+  ApplyStateToStateMachine(mPlayState);
 
   if (aState!= PLAY_STATE_LOADING) {
     mIsDormant = false;
@@ -1206,6 +1194,27 @@ void MediaDecoder::ChangeState(PlayState aState)
   }
 
   GetReentrantMonitor().NotifyAll();
+}
+
+void MediaDecoder::ApplyStateToStateMachine(PlayState aState)
+{
+  MOZ_ASSERT(NS_IsMainThread());
+  GetReentrantMonitor().AssertCurrentThreadIn();
+
+  if (mDecoderStateMachine) {
+    switch (aState) {
+      case PLAY_STATE_PLAYING:
+        mDecoderStateMachine->Play();
+        break;
+      case PLAY_STATE_SEEKING:
+        mDecoderStateMachine->Seek(mRequestedSeekTime);
+        mRequestedSeekTime = -1.0;
+        break;
+      default:
+        /* No action needed */
+        break;
+    }
+  }
 }
 
 void MediaDecoder::PlaybackPositionChanged()
@@ -1707,6 +1716,15 @@ bool
 MediaDecoder::IsWebMEnabled()
 {
   return Preferences::GetBool("media.webm.enabled");
+}
+#endif
+
+#ifdef MOZ_RTSP
+bool
+MediaDecoder::IsRtspEnabled()
+{
+  //Currently the Rtsp decoded by omx.
+  return (Preferences::GetBool("media.rtsp.enabled", false) && IsOmxEnabled());
 }
 #endif
 

@@ -6,10 +6,15 @@
 
 MODULE = 'faststartupqt'
 
-CPP_SOURCES += [
+SOURCES += [
     'mozqwidgetfast.cpp',
     'nsFastStartupQt.cpp',
 ]
 
 LIBRARY_NAME = 'faststartupqt'
+
+FORCE_STATIC_LIB = True
+EXPORT_LIBRARY = True
+
+include('/ipc/chromium/chromium-config.mozbuild')
 

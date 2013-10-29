@@ -705,6 +705,8 @@ class SetPropertyIC : public RepatchIonCache
 class GetElementIC : public RepatchIonCache
 {
   protected:
+    RegisterSet liveRegs_;
+
     Register object_;
     ConstantOrRegister index_;
     TypedOrValueRegister output_;
@@ -719,9 +721,10 @@ class GetElementIC : public RepatchIonCache
     static const size_t MAX_FAILED_UPDATES;
 
   public:
-    GetElementIC(Register object, ConstantOrRegister index,
+    GetElementIC(RegisterSet liveRegs, Register object, ConstantOrRegister index,
                  TypedOrValueRegister output, bool monitoredResult)
-      : object_(object),
+      : liveRegs_(liveRegs),
+        object_(object),
         index_(index),
         output_(output),
         monitoredResult_(monitoredResult),
@@ -761,7 +764,7 @@ class GetElementIC : public RepatchIonCache
 
     // Helpers for CanAttachNativeGetProp
     typedef JSContext * Context;
-    bool allowGetters() const { return false; }
+    bool allowGetters() const { JS_ASSERT(!idempotent()); return true; }
     bool allowArrayLength(Context, HandleObject) const { return false; }
     bool canMonitorSingletonUndefinedSlot(HandleObject holder, HandleShape shape) const {
         return monitoredResult();
@@ -772,7 +775,8 @@ class GetElementIC : public RepatchIonCache
     static bool canAttachTypedArrayElement(JSObject *obj, const Value &idval,
                                            TypedOrValueRegister output);
 
-    bool attachGetProp(JSContext *cx, IonScript *ion, HandleObject obj, const Value &idval, HandlePropertyName name);
+    bool attachGetProp(JSContext *cx, IonScript *ion, HandleObject obj, const Value &idval,
+                       HandlePropertyName name, void *returnAddr);
     bool attachDenseElement(JSContext *cx, IonScript *ion, JSObject *obj, const Value &idval);
     bool attachTypedArrayElement(JSContext *cx, IonScript *ion, TypedArrayObject *tarr,
                                  const Value &idval);
@@ -804,13 +808,14 @@ class SetElementIC : public RepatchIonCache
     ValueOperand index_;
     ConstantOrRegister value_;
     bool strict_;
+    bool guardHoles_;
 
     bool hasDenseStub_ : 1;
 
   public:
     SetElementIC(Register object, Register tempToUnboxIndex, Register temp,
                  FloatRegister tempFloat, ValueOperand index, ConstantOrRegister value,
-                 bool strict)
+                 bool strict, bool guardHoles)
       : object_(object),
         tempToUnboxIndex_(tempToUnboxIndex),
         temp_(temp),
@@ -818,6 +823,7 @@ class SetElementIC : public RepatchIonCache
         index_(index),
         value_(value),
         strict_(strict),
+        guardHoles_(guardHoles),
         hasDenseStub_(false)
     {
     }
@@ -846,6 +852,9 @@ class SetElementIC : public RepatchIonCache
     }
     bool strict() const {
         return strict_;
+    }
+    bool guardHoles() const {
+        return guardHoles_;
     }
 
     bool hasDenseStub() const {
@@ -1178,18 +1187,20 @@ class SetElementParIC : public ParallelIonCache
     ValueOperand index_;
     ConstantOrRegister value_;
     bool strict_;
+    bool guardHoles_;
 
   public:
     SetElementParIC(Register object, Register tempToUnboxIndex, Register temp,
                     FloatRegister tempFloat, ValueOperand index, ConstantOrRegister value,
-                    bool strict)
+                    bool strict, bool guardHoles)
       : object_(object),
         tempToUnboxIndex_(tempToUnboxIndex),
         temp_(temp),
         tempFloat_(tempFloat),
         index_(index),
         value_(value),
-        strict_(strict)
+        strict_(strict),
+        guardHoles_(guardHoles)
     {
     }
 
@@ -1221,6 +1232,9 @@ class SetElementParIC : public ParallelIonCache
     }
     bool strict() const {
         return strict_;
+    }
+    bool guardHoles() const {
+        return guardHoles_;
     }
 
     bool attachDenseElement(LockedJSContext &cx, IonScript *ion, JSObject *obj, const Value &idval);

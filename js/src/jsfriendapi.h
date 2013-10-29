@@ -639,7 +639,6 @@ ErrorFromException(JS::Value val);
 #define JSITER_KEYVALUE   0x4   /* destructuring for-in wants [key, value] */
 #define JSITER_OWNONLY    0x8   /* iterate over obj's own properties only */
 #define JSITER_HIDDEN     0x10  /* also enumerate non-enumerable properties */
-#define JSITER_FOR_OF     0x20  /* harmony for-of loop */
 
 JS_FRIEND_API(bool)
 RunningWithTrustedPrincipals(JSContext *cx);
@@ -1242,6 +1241,12 @@ extern JS_FRIEND_API(JSObject *)
 JS_GetArrayBufferViewBuffer(JSObject *obj);
 
 /*
+ * Set an ArrayBuffer's length to 0 and neuter all of its views.
+ */
+extern JS_FRIEND_API(void)
+JS_NeuterArrayBuffer(JSObject *obj, JSContext *cx);
+
+/*
  * Check whether obj supports JS_GetDataView* APIs.
  */
 JS_FRIEND_API(bool)
@@ -1493,7 +1498,7 @@ JSID_TO_ATOM(jsid id)
     return (JSAtom *)JSID_TO_STRING(id);
 }
 
-JS_STATIC_ASSERT(sizeof(jsid) == JS_BYTES_PER_WORD);
+JS_STATIC_ASSERT(sizeof(jsid) == sizeof(void*));
 
 namespace js {
 

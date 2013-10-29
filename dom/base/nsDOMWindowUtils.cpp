@@ -767,7 +767,7 @@ nsDOMWindowUtils::SendWheelEvent(float aX,
     return NS_ERROR_NULL_POINTER;
   }
 
-  WheelEvent wheelEvent(true, NS_WHEEL_WHEEL, widget);
+  WidgetWheelEvent wheelEvent(true, NS_WHEEL_WHEEL, widget);
   wheelEvent.modifiers = GetWidgetModifiers(aModifiers);
   wheelEvent.deltaX = aDeltaX;
   wheelEvent.deltaY = aDeltaY;
@@ -2385,8 +2385,9 @@ nsDOMWindowUtils::GetIsTestControllingRefreshes(bool *aResult)
     return NS_ERROR_DOM_SECURITY_ERR;
   }
 
+  nsPresContext* pc = GetPresContext();
   *aResult =
-    GetPresContext()->RefreshDriver()->IsTestControllingRefreshesEnabled();
+    pc ? pc->RefreshDriver()->IsTestControllingRefreshesEnabled() : false;
 
   return NS_OK;
 }

@@ -75,7 +75,7 @@ JSObject::deleteSpecial(JSContext *cx, js::HandleObject obj, js::HandleSpecialId
 inline void
 JSObject::finalize(js::FreeOp *fop)
 {
-    js::Probes::finalizeObject(this);
+    js::probes::FinalizeObject(this);
 
 #ifdef DEBUG
     JS_ASSERT(isTenured());
@@ -901,7 +901,8 @@ CopyInitializerObject(JSContext *cx, HandleObject baseobj, NewObjectKind newKind
 
 JSObject *
 NewReshapedObject(JSContext *cx, HandleTypeObject type, JSObject *parent,
-                  gc::AllocKind kind, HandleShape shape);
+                  gc::AllocKind allocKind, HandleShape shape,
+                  NewObjectKind newKind = GenericObject);
 
 /*
  * As for gc::GetGCObjectKind, where numSlots is a guess at the final size of
@@ -936,15 +937,15 @@ DefineConstructorAndPrototype(JSContext *cx, Handle<GlobalObject*> global,
     JS_ASSERT(!global->nativeLookup(cx, id));
 
     /* Set these first in case AddTypePropertyId looks for this class. */
-    global->setSlot(key, ObjectValue(*ctor));
-    global->setSlot(key + JSProto_LIMIT, ObjectValue(*proto));
-    global->setSlot(key + JSProto_LIMIT * 2, ObjectValue(*ctor));
+    global->setConstructor(key, ObjectValue(*ctor));
+    global->setPrototype(key, ObjectValue(*proto));
+    global->setConstructorPropertySlot(key, ObjectValue(*ctor));
 
     types::AddTypePropertyId(cx, global, id, ObjectValue(*ctor));
-    if (!global->addDataProperty(cx, id, key + JSProto_LIMIT * 2, 0)) {
-        global->setSlot(key, UndefinedValue());
-        global->setSlot(key + JSProto_LIMIT, UndefinedValue());
-        global->setSlot(key + JSProto_LIMIT * 2, UndefinedValue());
+    if (!global->addDataProperty(cx, id, GlobalObject::constructorPropertySlot(key), 0)) {
+        global->setConstructor(key, UndefinedValue());
+        global->setPrototype(key, UndefinedValue());
+        global->setConstructorPropertySlot(key, UndefinedValue());
         return false;
     }
 
@@ -1007,12 +1008,12 @@ NewObjectMetadata(ExclusiveContext *cxArg, JSObject **pmetadata)
     // analysis/compilation/parsing is active as the callback may reenter JS.
     JS_ASSERT(!*pmetadata);
     if (JSContext *cx = cxArg->maybeJSContext()) {
-        if (JS_UNLIKELY((size_t)cx->compartment()->objectMetadataCallback) &&
+        if (JS_UNLIKELY((size_t)cx->compartment()->hasObjectMetadataCallback()) &&
             !cx->compartment()->activeAnalysis &&
             !cx->runtime()->mainThread.activeCompilations)
         {
             gc::AutoSuppressGC suppress(cx);
-            return cx->compartment()->objectMetadataCallback(cx, pmetadata);
+            return cx->compartment()->callObjectMetadataCallback(cx, pmetadata);
         }
     }
     return true;

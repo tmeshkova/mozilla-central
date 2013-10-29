@@ -10,8 +10,8 @@
 #include "builtin/TypedObject.h"
 #include "frontend/BytecodeCompiler.h"
 #include "jit/BaselineIC.h"
-#include "jit/IonCompartment.h"
 #include "jit/IonFrames.h"
+#include "jit/JitCompartment.h"
 #include "vm/ArrayObject.h"
 #include "vm/Debugger.h"
 #include "vm/Interpreter.h"
@@ -465,8 +465,8 @@ InterruptCheck(JSContext *cx)
     // is definitely about to be handled; if there are still backedges
     // afterwards which point to the interrupt handler, the next time they are
     // taken the backedges will just be reset again.
-    cx->runtime()->ionRuntime()->patchIonBackedges(cx->runtime(),
-                                                   IonRuntime::BackedgeLoopHeader);
+    cx->runtime()->jitRuntime()->patchIonBackedges(cx->runtime(),
+                                                   JitRuntime::BackedgeLoopHeader);
 
     return !!js_HandleExecutionInterrupt(cx);
 }
@@ -491,6 +491,8 @@ NewCallObject(JSContext *cx, HandleScript script,
               HandleShape shape, HandleTypeObject type, HeapSlot *slots)
 {
     JSObject *obj = CallObject::create(cx, script, shape, type, slots);
+    if (!obj)
+        return nullptr;
 
 #ifdef JSGC_GENERATIONAL
     // The JIT creates call objects in the nursery, so elides barriers for
@@ -572,7 +574,7 @@ CreateThis(JSContext *cx, HandleObject callee, MutableHandleValue rval)
             JSScript *script = fun->getOrCreateScript(cx);
             if (!script || !script->ensureHasTypes(cx))
                 return false;
-            JSObject *thisObj = CreateThisForFunction(cx, callee, false);
+            JSObject *thisObj = CreateThisForFunction(cx, callee, GenericObject);
             if (!thisObj)
                 return false;
             rval.set(ObjectValue(*thisObj));
@@ -616,7 +618,7 @@ GetDynamicName(JSContext *cx, JSObject *scopeChain, JSString *str, Value *vp)
 }
 
 bool
-FilterArguments(JSContext *cx, JSString *str)
+FilterArgumentsOrEval(JSContext *cx, JSString *str)
 {
     // getChars() is fallible, but cannot GC: it can only allocate a character
     // for the flattened string. If this call fails then the calling Ion code
@@ -627,7 +629,10 @@ FilterArguments(JSContext *cx, JSString *str)
         return false;
 
     static const jschar arguments[] = {'a', 'r', 'g', 'u', 'm', 'e', 'n', 't', 's'};
-    return !StringHasPattern(chars, str->length(), arguments, mozilla::ArrayLength(arguments));
+    static const jschar eval[] = {'e', 'v', 'a', 'l'};
+
+    return !StringHasPattern(chars, str->length(), arguments, mozilla::ArrayLength(arguments)) &&
+        !StringHasPattern(chars, str->length(), eval, mozilla::ArrayLength(eval));
 }
 
 #ifdef JSGC_GENERATIONAL
@@ -716,7 +721,7 @@ DebugEpilogue(JSContext *cx, BaselineFrame *frame, bool ok)
     if (frame->hasPushedSPSFrame()) {
         cx->runtime()->spsProfiler.exit(cx, frame->script(), frame->maybeFun());
         // Unset the pushedSPSFrame flag because DebugEpilogue may get called before
-        // Probes::exitScript in baseline during exception handling, and we don't
+        // probes::ExitScript in baseline during exception handling, and we don't
         // want to double-pop SPS frames.
         frame->unsetPushedSPSFrame();
     }
@@ -892,7 +897,7 @@ InitBaselineFrameForOsr(BaselineFrame *frame, StackFrame *interpFrame, uint32_t 
 JSObject *CreateDerivedTypedObj(JSContext *cx, HandleObject type,
                                 HandleObject owner, int32_t offset)
 {
-    return BinaryBlock::createDerived(cx, type, owner, offset);
+    return TypedObject::createDerived(cx, type, owner, offset);
 }
 
 

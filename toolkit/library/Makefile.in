@@ -82,14 +82,16 @@ STATIC_LIBS += \
   $(NULL)
 
 ifdef MOZ_CONTENT_SANDBOX #{
+ifeq ($(OS_ARCH),Linux)
 STATIC_LIBS += sandbox_s
+endif
 endif #}
 
 ifdef MOZ_B2G_RIL #{
 STATIC_LIBS += mozril_s
 endif #}
 
-ifdef MOZ_B2G_BT #{
+ifdef MOZ_B2G_BT_BLUEZ #{
 STATIC_LIBS += mozdbus_s
 ifeq (gonk,$(MOZ_WIDGET_TOOLKIT))
 OS_LIBS += -ldbus
@@ -97,7 +99,7 @@ endif
 endif #}
 
 ifneq ($(strip $(MOZ_B2G_RIL)$(MOZ_B2G_BT)),) #{
-STATIC_LIBS += mozipcunixsocket_s
+STATIC_LIBS += mozipcunixsocket_s mozkeystore_s
 endif #}
 
 ifeq (gonk,$(MOZ_WIDGET_TOOLKIT))
@@ -468,6 +470,10 @@ OS_LIBS += \
   $(NULL)
 endif
 
+ifdef MOZ_RTSP
+OS_LIBS += -lstagefright_foundation
+endif
+
 ifdef MOZ_WMF
 OS_LIBS += $(call EXPAND_LIBNAME,mfuuid wmcodecdspuuid strmiids)
 endif
@@ -551,7 +557,7 @@ EXTRA_DSO_LDOPTS += -Wl,--warn-unresolved-symbols
 endif
 
 ifeq ($(OS_ARCH),WINNT)
-OS_LIBS += $(call EXPAND_LIBNAME,shell32 ole32 version winspool comdlg32 imm32 msimg32 shlwapi psapi ws2_32 dbghelp rasapi32 rasdlg iphlpapi uxtheme setupapi secur32 sensorsapi portabledeviceguids windowscodecs wininet)
+OS_LIBS += $(call EXPAND_LIBNAME,shell32 ole32 version winspool comdlg32 imm32 msimg32 shlwapi psapi ws2_32 dbghelp rasapi32 rasdlg iphlpapi uxtheme setupapi secur32 sensorsapi portabledeviceguids windowscodecs wininet wbemuuid)
 ifdef ACCESSIBILITY
 OS_LIBS += $(call EXPAND_LIBNAME,oleacc)
 endif
@@ -703,6 +709,7 @@ ifdef LINK_GTEST
 COMPONENT_LIBS += \
   gtest \
   gfxtest \
+  ssltest \
   $(NULL)
 endif
 

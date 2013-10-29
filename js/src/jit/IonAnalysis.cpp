@@ -9,6 +9,7 @@
 #include "jsanalyze.h"
 
 #include "jit/BaselineInspector.h"
+#include "jit/BaselineJIT.h"
 #include "jit/Ion.h"
 #include "jit/IonBuilder.h"
 #include "jit/LIR.h"
@@ -16,6 +17,7 @@
 #include "jit/MIRGraph.h"
 
 #include "jsinferinlines.h"
+#include "jsobjinlines.h"
 
 using namespace js;
 using namespace js::jit;
@@ -210,16 +212,25 @@ IsPhiObservable(MPhi *phi, Observability observe)
         break;
     }
 
-    // If the Phi is of the |this| value, it must always be observable.
     uint32_t slot = phi->slot();
     CompileInfo &info = phi->block()->info();
-    if (info.fun() && slot == info.thisSlot())
+    JSFunction *fun = info.fun();
+
+    // If the Phi is of the |this| value, it must always be observable.
+    if (fun && slot == info.thisSlot())
+        return true;
+
+    // If the function is heavyweight, and the Phi is of the |scopeChain|
+    // value, and the function may need an arguments object, then make sure
+    // to preserve the scope chain, because it may be needed to construct the
+    // arguments object during bailout.
+    if (fun && fun->isHeavyweight() && info.hasArguments() && slot == info.scopeChainSlot())
         return true;
 
     // If the Phi is one of the formal argument, and we are using an argument
     // object in the function. The phi might be observable after a bailout.
     // For inlined frames this is not needed, as they are captured in the inlineResumePoint.
-    if (info.fun() && info.hasArguments()) {
+    if (fun && info.hasArguments()) {
         uint32_t first = info.firstArgSlot();
         if (first <= slot && slot - first < info.nargs()) {
             // If arguments obj aliases formals, then the arg slots will never be used.
@@ -1274,6 +1285,8 @@ void
 jit::AssertGraphCoherency(MIRGraph &graph)
 {
 #ifdef DEBUG
+    if (!js_IonOptions.assertGraphConsistency)
+        return;
     AssertBasicGraphCoherency(graph);
     AssertReversePostOrder(graph);
 #endif
@@ -1287,6 +1300,8 @@ jit::AssertExtendedGraphCoherency(MIRGraph &graph)
     // are split)
 
 #ifdef DEBUG
+    if (!js_IonOptions.assertGraphConsistency)
+        return;
     AssertGraphCoherency(graph);
 
     uint32_t idx = 0;
@@ -1922,7 +1937,7 @@ AnalyzePoppedThis(JSContext *cx, types::TypeObject *type,
         // Don't use GetAtomId here, we need to watch for SETPROP on
         // integer properties and bail out. We can't mark the aggregate
         // JSID_VOID type property as being in a definite slot.
-        if (setprop->name() == cx->names().classPrototype ||
+        if (setprop->name() == cx->names().prototype ||
             setprop->name() == cx->names().proto ||
             setprop->name() == cx->names().constructor)
         {
@@ -2043,7 +2058,7 @@ CmpInstructions(const void *a, const void *b)
 }
 
 bool
-jit::AnalyzeNewScriptProperties(JSContext *cx, JSFunction *fun,
+jit::AnalyzeNewScriptProperties(JSContext *cx, HandleFunction fun,
                                 types::TypeObject *type, HandleObject baseobj,
                                 Vector<types::TypeNewScript::Initializer> *initializerList)
 {
@@ -2051,17 +2066,13 @@ jit::AnalyzeNewScriptProperties(JSContext *cx, JSFunction *fun,
     // which will definitely be added to the created object before it has a
     // chance to escape and be accessed elsewhere.
 
-    if (fun->isInterpretedLazy() && !fun->getOrCreateScript(cx)) {
+    if (fun->isInterpretedLazy() && !fun->getOrCreateScript(cx))
         return false;
-    }
 
-    if (!fun->nonLazyScript()->compileAndGo)
+    RootedScript script(cx, fun->nonLazyScript());
+
+    if (!script->compileAndGo || !script->canBaselineCompile())
         return true;
-
-    if (!fun->nonLazyScript()->ensureHasTypes(cx))
-        return false;
-
-    types::TypeScript::SetThis(cx, fun->nonLazyScript(), types::Type::ObjectType(type));
 
     Vector<PropertyName *> accessedProperties(cx);
 
@@ -2072,19 +2083,29 @@ jit::AnalyzeNewScriptProperties(JSContext *cx, JSFunction *fun,
 
     types::AutoEnterAnalysis enter(cx);
 
-    if (!fun->nonLazyScript()->ensureRanAnalysis(cx))
-        return false;
+    if (!cx->compartment()->ensureJitCompartmentExists(cx))
+        return Method_Error;
+
+    if (!script->hasBaselineScript()) {
+        MethodStatus status = BaselineCompile(cx, script);
+        if (status == Method_Error)
+            return false;
+        if (status != Method_Compiled)
+            return true;
+    }
+
+    types::TypeScript::SetThis(cx, script, types::Type::ObjectType(type));
 
     MIRGraph graph(&temp);
-    CompileInfo info(fun->nonLazyScript(), fun,
+    CompileInfo info(script, fun,
                      /* osrPc = */ nullptr, /* constructing = */ false,
                      DefinitePropertiesAnalysis);
 
     AutoTempAllocatorRooter root(cx, &temp);
 
-    types::CompilerConstraintList constraints;
-    BaselineInspector inspector(cx, fun->nonLazyScript());
-    IonBuilder builder(cx, &temp, &graph, &constraints,
+    types::CompilerConstraintList *constraints = types::NewCompilerConstraintList();
+    BaselineInspector inspector(script);
+    IonBuilder builder(cx, &temp, &graph, constraints,
                        &inspector, &info, /* baselineFrame = */ nullptr);
 
     if (!builder.build()) {

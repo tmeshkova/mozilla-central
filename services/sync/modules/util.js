@@ -10,7 +10,7 @@ this.EXPORTED_SYMBOLS = ["XPCOMUtils", "Services", "NetUtil",
 
 const {classes: Cc, interfaces: Ci, results: Cr, utils: Cu} = Components;
 
-Cu.import("resource://services-common/log4moz.js");
+Cu.import("resource://gre/modules/Log.jsm");
 Cu.import("resource://services-common/observers.js");
 Cu.import("resource://services-common/stringbundle.js");
 Cu.import("resource://services-common/utils.js");

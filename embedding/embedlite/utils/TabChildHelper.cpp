@@ -111,7 +111,7 @@ TabChildHelper::~TabChildHelper()
   mGlobal = nullptr;
 
   if (mTabChildGlobal) {
-    nsEventListenerManager* elm = mTabChildGlobal->GetListenerManager(false);
+    nsEventListenerManager* elm = mTabChildGlobal->GetExistingListenerManager();
     if (elm) {
       elm->Disconnect();
     }
@@ -572,15 +572,14 @@ TabChildHelper::DoSendSyncMessage(JSContext* aCx,
   JSAutoRequest ar(cx);
 
   // FIXME: Need callback interface for simple JSON to avoid useless conversion here
-  jsval jv = JSVAL_NULL;
+  JS::Rooted<JS::Value> rval(cx, JS::NullValue());
   if (aData.mDataLength &&
-      !ReadStructuredClone(cx, aData, &jv)) {
+      !ReadStructuredClone(cx, aData, &rval)) {
     JS_ClearPendingException(cx);
     return false;
   }
 
   nsAutoString json;
-  JS::Rooted<JS::Value> rval(cx, jv);
   NS_ENSURE_TRUE(JS_Stringify(cx, &rval, JS::NullPtr(), JS::NullHandleValue, JSONCreator, &json), false);
   NS_ENSURE_TRUE(!json.IsEmpty(), false);
 
@@ -603,15 +602,14 @@ TabChildHelper::DoSendAsyncMessage(JSContext* aCx,
   JSAutoRequest ar(cx);
 
   // FIXME: Need callback interface for simple JSON to avoid useless conversion here
-  jsval jv = JSVAL_NULL;
+  JS::Rooted<JS::Value> rval(cx, JS::NullValue());
   if (aData.mDataLength &&
-      !ReadStructuredClone(cx, aData, &jv)) {
+      !ReadStructuredClone(cx, aData, &rval)) {
     JS_ClearPendingException(cx);
     return false;
   }
 
   nsAutoString json;
-  JS::Rooted<JS::Value> rval(cx, jv);
   NS_ENSURE_TRUE(JS_Stringify(cx, &rval, JS::NullPtr(), JS::NullHandleValue, JSONCreator, &json), false);
   NS_ENSURE_TRUE(!json.IsEmpty(), false);
 

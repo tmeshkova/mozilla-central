@@ -15,6 +15,7 @@
 #include "nsServiceManagerUtils.h"
 #include "nsContentUtils.h"
 #include "nsCxPusher.h"
+#include "nsContentPermissionHelper.h"
 #include "nsIDocument.h"
 #include "nsIObserverService.h"
 #include "nsPIDOMWindow.h"
@@ -77,7 +78,7 @@ class nsGeolocationRequest
   void Shutdown();
 
   void SendLocation(nsIDOMGeoPosition* location);
-  bool WantsHighAccuracy() {return mOptions && mOptions->mEnableHighAccuracy;}
+  bool WantsHighAccuracy() {return !mShutdown && mOptions && mOptions->mEnableHighAccuracy;}
   void SetTimeoutTimer();
   nsIPrincipal* GetPrincipal();
 
@@ -223,23 +224,6 @@ private:
   nsCOMPtr<nsIDOMGeoPosition> mPosition;
   nsRefPtr<nsGeolocationRequest> mRequest;
   nsRefPtr<Geolocation> mLocator;
-};
-
-class RequestRestartTimerEvent : public nsRunnable
-{
-public:
-  RequestRestartTimerEvent(nsGeolocationRequest* aRequest)
-    : mRequest(aRequest)
-  {
-  }
-
-  NS_IMETHOD Run() {
-    mRequest->SetTimeoutTimer();
-    return NS_OK;
-  }
-
-private:
-  nsRefPtr<nsGeolocationRequest> mRequest;
 };
 
 ////////////////////////////////////////////////////
@@ -395,17 +379,11 @@ nsGeolocationRequest::GetPrincipal(nsIPrincipal * *aRequestingPrincipal)
 }
 
 NS_IMETHODIMP
-nsGeolocationRequest::GetType(nsACString & aType)
+nsGeolocationRequest::GetTypes(nsIArray** aTypes)
 {
-  aType = "geolocation";
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-nsGeolocationRequest::GetAccess(nsACString & aAccess)
-{
-  aAccess = "unused";
-  return NS_OK;
+  return CreatePermissionArray(NS_LITERAL_CSTRING("geolocation"),
+                               NS_LITERAL_CSTRING("unused"),
+                               aTypes);
 }
 
 NS_IMETHODIMP
@@ -462,7 +440,7 @@ nsGeolocationRequest::Allow()
       maximumAge = mOptions->mMaximumAge;
     }
   }
-  gs->SetHigherAccuracy(mOptions && mOptions->mEnableHighAccuracy);
+  gs->UpdateAccuracy(WantsHighAccuracy());
 
   bool canUseCache = lastPosition && maximumAge > 0 &&
     (PRTime(PR_Now() / PR_USEC_PER_MSEC) - maximumAge <=
@@ -602,12 +580,12 @@ nsGeolocationRequest::Shutdown()
     mTimeoutTimer = nullptr;
   }
 
-  // This should happen last, to ensure that this request isn't taken into consideration
-  // when deciding whether existing requests still require high accuracy.
+  // If there are no other high accuracy requests, the geolocation service will
+  // notify the provider to switch to the default accuracy.
   if (mOptions && mOptions->mEnableHighAccuracy) {
     nsRefPtr<nsGeolocationService> gs = nsGeolocationService::GetGeolocationService();
     if (gs) {
-      gs->SetHigherAccuracy(false);
+      gs->UpdateAccuracy();
     }
   }
 }
@@ -636,14 +614,12 @@ NS_IMPL_RELEASE(nsGeolocationService)
 
 static bool sGeoEnabled = true;
 static bool sGeoInitPending = true;
-static bool sGeoIgnoreLocationFilter = false;
 static int32_t sProviderTimeout = 6000; // Time, in milliseconds, to wait for the location provider to spin up.
 
 nsresult nsGeolocationService::Init()
 {
   Preferences::AddIntVarCache(&sProviderTimeout, "geo.timeout", sProviderTimeout);
   Preferences::AddBoolVarCache(&sGeoEnabled, "geo.enabled", sGeoEnabled);
-  Preferences::AddBoolVarCache(&sGeoIgnoreLocationFilter, "geo.ignore.location_filter", sGeoIgnoreLocationFilter);
 
   if (!sGeoEnabled) {
     return NS_ERROR_FAILURE;
@@ -694,7 +670,10 @@ nsresult nsGeolocationService::Init()
 #endif
 
 #ifdef MOZ_WIDGET_COCOA
-  mProvider = new CoreLocationLocationProvider();
+  if (Preferences::GetBool("geo.provider.use_corelocation", true) &&
+      CoreLocationLocationProvider::IsCoreLocationAvailable()) {
+    mProvider = new CoreLocationLocationProvider();
+  }
 #endif
 
   // Override platform-specific providers with the default (network)
@@ -918,9 +897,9 @@ nsGeolocationService::HighAccuracyRequested()
 }
 
 void
-nsGeolocationService::SetHigherAccuracy(bool aEnable)
+nsGeolocationService::UpdateAccuracy(bool aForceHigh)
 {
-  bool highRequired = aEnable || HighAccuracyRequested();
+  bool highRequired = aForceHigh || HighAccuracyRequested();
 
   if (XRE_GetProcessType() == GeckoProcessType_Content) {
     ContentChild* cpc = ContentChild::GetSingleton();
@@ -1078,6 +1057,7 @@ Geolocation::Shutdown()
 
   if (mService) {
     mService->RemoveLocator(this);
+    mService->UpdateAccuracy();
   }
 
   mService = nullptr;
@@ -1460,12 +1440,15 @@ Geolocation::RegisterRequestWithPrompt(nsGeolocationRequest* request)
       return false;
     }
 
+    nsTArray<PermissionRequest> permArray;
+    permArray.AppendElement(PermissionRequest(NS_LITERAL_CSTRING("geolocation"),
+                                              NS_LITERAL_CSTRING("unused")));
+
     // Retain a reference so the object isn't deleted without IPDL's knowledge.
     // Corresponding release occurs in DeallocPContentPermissionRequest.
     request->AddRef();
     child->SendPContentPermissionRequestConstructor(request,
-                                                    NS_LITERAL_CSTRING("geolocation"),
-                                                    NS_LITERAL_CSTRING("unused"),
+                                                    permArray,
                                                     IPC::Principal(mPrincipal));
 
     request->Sendprompt();

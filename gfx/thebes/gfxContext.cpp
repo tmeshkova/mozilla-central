@@ -275,25 +275,31 @@ gfxContext::ClosePath()
   }
 }
 
-already_AddRefed<gfxPath> gfxContext::CopyPath() const
+already_AddRefed<gfxPath> gfxContext::CopyPath()
 {
+  nsRefPtr<gfxPath> path;
   if (mCairo) {
-    nsRefPtr<gfxPath> path = new gfxPath(cairo_copy_path(mCairo));
-    return path.forget();
+    path = new gfxPath(cairo_copy_path(mCairo));
   } else {
-    // XXX - This is not yet supported for Azure.
-    return nullptr;
+    EnsurePath();
+    path = new gfxPath(mPath);
   }
+  return path.forget();
 }
 
-void gfxContext::AppendPath(gfxPath* path)
+void gfxContext::SetPath(gfxPath* path)
 {
   if (mCairo) {
+    cairo_new_path(mCairo);
     if (path->mPath->status == CAIRO_STATUS_SUCCESS && path->mPath->num_data != 0)
         cairo_append_path(mCairo, path->mPath);
   } else {
-    // XXX - This is not yet supported for Azure.
-    return;
+    MOZ_ASSERT(path->mMoz2DPath, "Can't mix cairo and azure paths!");
+    MOZ_ASSERT(path->mMoz2DPath->GetBackendType() == mDT->GetType());
+    mPath = path->mMoz2DPath;
+    mPathBuilder = nullptr;
+    mPathIsRect = false;
+    mTransformChanged = false;
   }
 }
 
@@ -569,6 +575,10 @@ gfxContext::DrawSurface(gfxASurface *surface, const gfxSize& size)
     RefPtr<SourceSurface> surf =
       gfxPlatform::GetPlatform()->GetSourceSurfaceForSurface(mDT, surface);
 
+    if (!surf) {
+      return;
+    }
+
     Rect rect(0, 0, Float(size.width), Float(size.height));
     rect.Intersect(Rect(0, 0, Float(surf->GetSize().width), Float(surf->GetSize().height)));
 
@@ -645,8 +655,6 @@ gfxContext::SetMatrix(const gfxMatrix& matrix)
     const cairo_matrix_t& mat = reinterpret_cast<const cairo_matrix_t&>(matrix);
     cairo_set_matrix(mCairo, &mat);
   } else {
-    Matrix mat;
-    mat.Translate(-CurrentState().deviceOffset.x, -CurrentState().deviceOffset.y);
     ChangeTransform(ToMatrix(matrix));
   }
 }
@@ -1385,6 +1393,7 @@ gfxContext::SetSource(gfxASurface *surface, const gfxPoint& offset)
     CurrentState().sourceSurfCairo = surface;
     CurrentState().sourceSurface =
       gfxPlatform::GetPlatform()->GetSourceSurfaceForSurface(mDT, surface);
+    CurrentState().color = Color(0, 0, 0, 0);
   }
 }
 
@@ -1487,6 +1496,10 @@ gfxContext::Mask(gfxASurface *surface, const gfxPoint& offset)
     // Lifetime needs to be limited here as we may simply wrap surface's data.
     RefPtr<SourceSurface> sourceSurf =
       gfxPlatform::GetPlatform()->GetSourceSurfaceForSurface(mDT, surface);
+
+    if (!sourceSurf) {
+      return;
+    }
 
     gfxPoint pt = surface->GetDeviceOffset();
 
@@ -1748,19 +1761,6 @@ gfxContext::GetUserStrokeExtent()
     return gfxRect(xmin, ymin, xmax - xmin, ymax - ymin);
   } else {
     return ThebesRect(mPath->GetStrokedBounds(CurrentState().strokeOptions, mTransform));
-  }
-}
-
-already_AddRefed<gfxFlattenedPath>
-gfxContext::GetFlattenedPath()
-{
-  if (mCairo) {
-    nsRefPtr<gfxFlattenedPath> path =
-        new gfxFlattenedPath(cairo_copy_path_flat(mCairo));
-    return path.forget();
-  } else {
-    // XXX - Used by SVG, needs fixing.
-    return nullptr;
   }
 }
 

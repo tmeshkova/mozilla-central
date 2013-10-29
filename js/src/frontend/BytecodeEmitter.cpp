@@ -107,6 +107,7 @@ BytecodeEmitter::BytecodeEmitter(BytecodeEmitter *parent,
     hasSingletons(false),
     emittingForInit(false),
     emittingRunOnceLambda(false),
+    lazyRunOnceLambda(false),
     insideEval(insideEval),
     hasGlobalScope(hasGlobalScope),
     emitterMode(emitterMode)
@@ -2408,19 +2409,19 @@ EmitSwitch(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
                 i += JS_BIT(16);
             if (i >= intmap_bitlen) {
                 if (!intmap &&
-                    i < (INTMAP_LENGTH << JS_BITS_PER_WORD_LOG2)) {
+                    size_t(i) < (INTMAP_LENGTH * JS_BITMAP_NBITS)) {
                     intmap = intmap_space;
-                    intmap_bitlen = INTMAP_LENGTH << JS_BITS_PER_WORD_LOG2;
+                    intmap_bitlen = INTMAP_LENGTH * JS_BITMAP_NBITS;
                 } else {
                     /* Just grab 8K for the worst-case bitmap. */
                     intmap_bitlen = JS_BIT(16);
-                    intmap = cx->pod_malloc<jsbitmap>(JS_BIT(16) >> JS_BITS_PER_WORD_LOG2);
+                    intmap = cx->pod_malloc<jsbitmap>(JS_BIT(16) / JS_BITMAP_NBITS);
                     if (!intmap) {
                         js_ReportOutOfMemory(cx);
                         return false;
                     }
                 }
-                memset(intmap, 0, intmap_bitlen >> JS_BITS_PER_BYTE_LOG2);
+                memset(intmap, 0, size_t(intmap_bitlen) / CHAR_BIT);
             }
             if (JS_TEST_BIT(intmap, i)) {
                 switchOp = JSOP_CONDSWITCH;
@@ -2622,6 +2623,22 @@ EmitSwitch(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
 }
 
 bool
+BytecodeEmitter::isRunOnceLambda()
+{
+    // The run once lambda flags set by the parser are approximate, and we look
+    // at properties of the function itself before deciding to emit a function
+    // as a run once lambda.
+
+    if (!(parent && parent->emittingRunOnceLambda) && !lazyRunOnceLambda)
+        return false;
+
+    FunctionBox *funbox = sc->asFunctionBox();
+    return !funbox->argumentsHasLocalBinding() &&
+           !funbox->isGenerator() &&
+           !funbox->function()->name();
+}
+
+bool
 frontend::EmitFunctionScript(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *body)
 {
     /*
@@ -2666,10 +2683,7 @@ frontend::EmitFunctionScript(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNo
      * the script ends up running multiple times via foo.caller related
      * shenanigans.
      */
-    bool runOnce = bce->parent &&
-        bce->parent->emittingRunOnceLambda &&
-        !funbox->argumentsHasLocalBinding() &&
-        !funbox->isGenerator();
+    bool runOnce = bce->isRunOnceLambda();
     if (runOnce) {
         bce->switchToProlog();
         if (Emit1(cx, bce, JSOP_RUNONCE) < 0)
@@ -3234,10 +3248,10 @@ EmitVariables(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, VarEmit
                 /*
                  * Emit variable binding ops, but not destructuring ops.  The
                  * parser (see Parser::variables) has ensured that our caller
-                 * will be the PNK_FOR/PNK_FORIN case in EmitTree, and that
-                 * case will emit the destructuring code only after emitting an
-                 * enumerating opcode and a branch that tests whether the
-                 * enumeration ended.
+                 * will be the PNK_FOR/PNK_FORIN/PNK_FOROF case in EmitTree, and
+                 * that case will emit the destructuring code only after
+                 * emitting an enumerating opcode and a branch that tests
+                 * whether the enumeration ended.
                  */
                 JS_ASSERT(emitOption == DefineVars);
                 JS_ASSERT(pn->pn_count == 1);
@@ -4743,12 +4757,12 @@ EmitNormalFor(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, ptrdiff
 static inline bool
 EmitFor(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn, ptrdiff_t top)
 {
-    if (pn->pn_left->isKind(PNK_FORIN)) {
-        // FIXME: Give for-of loops their own PNK.  Bug 922066.
-        if (pn->pn_iflags == JSITER_FOR_OF)
-            return EmitForOf(cx, bce, pn, top);
+    if (pn->pn_left->isKind(PNK_FORIN))
         return EmitForIn(cx, bce, pn, top);
-    }
+
+    if (pn->pn_left->isKind(PNK_FOROF))
+        return EmitForOf(cx, bce, pn, top);
+
     JS_ASSERT(pn->pn_left->isKind(PNK_FORHEAD));
     return EmitNormalFor(cx, bce, pn, top);
 }
@@ -4788,9 +4802,7 @@ EmitFunc(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
             bce->script->compileAndGo &&
             fun->isInterpreted() &&
             (bce->checkSingletonContext() ||
-             (!bce->isInLoop() &&
-              bce->parent &&
-              bce->parent->emittingRunOnceLambda));
+             (!bce->isInLoop() && bce->isRunOnceLambda()));
         if (!JSFunction::setTypeForScriptedFunction(cx, fun, singleton))
             return false;
 
@@ -4801,6 +4813,8 @@ EmitFunc(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *pn)
                     scope = bce->sc->asFunctionBox()->function();
                 fun->lazyScript()->setParent(scope, bce->script->sourceObject());
             }
+            if (bce->emittingRunOnceLambda)
+                fun->lazyScript()->setTreatAsRunOnce();
         } else {
             SharedContext *outersc = bce->sc;
 
@@ -5107,8 +5121,21 @@ EmitYieldStar(ExclusiveContext *cx, BytecodeEmitter *bce, ParseNode *iter)
     JS_ASSERT(bce->sc->isFunctionBox());
     JS_ASSERT(bce->sc->asFunctionBox()->isStarGenerator());
 
-    if (!EmitTree(cx, bce, iter))                                // ITER
+    if (!EmitTree(cx, bce, iter))                                // ITERABLE
         return false;
+
+    // Convert iterable to iterator.
+    if (Emit1(cx, bce, JSOP_DUP) < 0)                            // ITERABLE ITERABLE
+        return false;
+    if (!EmitAtomOp(cx, cx->names().std_iterator, JSOP_CALLPROP, bce)) // ITERABLE @@ITERATOR
+        return false;
+    if (Emit1(cx, bce, JSOP_SWAP) < 0)                           // @@ITERATOR ITERABLE
+        return false;
+    if (Emit1(cx, bce, JSOP_NOTEARG) < 0)
+        return false;
+    if (EmitCall(cx, bce, JSOP_CALL, 0) < 0)                     // ITER
+        return false;
+    CheckTypeSet(cx, bce, JSOP_CALL);
 
     int depth = bce->stackDepth;
     JS_ASSERT(depth >= 1);

@@ -741,10 +741,6 @@ nsPresContext::GetUserPreferences()
   mUseDocumentFonts =
     Preferences::GetInt("browser.display.use_document_fonts") != 0;
 
-  // * replace backslashes with Yen signs? (bug 245770)
-  mEnableJapaneseTransform =
-    Preferences::GetBool("layout.enable_japanese_specific_transform");
-
   mPrefScrollbarSide = Preferences::GetInt("layout.scrollbar.side");
 
   ResetCachedFontPrefs();
@@ -1877,9 +1873,8 @@ nsPresContext::HandleMediaFeatureValuesChangedEvent()
   }
 }
 
-void
-nsPresContext::MatchMedia(const nsAString& aMediaQueryList,
-                          nsIDOMMediaQueryList** aResult)
+already_AddRefed<nsIDOMMediaQueryList>
+nsPresContext::MatchMedia(const nsAString& aMediaQueryList)
 {
   nsRefPtr<nsDOMMediaQueryList> result =
     new nsDOMMediaQueryList(this, aMediaQueryList);
@@ -1887,7 +1882,7 @@ nsPresContext::MatchMedia(const nsAString& aMediaQueryList,
   // Insert the new item at the end of the linked list.
   PR_INSERT_BEFORE(result, &mDOMMediaQueryLists);
 
-  result.forget(aResult);
+  return result.forget();
 }
 
 nsCompatibility
@@ -2208,7 +2203,7 @@ MayHavePaintEventListener(nsPIDOMWindow* aInnerWindow)
     return false;
 
   nsEventListenerManager* manager = nullptr;
-  if ((manager = parentTarget->GetListenerManager(false)) &&
+  if ((manager = parentTarget->GetExistingListenerManager()) &&
       manager->MayHavePaintEventListener()) {
     return true;
   }
@@ -2236,7 +2231,7 @@ MayHavePaintEventListener(nsPIDOMWindow* aInnerWindow)
   EventTarget* tabChildGlobal;
   return root &&
          (tabChildGlobal = root->GetParentTarget()) &&
-         (manager = tabChildGlobal->GetListenerManager(false)) &&
+         (manager = tabChildGlobal->GetExistingListenerManager()) &&
          manager->MayHavePaintEventListener();
 }
 

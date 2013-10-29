@@ -17,7 +17,6 @@ simple_events = [
     'PopStateEvent',
     'HashChangeEvent',
     'CloseEvent',
-    'MozContactChangeEvent',
     'DeviceOrientationEvent',
     'MozApplicationEvent',
     'SmartCardEvent',
@@ -73,5 +72,6 @@ xpidl_to_native = [
     ['nsIDOMDocument', 'nsIDocument', 'nsIDocument'],
     ['nsIDOMElement', 'mozilla::dom::Element', 'mozilla::dom::Element'],
     ['nsIDOMCSSStyleSheet', 'nsCSSStyleSheet', 'nsIStyleSheet'],
+    ['nsIDOMWindow', 'nsGlobalWindow', 'nsIDOMEventTarget']
   ]
 

@@ -7,12 +7,12 @@
 MODULE = 'dom'
 
 if CONFIG['MOZ_ENABLE_QT5GEOPOSITION']:
-    CPP_SOURCES += [
+    SOURCES += [
         'QTMLocationProvider.cpp',
     ]
 
 if CONFIG['MOZ_ENABLE_QT5FEEDBACK']:
-    CPP_SOURCES += [
+    SOURCES += [
         'nsHapticFeedback.cpp',
     ]
 
@@ -23,4 +23,6 @@ LIBXUL_LIBRARY = True
 LIBRARY_NAME = 'domsystemunix_s'
 
 EXPORT_LIBRARY = True
+
+include('/ipc/chromium/chromium-config.mozbuild')
 

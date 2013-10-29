@@ -769,7 +769,7 @@ js::WouldDefinePastNonwritableLength(ThreadSafeContext *cx,
 
     JSContext *ncx = cx->asJSContext();
 
-    if (!strict && !ncx->hasExtraWarningsOption())
+    if (!strict && !ncx->options().extraWarnings())
         return true;
 
     // XXX include the index and maybe array length in the error message
@@ -1086,14 +1086,12 @@ ArrayJoin(JSContext *cx, CallArgs &args)
 
     // Steps 4 and 5
     RootedString sepstr(cx, nullptr);
+    const jschar *sepchars;
+    size_t seplen;
     if (!Locale && args.hasDefined(0)) {
         sepstr = ToString<CanGC>(cx, args[0]);
         if (!sepstr)
             return false;
-    }
-    const jschar *sepchars;
-    size_t seplen;
-    if (sepstr) {
         sepchars = sepstr->getChars(cx);
         if (!sepchars)
             return false;
@@ -1127,6 +1125,9 @@ ArrayJoin(JSContext *cx, CallArgs &args)
         if (!ArrayJoinKernel<Locale>(cx, op, obj, length, sb))
             return false;
     }
+
+    // Ensure that sepstr stays alive longer than sepchars.
+    JS_AnchorPtr(sepstr);
 
     // Step 11
     JSString *str = sb.finishString();
@@ -2957,8 +2958,7 @@ static const JSFunctionSpec array_methods[] = {
     JS_SELF_HOSTED_FN("find",        "ArrayFind",        1,0),
     JS_SELF_HOSTED_FN("findIndex",   "ArrayFindIndex",   1,0),
 
-    JS_SELF_HOSTED_FN("@@iterator",  "ArrayIterator",    0,0),
-    JS_FN("iterator",           JS_ArrayIterator,   0,0),
+    JS_SELF_HOSTED_FN("@@iterator",  "ArrayValues",      0,0),
     JS_FS_END
 };
 
@@ -3126,7 +3126,7 @@ NewArray(ExclusiveContext *cxArg, uint32_t length,
     if (JSContext *cx = cxArg->maybeJSContext()) {
         NewObjectCache &cache = cx->runtime()->newObjectCache;
         if (newKind == GenericObject &&
-            !cx->compartment()->objectMetadataCallback &&
+            !cx->compartment()->hasObjectMetadataCallback() &&
             cache.lookupGlobal(&ArrayObject::class_, cx->global(), allocKind, &entry))
         {
             RootedObject obj(cx, cache.newObjectFromHit(cx, entry,
@@ -3192,7 +3192,7 @@ NewArray(ExclusiveContext *cxArg, uint32_t length,
     if (allocateCapacity && !EnsureNewArrayElements(cxArg, arr, length))
         return nullptr;
 
-    Probes::createObject(cxArg, arr);
+    probes::CreateObject(cxArg, arr);
     return arr;
 }
 

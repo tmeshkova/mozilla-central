@@ -84,7 +84,7 @@ WrapperFactory::CreateXrayWaiver(JSContext *cx, HandleObject obj)
 
     // Create the waiver.
     JSAutoCompartment ac(cx, obj);
-    if (!JS_WrapObject(cx, proto.address()))
+    if (!JS_WrapObject(cx, &proto))
         return nullptr;
     JSObject *waiver = Wrapper::New(cx, obj, proto,
                                     JS_GetGlobalForObject(cx, obj),
@@ -544,15 +544,15 @@ WrapperFactory::WrapForSameCompartment(JSContext *cx, HandleObject objArg)
 // using the returned object. If the object to be wrapped is already in the
 // correct compartment, then this returns the unwrapped object.
 bool
-WrapperFactory::WaiveXrayAndWrap(JSContext *cx, jsval *vp)
+WrapperFactory::WaiveXrayAndWrap(JSContext *cx, MutableHandleValue vp)
 {
-    if (JSVAL_IS_PRIMITIVE(*vp))
+    if (vp.isPrimitive())
         return JS_WrapValue(cx, vp);
 
-    JSObject *obj = js::UncheckedUnwrap(JSVAL_TO_OBJECT(*vp));
+    JSObject *obj = js::UncheckedUnwrap(&vp.toObject());
     MOZ_ASSERT(!js::IsInnerObject(obj));
     if (js::IsObjectInContextCompartment(obj, cx)) {
-        *vp = OBJECT_TO_JSVAL(obj);
+        vp.setObject(*obj);
         return true;
     }
 
@@ -570,7 +570,7 @@ WrapperFactory::WaiveXrayAndWrap(JSContext *cx, jsval *vp)
     if (!obj)
         return false;
 
-    *vp = OBJECT_TO_JSVAL(obj);
+    vp.setObject(*obj);
     return JS_WrapValue(cx, vp);
 }
 
@@ -665,25 +665,6 @@ TransplantObject(JSContext *cx, JS::HandleObject origobj, JS::HandleObject targe
     if (!FixWaiverAfterTransplant(cx, oldWaiver, newIdentity))
         return nullptr;
     return newIdentity;
-}
-
-JSObject *
-TransplantObjectWithWrapper(JSContext *cx,
-                            HandleObject origobj, HandleObject origwrapper,
-                            HandleObject targetobj, HandleObject targetwrapper)
-{
-    RootedObject oldWaiver(cx, WrapperFactory::GetXrayWaiver(origobj));
-    RootedObject newSameCompartmentWrapper(cx,
-      js_TransplantObjectWithWrapper(cx, origobj, origwrapper, targetobj,
-                                     targetwrapper));
-    if (!newSameCompartmentWrapper || !oldWaiver)
-        return newSameCompartmentWrapper;
-
-    RootedObject newIdentity(cx, Wrapper::wrappedObject(newSameCompartmentWrapper));
-    MOZ_ASSERT(!js::IsWrapper(newIdentity));
-    if (!FixWaiverAfterTransplant(cx, oldWaiver, newIdentity))
-        return nullptr;
-    return newSameCompartmentWrapper;
 }
 
 nsIGlobalObject *

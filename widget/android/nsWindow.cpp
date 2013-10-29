@@ -689,7 +689,7 @@ nsWindow::DispatchEvent(WidgetGUIEvent* aEvent)
             break;
         case NS_TEXT_TEXT:
             MOZ_ASSERT(mIMEComposing);
-            mIMEComposingText = static_cast<WidgetTextEvent*>(aEvent)->theText;
+            mIMEComposingText = aEvent->AsTextEvent()->theText;
             break;
         }
         return status;
@@ -1168,46 +1168,16 @@ nsWindow::GetNativeData(uint32_t aDataType)
 void
 nsWindow::OnMouseEvent(AndroidGeckoEvent *ae)
 {
-    uint32_t msg;
-    switch (ae->Action()) {
-        case AndroidMotionEvent::ACTION_HOVER_MOVE:
-            msg = NS_MOUSE_MOVE;
-            break;
-
-        case AndroidMotionEvent::ACTION_HOVER_ENTER:
-            msg = NS_MOUSEENTER;
-            break;
-
-        case AndroidMotionEvent::ACTION_HOVER_EXIT:
-            msg = NS_MOUSELEAVE;
-            break;
-
-        default:
-            return;
-    }
-
     nsRefPtr<nsWindow> kungFuDeathGrip(this);
 
-send_again:
-
-    WidgetMouseEvent event(true, msg, this,
-                           WidgetMouseEvent::eReal, WidgetMouseEvent::eNormal);
-    // XXX can we synthesize different buttons?
-    event.button = WidgetMouseEvent::eLeftButton;
-
-    if (msg != NS_MOUSE_MOVE)
-        event.clickCount = 1;
+    WidgetMouseEvent event = ae->MakeMouseEvent(this);
+    if (event.message == NS_EVENT_NULL) {
+        // invalid event type, abort
+        return;
+    }
 
     // XXX add the double-click handling logic here
-    if (ae->Points().Length() > 0)
-        DispatchMotionEvent(event, ae, ae->Points()[0]);
-    if (Destroyed())
-        return;
-
-    if (msg == NS_MOUSE_BUTTON_DOWN) {
-        msg = NS_MOUSE_MOVE;
-        goto send_again;
-    }
+    DispatchEvent(&event);
 }
 
 bool nsWindow::OnMultitouchEvent(AndroidGeckoEvent *ae)
@@ -1437,6 +1407,9 @@ static unsigned int ConvertAndroidKeyCodeToDOMKeyCode(int androidKeyCode)
         case AKEYCODE_RO:                 return NS_VK_BACK_SLASH; // Same as other platforms.
         case AKEYCODE_KANA:               return NS_VK_KANA;
         case AKEYCODE_ASSIST:             return NS_VK_HELP;
+
+        // the A key is the action key for gamepad devices.
+        case AKEYCODE_BUTTON_A:          return NS_VK_RETURN;
 
         default:
             ALOG("ConvertAndroidKeyCodeToDOMKeyCode: "
