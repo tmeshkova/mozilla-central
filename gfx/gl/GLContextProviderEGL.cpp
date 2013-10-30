@@ -3,23 +3,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "GLContext.h"
+#include "mozilla/Util.h"
+
 #if defined(XP_UNIX)
 
 #ifdef MOZ_WIDGET_GTK
 #include <gdk/gdkx.h>
 // we're using default display for now
 #define GET_NATIVE_WINDOW(aWidget) (EGLNativeWindowType)GDK_WINDOW_XID((GdkWindow *) aWidget->GetNativeData(NS_NATIVE_WINDOW))
-#elif defined(MOZ_WIDGET_QT)
-#include <QWidget>
-#define GET_NATIVE_WINDOW(aWidget) (EGLNativeWindowType)static_cast<QWidget*>(aWidget->GetNativeData(NS_NATIVE_SHELLWIDGET))->winId()
 #elif defined(MOZ_WIDGET_GONK)
 #define GET_NATIVE_WINDOW(aWidget) ((EGLNativeWindowType)aWidget->GetNativeData(NS_NATIVE_WINDOW))
 #include "HwcComposer2D.h"
 #include "libdisplay/GonkDisplay.h"
 #endif
-
-#include "GLContext.h"
-#include "mozilla/Util.h"
 
 #ifdef HAS_NEMO_INTERFACE
 #include <gst/interfaces/nemovideotexture.h>
@@ -1223,7 +1220,7 @@ CreateSurfaceForWindow(nsIWidget *aWidget, EGLConfig config)
     sEGLLibrary.DumpEGLConfig(config);
 #endif
 
-#if !defined(MOZ_WIDGET_ANDROID)
+#if !defined(MOZ_WIDGET_ANDROID) && !defined(MOZ_WIDGET_QT)
     surface = sEGLLibrary.fCreateWindowSurface(EGL_DISPLAY(), config, GET_NATIVE_WINDOW(aWidget), 0);
 #endif
 
@@ -1252,7 +1249,10 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
     if (hasNativeContext && eglContext) {
         void* platformContext = eglContext;
         SurfaceCaps caps = SurfaceCaps::Any();
-        EGLConfig config = EGL_NO_CONFIG;
+        int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
+        caps.bpp16 = depth == 16 ? true : false;
+        caps.depth = depth;
+        EGLConfoig config = EGL_NO_CONFIG;
         EGLSurface surface = sEGLLibrary.fGetCurrentSurface(LOCAL_EGL_DRAW);
         nsRefPtr<GLContextEGL> glContext =
             new GLContextEGL(caps,

@@ -9,8 +9,6 @@
 #define GET_NATIVE_WINDOW(aWidget) GDK_WINDOW_XID((GdkWindow *) aWidget->GetNativeData(NS_NATIVE_WINDOW))
 #elif defined(MOZ_WIDGET_QT)
 #include <QWidget>
-#include <QGLContext>
-#define GLboolean_defined 1
 #define GET_NATIVE_WINDOW(aWidget) static_cast<QWidget*>(aWidget->GetNativeData(NS_NATIVE_SHELLWIDGET))->winId()
 #endif
 
@@ -889,13 +887,6 @@ TRY_AGAIN_NO_SHARING:
         //     "glXGetCurrentContext returns client-side information.
         //      It does not make a round trip to the server."
         // I assume that it's not worth using our own TLS slot here.
-        if (mPlatformContext) {
-#ifdef MOZ_WIDGET_QT
-           static_cast<QGLContext*>(mPlatformContext)->makeCurrent();
-           succeeded = true;
-#endif
-        }
-        else
         if (aForce || mGLX->xGetCurrentContext() != mContext) {
             succeeded = mGLX->xMakeCurrent(mDisplay, mDrawable, mContext);
             NS_ASSERTION(succeeded, "Failed to make GL context current!");
@@ -1220,20 +1211,9 @@ GLContextProviderGLX::CreateForWindow(nsIWidget *aWidget)
     if (hasNativeContext && glxContext) {
         void* platformContext = glxContext;
         SurfaceCaps caps = SurfaceCaps::Any();
-#ifdef MOZ_WIDGET_QT
         int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
-        QGLContext* context = const_cast<QGLContext*>(QGLContext::currentContext());
-        if (context && context->device()) {
-            depth = context->device()->depth();
-        }
-        const QGLFormat& format = context->format();
-        doubleBuffered = format.doubleBuffer();
-        platformContext = context;
         caps.bpp16 = depth == 16 ? true : false;
-        caps.alpha = format.rgba();
-        caps.depth = format.depth();
-        caps.stencil = format.stencil();
-#endif
+        caps.depth = depth;
         nsRefPtr<GLContextGLX> glContext =
             new GLContextGLX(caps,
                              nullptr, // SharedContext
