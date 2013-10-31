@@ -614,10 +614,17 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
                                          (void*)mPlaySink,
                                          gl::GstreamerMagicHandle);
 
+    int64_t offset = mDecoder->GetResource()->Tell(); // Estimate location in media. ?
+    int64_t timestamp = 0; // GST_SYNC_TIMESTAMP(mPlaySink);
+    int64_t endTime = 0; // timestamp + GST_SYNC_DURATION(mPlaySink);
+    bool isKeyframe = true; // !GST_SYNC_FLAG_IS_SET(mPlaySink, GST_SYNC_FLAG_DISCONT);
+    int64_t timecode = -1; //
     VideoData *v = VideoData::Create(mInfo.mVideo,
                                      mDecoder->GetImageContainer(),
                                      (void*)handle,
-                                     mPicture);
+                                     mPicture,
+                                     offset, timestamp, endTime,
+                                     isKeyframe, timecode);
     if (!v)
       return false;
 
