@@ -8,6 +8,7 @@
 
 #include "EmbedLiteApp.h"
 #include "nsISupports.h"
+#include "nsIFile.h"
 #include "base/at_exit.h"
 #include "mozilla/unused.h"
 
