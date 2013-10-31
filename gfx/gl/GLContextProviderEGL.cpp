@@ -1252,7 +1252,7 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
         int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
         caps.bpp16 = depth == 16 ? true : false;
         caps.depth = depth;
-        EGLConfoig config = EGL_NO_CONFIG;
+        EGLConfig config = EGL_NO_CONFIG;
         EGLSurface surface = sEGLLibrary.fGetCurrentSurface(LOCAL_EGL_DRAW);
         nsRefPtr<GLContextEGL> glContext =
             new GLContextEGL(caps,
