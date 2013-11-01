@@ -607,12 +607,12 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
 
     int64_t offset = 0; // mDecoder->GetResource()->Tell(); Estimate location in media. ?
     int64_t timestamp = 0; // GST_SYNC_TIMESTAMP(mPlaySink);
-    int64_t endTime = 0; // timestamp + GST_SYNC_DURATION(mPlaySink);
+    int64_t endTime = 1; // timestamp + GST_SYNC_DURATION(mPlaySink);
     bool isKeyframe = true; // !GST_SYNC_FLAG_IS_SET(mPlaySink, GST_SYNC_FLAG_DISCONT);
     int64_t timecode = -1; //
 #ifdef HAS_NEMO_INTERFACE
     NemoGstVideoTextureFrameInfo info;
-    if (nemo_gst_video_texture_get_frame_info(NEMO_GST_VIDEO_TEXTURE(mPlaySink), &info))
+    if (false && nemo_gst_video_texture_get_frame_info(NEMO_GST_VIDEO_TEXTURE(mPlaySink), &info))
     {
         timestamp = info.timestamp;
         offset = info.offset;
