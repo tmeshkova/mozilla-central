@@ -17,6 +17,10 @@
 #include "GStreamerLoader.h"
 #include "GLContextProvider.h"
 #include "GLContext.h"
+#ifdef HAS_NEMO_INTERFACE
+#include <gst/interfaces/nemovideotexture.h>
+#endif
+
 using namespace mozilla::gl;
 
 namespace mozilla {
@@ -619,6 +623,15 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
     int64_t endTime = 0; // timestamp + GST_SYNC_DURATION(mPlaySink);
     bool isKeyframe = true; // !GST_SYNC_FLAG_IS_SET(mPlaySink, GST_SYNC_FLAG_DISCONT);
     int64_t timecode = -1; //
+#ifdef HAS_NEMO_INTERFACE
+    NemoGstVideoTextureFrameInfo info;
+    if (false && nemo_gst_video_texture_get_frame_info(NEMO_GST_VIDEO_TEXTURE(mPlaySink), &info))
+    {
+        timestamp = info.timestamp;
+        offset = info.offset;
+        endTime = timestamp + info.duration;
+    }
+#endif
     VideoData *v = VideoData::Create(mInfo.mVideo,
                                      mDecoder->GetImageContainer(),
                                      (void*)handle,
