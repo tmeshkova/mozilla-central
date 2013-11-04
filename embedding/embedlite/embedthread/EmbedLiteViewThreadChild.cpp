@@ -738,7 +738,6 @@ EmbedLiteViewThreadChild::RecvHandleKeyPressEvent(const int& domKeyCode, const i
   // no official spec covers KeyPress events).
   if (domKeyCode != nsIDOMKeyEvent::DOM_VK_SHIFT &&
       domKeyCode != nsIDOMKeyEvent::DOM_VK_META &&
-      domKeyCode != nsIDOMKeyEvent::DOM_VK_SHIFT &&
       domKeyCode != nsIDOMKeyEvent::DOM_VK_CONTROL &&
       domKeyCode != nsIDOMKeyEvent::DOM_VK_ALT)
   {
