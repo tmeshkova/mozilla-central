@@ -6,20 +6,21 @@ include protocol PEmbedLiteApp;
 
 include "ipc/nsGUIEventIPC.h";
 include "ipc/InputDataIPC.h";
-
-using gfxSize;
-using gfxRect;
-using CSSRect;
-using gfxPoint;
-using nsIntPoint;
-using mozilla::layers::FrameMetrics;
-using FrameMetrics::ViewID;
-using nscolor;
-using nsKeyEvent;
-using nsMouseEvent;
-using InputData;
-using MultiTouchInput;
-using mozilla::CSSIntPoint;
+include "mozilla/GfxMessageUtils.h";
+using struct gfxSize from "gfxPoint.h";
+using gfxRect from "mozilla/GfxMessageUtils.h";
+using CSSRect from "Units.h";
+using CSSSize from "Units.h";
+using struct nsIntSize from "nsSize.h";
+using struct gfxPoint from "gfxPoint.h";
+using struct nsIntPoint from "nsPoint.h";
+using struct mozilla::layers::FrameMetrics from "FrameMetrics.h";
+using FrameMetrics::ViewID from "FrameMetrics.h";
+using nscolor from "nsColor.h";
+using class mozilla::WidgetKeyboardEvent from "ipc/nsGUIEventIPC.h";
+using class mozilla::WidgetMouseEvent from "ipc/nsGUIEventIPC.h";
+using MultiTouchInput from "InputData.h";
+using mozilla::CSSIntPoint from "Units.h";
 
 namespace mozilla {
 namespace embedlite {
