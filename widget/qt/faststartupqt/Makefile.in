@@ -11,11 +11,6 @@ EXTRA_DSO_LDOPTS = \
 	$(MOZ_QT_LIBS) \
 	$(NULL)
 
-CPPSRCS += \
-	moc_moziqwidget.cpp \
-	moc_nsFastStartupQt.cpp \
-	$(NULL)
-
 LOCAL_INCLUDES += \
 	-I$(topsrcdir)/xpcom/build \
 	-I$(topsrcdir)/widget/qt \
