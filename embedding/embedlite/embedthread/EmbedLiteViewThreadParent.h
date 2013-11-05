@@ -119,9 +119,7 @@ protected:
                                       const CSSIntPoint& aScrollOffset);
   virtual bool RecvZoomToRect(const CSSRect& aRect);
   virtual bool RecvSetBackgroundColor(const nscolor& aColor);
-  virtual bool RecvCancelDefaultPanZoom() MOZ_OVERRIDE;
   virtual bool RecvContentReceivedTouch(const bool& aPreventDefault);
-  virtual bool RecvDetectScrollableSubframe() MOZ_OVERRIDE;
 
   // IME
   virtual bool RecvGetInputContext(int32_t* aIMEEnabled,

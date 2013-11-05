@@ -285,24 +285,6 @@ EmbedLiteAppService::ContentReceivedTouch(uint32_t aWinId, bool aPreventDefault)
 }
 
 NS_IMETHODIMP
-EmbedLiteAppService::DetectScrollableSubframe(uint32_t aWinId)
-{
-  EmbedLiteViewThreadChild* view = sGetViewById(aWinId);
-  NS_ENSURE_TRUE(view, NS_ERROR_FAILURE);
-  view->SendDetectScrollableSubframe();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
-EmbedLiteAppService::CancelDefaultPanZoom(uint32_t aWinId)
-{
-  EmbedLiteViewThreadChild* view = sGetViewById(aWinId);
-  NS_ENSURE_TRUE(view, NS_ERROR_FAILURE);
-  view->SendCancelDefaultPanZoom();
-  return NS_OK;
-}
-
-NS_IMETHODIMP
 EmbedLiteAppService::GetBrowserByID(uint32_t aId, nsIWebBrowser * *outWindow)
 {
   EmbedLiteViewThreadChild* view = sGetViewById(aId);

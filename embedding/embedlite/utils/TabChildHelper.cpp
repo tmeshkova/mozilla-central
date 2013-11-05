@@ -225,18 +225,13 @@ TabChildHelper::Observe(nsISupports* aSubject,
                         const char* aTopic,
                         const PRUnichar* aData)
 {
-  if (!strcmp(aTopic, CANCEL_DEFAULT_PAN_ZOOM)) {
-    LOGNI("top:%s >>>>>>>>>>>>>.", aTopic);
-    mView->SendCancelDefaultPanZoom();
-  } else if (!strcmp(aTopic, BROWSER_ZOOM_TO_RECT)) {
+  if (!strcmp(aTopic, BROWSER_ZOOM_TO_RECT)) {
     nsCOMPtr<nsIDocShell> docShell(do_QueryInterface(aSubject));
     CSSRect rect;
     sscanf(NS_ConvertUTF16toUTF8(aData).get(),
            "{\"x\":%f,\"y\":%f,\"w\":%f,\"h\":%f}",
            &rect.x, &rect.y, &rect.width, &rect.height);
     mView->SendZoomToRect(rect);
-  } else if (!strcmp(aTopic, DETECT_SCROLLABLE_SUBFRAME)) {
-    mView->SendDetectScrollableSubframe();
   } else if (!strcmp(aTopic, BEFORE_FIRST_PAINT)) {
     nsCOMPtr<nsIDocument> subject(do_QueryInterface(aSubject));
     nsCOMPtr<nsIDOMDocument> domDoc;

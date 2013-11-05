@@ -225,7 +225,7 @@ if os_linux:
             'src/base/message_pump_qt.cc',
         ]
         GENERATED_SOURCES += [
-            'src/base/moc_message_pump_qt.cc',
+            'moc_message_pump_qt.cc',
         ]
     if CONFIG['OS_TARGET'] != 'Android':
         SOURCES += [
@@ -257,7 +257,7 @@ if os_bsd:
             'src/base/message_pump_qt.cc',
         ]
         GENERATED_SOURCES += [
-            'src/base/moc_message_pump_qt.cc',
+            'moc_message_pump_qt.cc',
         ]
     SOURCES += [
         'src/third_party/libevent/kqueue.c',

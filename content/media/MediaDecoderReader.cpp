@@ -318,10 +318,7 @@ VideoData* VideoData::Create(VideoInfo& aInfo,
   SharedTextureImage::Data data;
   data.mShareType = gl::SameProcess;
   data.mInverted = false;
-  data.mHandle = gl::GLContextProvider::CreateSharedHandle(data.mShareType,
-                                                           aMagicHandle,
-                                                           gl::GstreamerMagicHandle);
-
+  data.mHandle = (gl::SharedTextureHandle)aMagicHandle;
   // Use the device pixel size of the IOSurface, since layers handles resolution scaling
   // already.
   data.mSize = gfxIntSize(aPicture.width, aPicture.height);

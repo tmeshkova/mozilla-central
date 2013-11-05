@@ -89,9 +89,7 @@ parent:
 
     ZoomToRect(CSSRect aRect);
     async SetBackgroundColor(nscolor color);
-    async CancelDefaultPanZoom();
     ContentReceivedTouch(bool aPreventDefault);
-    async DetectScrollableSubframe();
     sync GetGLViewSize()
       returns (gfxSize aSize);
 

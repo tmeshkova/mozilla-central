@@ -18,7 +18,7 @@ endif
 endif
 
 ifdef GNU_AS
-ifeq ($(findstring arm,$(OS_TEST)), arm)
+ifeq ($(findstring arm,$(CPU_ARCH)), arm)
 
 DEFINES += -DOC_ARM_ASM -DOC_ARM_ASM_EDSP -DOC_ARM_ASM_MEDIA -DOC_ARM_ASM_NEON
 

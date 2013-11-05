@@ -492,28 +492,10 @@ EmbedLiteViewThreadParent::RecvZoomToRect(const CSSRect& aRect)
 }
 
 bool
-EmbedLiteViewThreadParent::RecvCancelDefaultPanZoom()
-{
-  if (mController && mInTouchProcess) {
-    mController->CancelDefaultPanZoom();
-  }
-  return true;
-}
-
-bool
 EmbedLiteViewThreadParent::RecvContentReceivedTouch(const bool& aPreventDefault)
 {
   if (mController) {
     mController->ContentReceivedTouch(aPreventDefault);
-  }
-  return true;
-}
-
-bool
-EmbedLiteViewThreadParent::RecvDetectScrollableSubframe()
-{
-  if (mController) {
-    mController->DetectScrollableSubframe();
   }
   return true;
 }

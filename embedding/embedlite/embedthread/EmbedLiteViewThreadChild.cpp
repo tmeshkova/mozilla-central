@@ -781,9 +781,6 @@ EmbedLiteViewThreadChild::RecvInputDataTouchEvent(const mozilla::MultiTouchInput
     nsCOMPtr<nsPIDOMWindow> innerWindow = outerWindow->GetCurrentInnerWindow();
     if (innerWindow && innerWindow->HasTouchEventListeners()) {
       SendContentReceivedTouch(nsIPresShell::gPreventMouseEvents);
-      if (status == nsEventStatus_eConsumeNoDefault) {
-        SendCancelDefaultPanZoom();
-      }
     }
     static bool sDispatchMouseEvents;
     static bool sDispatchMouseEventsCached = false;
@@ -797,8 +794,6 @@ EmbedLiteViewThreadChild::RecvInputDataTouchEvent(const mozilla::MultiTouchInput
       status = mHelper->DispatchSynthesizedMouseEvent(localEvent);
       if (status != nsEventStatus_eConsumeNoDefault && status != nsEventStatus_eConsumeDoDefault) {
         mDispatchSynthMouseEvents = false;
-      } else {
-        SendCancelDefaultPanZoom();
       }
     }
   }

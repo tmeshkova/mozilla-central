@@ -866,6 +866,10 @@ GLContextEGL::CreateSharedHandle(SharedTextureShareType shareType,
 
         return (SharedTextureHandle) new SurfaceTextureWrapper(reinterpret_cast<nsSurfaceTexture*>(buffer));
 #endif
+#ifdef HAS_NEMO_INTERFACE
+    case SharedTextureBufferType::GstreamerMagicHandle:
+        return (SharedTextureHandle) new GstVideoSyncWrapper(static_cast<GstElement*>(buffer));
+#endif
     case SharedTextureBufferType::TextureID: {
         if (!mShareWithEGLImage)
             return 0;
@@ -1419,29 +1423,6 @@ GLContextProviderEGL::CreateOffscreen(const gfxIntSize& size,
         return nullptr;
 
     return glContext.forget();
-}
-
-SharedTextureHandle
-GLContextProviderEGL::CreateSharedHandle(SharedTextureShareType shareType,
-                                         void* buffer,
-                                         SharedTextureBufferType bufferType)
-{
-#ifdef HAS_NEMO_INTERFACE
-  if (shareType == gl::SameProcess &&
-      bufferType == gl::GstreamerMagicHandle) {
-
-    GstVideoSyncWrapper* wrap = new GstVideoSyncWrapper(static_cast<GstElement*>(buffer));
-    return (SharedTextureHandle)wrap;
-  }
-#endif
-  return 0;
-}
-
-already_AddRefed<gfxASurface>
-GLContextProviderEGL::GetSharedHandleAsSurface(SharedTextureShareType shareType,
-                                               SharedTextureHandle sharedHandle)
-{
-  return nullptr;
 }
 
 // Don't want a global context on Android as 1) share groups across 2 threads fail on many Tegra drivers (bug 759225)

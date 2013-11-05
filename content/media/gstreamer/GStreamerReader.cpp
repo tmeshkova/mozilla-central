@@ -15,6 +15,9 @@
 #include "mozilla/dom/TimeRanges.h"
 #include "mozilla/Preferences.h"
 #include "GStreamerLoader.h"
+#include "GLContextProvider.h"
+#include "GLContext.h"
+using namespace mozilla::gl;
 
 namespace mozilla {
 
@@ -56,6 +59,20 @@ typedef enum {
 } PlayFlags;
 
 static int sDroidEGLSinkInUse = 0;
+#ifdef HAS_NEMO_INTERFACE
+static nsRefPtr<GLContext> sPluginContext = nullptr;
+
+static bool EnsureGLContext()
+{
+  if (!sPluginContext) {
+    gfxIntSize dummySize(16, 16);
+    sPluginContext = GLContextProvider::CreateOffscreen(dummySize,
+                                                        GLContext::SurfaceCaps::Any());
+  }
+
+  return sPluginContext != nullptr;
+}
+#endif
 
 GStreamerReader::GStreamerReader(AbstractMediaDecoder* aDecoder)
   : MediaDecoderReader(aDecoder),
@@ -588,14 +605,24 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
     MediaResource* resource = mDecoder->GetResource();
     NS_ASSERTION(resource, "Decoder has no media resource");
 
+#ifdef HAS_NEMO_INTERFACE
+    if (!EnsureGLContext())
+      return false;
+
+    SharedTextureHandle handle =
+      sPluginContext->CreateSharedHandle(gl::SameProcess,
+                                         (void*)mPlaySink,
+                                         gl::GstreamerMagicHandle);
+
     VideoData *v = VideoData::Create(mInfo.mVideo,
                                      mDecoder->GetImageContainer(),
-                                     (void*)mPlaySink,
+                                     (void*)handle,
                                      mPicture);
     if (!v)
       return false;
 
     mVideoQueue.Push(v);
+#endif
     return true;
   }
 
