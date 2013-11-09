@@ -107,15 +107,15 @@ GStreamerReader::~GStreamerReader()
     if (mSource)
       gst_object_unref(mSource);
     gst_element_set_state(mPlayBin, GST_STATE_NULL);
-    gst_object_unref(mPlayBin);
-    mPlayingStartedOnce = false;
-    mPlayBin = nullptr;
-    mPlaySink = nullptr;
     if (mDroidEGLSinkInUse)
     {
       sDroidEGLSinkInUse--;
       mDroidEGLSinkInUse = false;
     }
+    gst_object_unref(mPlayBin);
+    mPlayingStartedOnce = false;
+    mPlayBin = nullptr;
+    mPlaySink = nullptr;
     mVideoSink = nullptr;
     mVideoAppSink = nullptr;
     mAudioSink = nullptr;
@@ -143,18 +143,11 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
   static bool sDisableNemoIface = getenv("NO_GST_NEMO") != 0;
   if (!sDisableNemoIface)
   {
-    if (sDroidEGLSinkInUse && !Preferences::GetBool("gstreamer.no_hw_decoder_limit", false))
-    {
-      LOG(PR_LOG_ERROR, ("couldn't start droideglsink because it busy"));
-      return NS_ERROR_FAILURE;
-    }
     mPlaySink = gst_element_factory_make("droideglsink", nullptr);
     if (!mPlaySink) {
       LOG(PR_LOG_DEBUG, ("could not create egl sink: %p", mPlaySink));
       return NS_ERROR_FAILURE;
     }
-    sDroidEGLSinkInUse++;
-    mDroidEGLSinkInUse = true;
   }
 #endif
   g_object_set(mPlayBin, "buffer-size", 0, nullptr);
@@ -225,13 +218,23 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
 void GStreamerReader::Play()
 {
   if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
-    gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
+    if (!mDroidEGLSinkInUse && sDroidEGLSinkInUse == 0)
+    {
+      sDroidEGLSinkInUse++;
+      mDroidEGLSinkInUse = true;
+      gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
+    }
   }
 }
 
 void GStreamerReader::Pause()
 {
   if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
+    if (mDroidEGLSinkInUse)
+    {
+      sDroidEGLSinkInUse--;
+      mDroidEGLSinkInUse = false;
+    }
     gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
   }
 }
@@ -352,6 +355,11 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
 
     /* start the pipeline */
     gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
+    if (mDroidEGLSinkInUse)
+    {
+      sDroidEGLSinkInUse--;
+      mDroidEGLSinkInUse = false;
+    }
 
     /* Wait for ASYNC_DONE, which is emitted when the pipeline is built,
      * prerolled and ready to play. Also watch for errors.
@@ -387,7 +395,7 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
 
   /* FIXME: workaround for a bug in matroskademux. This seek makes matroskademux
    * parse the index */
-  if (gst_element_seek_simple(mPlayBin, GST_FORMAT_TIME,
+  if (!mPlaySink && gst_element_seek_simple(mPlayBin, GST_FORMAT_TIME,
         GST_SEEK_FLAG_FLUSH, 0)) {
     /* after a seek we need to wait again for ASYNC_DONE */
     message = gst_bus_timed_pop_filtered(mBus, GST_CLOCK_TIME_NONE,
@@ -428,8 +436,13 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
 
   /* set the pipeline to PLAYING so that it starts decoding and queueing data in
    * the appsinks */
-  gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
-  mPlayingStartedOnce = true;
+  if (!mDroidEGLSinkInUse && sDroidEGLSinkInUse == 0)
+  {
+    sDroidEGLSinkInUse++;
+    mDroidEGLSinkInUse = true;
+    mPlayingStartedOnce = true;
+    gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
+  }
 
   return NS_OK;
 }
@@ -502,11 +515,6 @@ nsresult GStreamerReader::ResetDecode()
   mReachedEos = false;
   mLastReportedByteOffset = 0;
   mByteOffset = 0;
-  if (mDroidEGLSinkInUse)
-  {
-    sDroidEGLSinkInUse--;
-    mDroidEGLSinkInUse = false;
-  }
 
   return res;
 }
