@@ -43,9 +43,6 @@ abstract class HomeFragment extends Fragment {
     // Log Tag.
     private static final String LOGTAG="GeckoHomeFragment";
 
-    // Share MIME type.
-    private static final String SHARE_MIME_TYPE = "text/plain";
-
     // Whether the fragment can load its content or not
     // This is used to defer data loading until the editing
     // mode animation ends.
@@ -86,8 +83,9 @@ abstract class HomeFragment extends Fragment {
 
         menu.setHeaderTitle(info.getDisplayTitle());
 
-        // Hide the "Edit" menuitem if this item isn't a bookmark.
-        if (info.bookmarkId < 0) {
+        // Hide the "Edit" menuitem if this item isn't a bookmark,
+        // or if this is a reading list item.
+        if (info.bookmarkId < 0 || info.inReadingList) {
             menu.findItem(R.id.home_edit_bookmark).setVisible(false);
         }
 
@@ -95,8 +93,6 @@ abstract class HomeFragment extends Fragment {
         if (info.bookmarkId < 0 && info.historyId < 0) {
             menu.findItem(R.id.home_remove).setVisible(false);
         }
-
-        menu.findItem(R.id.home_share).setVisible(!GeckoProfile.get(getActivity()).inGuestMode());
 
         final boolean canOpenInReader = (info.display == Combined.DISPLAY_READER);
         menu.findItem(R.id.home_open_in_reader).setVisible(canOpenInReader);
@@ -118,24 +114,6 @@ abstract class HomeFragment extends Fragment {
         final Context context = getActivity().getApplicationContext();
 
         final int itemId = item.getItemId();
-        if (itemId == R.id.home_share) {
-            if (info.url == null) {
-                Log.e(LOGTAG, "Can't share because URL is null");
-            } else {
-                GeckoAppShell.openUriExternal(info.url, SHARE_MIME_TYPE, "", "",
-                                              Intent.ACTION_SEND, info.getDisplayTitle());
-            }
-        }
-
-        if (itemId == R.id.home_add_to_launcher) {
-            if (info.url == null) {
-                Log.e(LOGTAG, "Can't add to home screen because URL is null");
-                return false;
-            }
-
-            new AddToLauncherTask(info.url, info.getDisplayTitle()).execute();
-            return true;
-        }
 
         if (itemId == R.id.home_open_private_tab || itemId == R.id.home_open_new_tab) {
             if (info.url == null) {
@@ -216,35 +194,6 @@ abstract class HomeFragment extends Fragment {
         if (!mIsLoaded) {
             load();
             mIsLoaded = true;
-        }
-    }
-
-    private static class AddToLauncherTask extends UiAsyncTask<Void, Void, String> {
-        private final String mUrl;
-        private final String mTitle;
-
-        public AddToLauncherTask(String url, String title) {
-            super(ThreadUtils.getBackgroundHandler());
-
-            mUrl = url;
-            mTitle = title;
-        }
-
-        @Override
-        public String doInBackground(Void... params) {
-            return Favicons.getFaviconUrlForPageUrl(mUrl);
-        }
-
-        @Override
-        public void onPostExecute(String faviconUrl) {
-            OnFaviconLoadedListener listener = new OnFaviconLoadedListener() {
-                @Override
-                public void onFaviconLoaded(String url, Bitmap favicon) {
-                    GeckoAppShell.createShortcut(mTitle, mUrl, favicon, "");
-                }
-            };
-
-            Favicons.loadFavicon(mUrl, faviconUrl, 0, listener);
         }
     }
 
