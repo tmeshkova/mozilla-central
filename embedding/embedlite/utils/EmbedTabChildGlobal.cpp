@@ -124,3 +124,9 @@ EmbedTabChildGlobal::GetMessageManager(nsIContentFrameMessageManager** aResult)
   NS_ADDREF(*aResult = this);
   return NS_OK;
 }
+
+NS_IMETHODIMP_(void)
+EmbedTabChildGlobal::SendRequestFocus(bool canFocus)
+{
+    return;
+}

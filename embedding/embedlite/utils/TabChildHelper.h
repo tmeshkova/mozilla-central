@@ -54,7 +54,8 @@ public:
   virtual bool DoSendAsyncMessage(JSContext* aCx,
                                   const nsAString& aMessage,
                                   const mozilla::dom::StructuredCloneData& aData,
-                                  JS::Handle<JSObject *> aCpows);
+                                  JS::Handle<JSObject *> aCpows,
+                                  nsIPrincipal* aPrincipal) MOZ_OVERRIDE;
   virtual bool CheckPermission(const nsAString& aPermission);
 
   bool RecvAsyncMessage(const nsAString& aMessage,

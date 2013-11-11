@@ -32,23 +32,27 @@ public:
   NS_IMETHOD SendRpcMessage(const nsAString& aMessageName,
                             const JS::Value& aObject,
                             const JS::Value& aRemote,
+                            nsIPrincipal* aPrincipal,
                             JSContext* aCx,
                             uint8_t aArgc,
                             JS::Value* aRetval)
   {
     return mMessageManager
-      ? mMessageManager->SendRpcMessage(aMessageName, aObject, aRemote, aCx, aArgc, aRetval)
+      ? mMessageManager->SendRpcMessage(aMessageName, aObject, aRemote,
+                                        aPrincipal, aCx, aArgc, aRetval)
       : NS_ERROR_NULL_POINTER;
   }
   NS_IMETHOD SendSyncMessage(const nsAString& aMessageName,
                              const JS::Value& aObject,
                              const JS::Value& aRemote,
+                             nsIPrincipal* aPrincipal,
                              JSContext* aCx,
                              uint8_t aArgc,
                              JS::Value* aRetval)
   {
     return mMessageManager
-      ? mMessageManager->SendSyncMessage(aMessageName, aObject, aRemote, aCx, aArgc, aRetval)
+      ? mMessageManager->SendSyncMessage(aMessageName, aObject, aRemote,
+                                         aPrincipal, aCx, aArgc, aRetval)
       : NS_ERROR_NULL_POINTER;
   }
   NS_IMETHOD GetContent(nsIDOMWindow** aContent) MOZ_OVERRIDE;

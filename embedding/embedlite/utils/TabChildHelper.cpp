@@ -350,17 +350,6 @@ TabChildHelper::HandleEvent(nsIDOMEvent* aEvent)
   return NS_OK;
 }
 
-static void
-ScrollWindowTo(nsIDOMWindow* aWindow, const CSSPoint& aPoint)
-{
-  nsGlobalWindow* window = static_cast<nsGlobalWindow*>(aWindow);
-  nsIScrollableFrame* sf = window->GetScrollFrame();
-
-  if (sf) {
-    sf->ScrollToCSSPixelsApproximate(aPoint);
-  }
-}
-
 bool
 TabChildHelper::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
 {
@@ -585,7 +574,8 @@ bool
 TabChildHelper::DoSendAsyncMessage(JSContext* aCx,
                                    const nsAString& aMessage,
                                    const mozilla::dom::StructuredCloneData& aData,
-                                   JS::Handle<JSObject *> aCpows)
+                                   JS::Handle<JSObject *> aCpows,
+                                   nsIPrincipal* aPrincipal)
 {
   if (!mView->HasMessageListener(aMessage)) {
     LOGW("Message not registered msg:%s\n", NS_ConvertUTF16toUTF8(aMessage).get());
@@ -640,7 +630,8 @@ TabChildHelper::RecvAsyncMessage(const nsAString& aMessage,
   nsRefPtr<nsFrameMessageManager> mm =
     static_cast<nsFrameMessageManager*>(mTabChildGlobal->mMessageManager.get());
   mm->ReceiveMessage(static_cast<EventTarget*>(mTabChildGlobal),
-                     aMessage, false, &cloneData, nullptr, nullptr);
+                     aMessage, false, &cloneData, nullptr, nullptr, nullptr);
+
   return true;
 }
 
