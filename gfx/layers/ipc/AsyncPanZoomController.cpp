@@ -674,9 +674,15 @@ nsEventStatus AsyncPanZoomController::OnScale(const PinchGestureInput& aEvent) {
 
 nsEventStatus AsyncPanZoomController::OnScaleEnd(const PinchGestureInput& aEvent) {
   APZC_LOG("%p got a scale-end in state %d\n", this, mState);
-  SetState(PANNING);
-  mX.StartTouch(aEvent.mFocusPoint.x);
-  mY.StartTouch(aEvent.mFocusPoint.y);
+  // When a pinch ends, it might either turn into a pan (if only one finger
+  // was lifted) or not (if both fingers were lifted). GestureEventListener
+  // sets mCurrentSpan to a negative value in the latter case, and sets
+  // mFocusPoint to the remaining touch point in the former case.
+  if (aEvent.mCurrentSpan >= 0) {
+    SetState(PANNING);
+    mX.StartTouch(aEvent.mFocusPoint.x);
+    mY.StartTouch(aEvent.mFocusPoint.y);
+  }
   {
     ReentrantMonitorAutoEnter lock(mMonitor);
     ScheduleComposite();
@@ -1553,6 +1559,16 @@ bool AsyncPanZoomController::Matches(const ScrollableLayerGuid& aGuid)
   // TODO: also check the presShellId, once that is fully propagated
   // everywhere in RenderFrameParent and AndroidJNI.
   return aGuid.mLayersId == mLayersId && aGuid.mScrollId == mFrameMetrics.mScrollId;
+}
+
+void AsyncPanZoomController::GetGuid(ScrollableLayerGuid* aGuidOut)
+{
+  if (!aGuidOut) {
+    return;
+  }
+  aGuidOut->mLayersId = mLayersId;
+  aGuidOut->mScrollId = mFrameMetrics.mScrollId;
+  aGuidOut->mPresShellId = mFrameMetrics.mPresShellId;
 }
 
 }

@@ -834,7 +834,7 @@ RenderFrameParent::NotifyInputEvent(const WidgetInputEvent& aEvent,
                                     WidgetInputEvent* aOutEvent)
 {
   if (GetApzcTreeManager()) {
-    GetApzcTreeManager()->ReceiveInputEvent(aEvent, aOutEvent);
+    GetApzcTreeManager()->ReceiveInputEvent(aEvent, nullptr, aOutEvent);
   }
 }
 

@@ -108,7 +108,7 @@ BaselineCompiler::compile()
         return Method_Error;
 
     Linker linker(masm);
-    IonCode *code = linker.newCode(cx, JSC::BASELINE_CODE);
+    IonCode *code = linker.newCode<CanGC>(cx, JSC::BASELINE_CODE);
     if (!code)
         return Method_Error;
 
@@ -250,6 +250,9 @@ BaselineCompiler::compile()
         // searches for the sought entry when queries are in linear order.
         bytecodeMap[script->nTypeSets] = 0;
     }
+
+    if (script->compartment()->debugMode())
+        baselineScript->setDebugMode();
 
     return Method_Compiled;
 }
