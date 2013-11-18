@@ -63,6 +63,10 @@ public:
   virtual void Play();
   virtual void Pause();
 
+  virtual bool IsDormantNeeded();
+  virtual void ReleaseMediaResources();
+  virtual void ReleaseDecoder() MOZ_OVERRIDE;
+
 private:
 
   void ReadAndPushData(guint aLength);

@@ -107,8 +107,7 @@ GStreamerReader::~GStreamerReader()
     if (mSource)
       gst_object_unref(mSource);
     gst_element_set_state(mPlayBin, GST_STATE_NULL);
-    if (mDroidEGLSinkInUse)
-    {
+    if (mDroidEGLSinkInUse) {
       sDroidEGLSinkInUse--;
       mDroidEGLSinkInUse = false;
     }
@@ -218,8 +217,7 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
 void GStreamerReader::Play()
 {
   if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
-    if (!mDroidEGLSinkInUse && sDroidEGLSinkInUse == 0)
-    {
+    if (!mDroidEGLSinkInUse && sDroidEGLSinkInUse == 0) {
       sDroidEGLSinkInUse++;
       mDroidEGLSinkInUse = true;
       gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
@@ -230,13 +228,27 @@ void GStreamerReader::Play()
 void GStreamerReader::Pause()
 {
   if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
-    if (mDroidEGLSinkInUse)
-    {
+    if (mDroidEGLSinkInUse) {
       sDroidEGLSinkInUse--;
       mDroidEGLSinkInUse = false;
     }
     gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
   }
+}
+
+bool GStreamerReader::IsDormantNeeded()
+{
+  return MediaDecoderReader::IsDormantNeeded();
+}
+
+void GStreamerReader::ReleaseMediaResources()
+{
+  MediaDecoderReader::ReleaseMediaResources();
+}
+
+void GStreamerReader::ReleaseDecoder()
+{
+  MediaDecoderReader::ReleaseDecoder();
 }
 
 GstBusSyncReply
@@ -355,8 +367,7 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
 
     /* start the pipeline */
     gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
-    if (mDroidEGLSinkInUse)
-    {
+    if (mDroidEGLSinkInUse) {
       sDroidEGLSinkInUse--;
       mDroidEGLSinkInUse = false;
     }
@@ -436,8 +447,7 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
 
   /* set the pipeline to PLAYING so that it starts decoding and queueing data in
    * the appsinks */
-  if (!mDroidEGLSinkInUse && sDroidEGLSinkInUse == 0)
-  {
+  if (!mDroidEGLSinkInUse && sDroidEGLSinkInUse == 0) {
     sDroidEGLSinkInUse++;
     mDroidEGLSinkInUse = true;
     mPlayingStartedOnce = true;
