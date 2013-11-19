@@ -58,6 +58,30 @@ typedef enum {
   GST_PLAY_FLAG_SOFT_COLORBALANCE = (1 << 10)
 } PlayFlags;
 
+void* sCurrentDecoderUser = nullptr;
+
+void ResetIfCurrentDecoderActive(void* aCaller)
+{
+#ifdef HAS_NEMO_INTERFACE
+  if (sCurrentDecoderUser == aCaller) {
+    sCurrentDecoderUser = nullptr;
+  }
+#endif
+}
+
+bool UpdateCurrentAsActiveIfNotBusy(void* aCaller)
+{
+#ifdef HAS_NEMO_INTERFACE
+  if (sCurrentDecoderUser != nullptr && sCurrentDecoderUser != aCaller)
+  {
+    return false;
+  }
+  sCurrentDecoderUser = aCaller;
+#endif
+  return true;
+}
+
+
 GStreamerReader::GStreamerReader(AbstractMediaDecoder* aDecoder)
   : MediaDecoderReader(aDecoder),
   mPlayBin(nullptr),
@@ -99,6 +123,7 @@ GStreamerReader::~GStreamerReader()
   MOZ_COUNT_DTOR(GStreamerReader);
   ResetDecode();
 
+  ResetIfCurrentDecoderActive(this);
   if (mPlayBin) {
     gst_app_src_end_of_stream(mSource);
     if (mSource)
@@ -135,6 +160,11 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
   static bool sDisableNemoIface = getenv("NO_GST_NEMO") != 0;
   if (!sDisableNemoIface)
   {
+    static bool sBlockGstIfDecoderBusy = getenv("BLOCK_GST_INIT_IF_BUSY") != 0;
+    if (sBlockGstIfDecoderBusy && sCurrentDecoderUser != nullptr && sCurrentDecoderUser != this) {
+      return NS_ERROR_FAILURE;
+    }
+
     mPlaySink = gst_element_factory_make("droideglsink", nullptr);
     if (!mPlaySink) {
       LOG(PR_LOG_DEBUG, ("could not create egl sink: %p", mPlaySink));
@@ -210,15 +240,32 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
 void GStreamerReader::Play()
 {
   if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
-    gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
+    if (UpdateCurrentAsActiveIfNotBusy(this)) {
+      gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
+    }
   }
 }
 
 void GStreamerReader::Pause()
 {
   if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
-    gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
+    if (UpdateCurrentAsActiveIfNotBusy(this)) {
+      gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
+    }
   }
+}
+
+void GStreamerReader::Suspend()
+{
+  if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
+    gst_element_set_state(mPlayBin, GST_STATE_NULL);
+    ResetIfCurrentDecoderActive(this);
+    mPlayingStartedOnce = false;
+  }
+}
+
+void GStreamerReader::Resume(bool aForceBuffering)
+{
 }
 
 GstBusSyncReply
@@ -336,7 +383,9 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
     }
 
     /* start the pipeline */
-    gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
+    if (UpdateCurrentAsActiveIfNotBusy(this)) {
+      gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
+    }
 
     /* Wait for ASYNC_DONE, which is emitted when the pipeline is built,
      * prerolled and ready to play. Also watch for errors.
@@ -353,6 +402,7 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
       g_error_free(error);
       g_free(debug);
       gst_element_set_state(mPlayBin, GST_STATE_NULL);
+      ResetIfCurrentDecoderActive(this);
       gst_message_unref(message);
       mPlayingStartedOnce = false;
       ret = NS_ERROR_FAILURE;
@@ -379,6 +429,7 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
        (GstMessageType)(GST_MESSAGE_ASYNC_DONE | GST_MESSAGE_ERROR));
     if (GST_MESSAGE_TYPE(message) == GST_MESSAGE_ERROR) {
       gst_element_set_state(mPlayBin, GST_STATE_NULL);
+      ResetIfCurrentDecoderActive(this);
       mPlayingStartedOnce = false;
       gst_message_unref(message);
       return NS_ERROR_FAILURE;
@@ -413,8 +464,10 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
 
   /* set the pipeline to PLAYING so that it starts decoding and queueing data in
    * the appsinks */
-  mPlayingStartedOnce = true;
-  gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
+  if (UpdateCurrentAsActiveIfNotBusy(this)) {
+    mPlayingStartedOnce = true;
+    gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
+  }
 
   return NS_OK;
 }
