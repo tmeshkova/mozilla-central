@@ -236,21 +236,6 @@ void GStreamerReader::Pause()
   }
 }
 
-bool GStreamerReader::IsDormantNeeded()
-{
-  return MediaDecoderReader::IsDormantNeeded();
-}
-
-void GStreamerReader::ReleaseMediaResources()
-{
-  MediaDecoderReader::ReleaseMediaResources();
-}
-
-void GStreamerReader::ReleaseDecoder()
-{
-  MediaDecoderReader::ReleaseDecoder();
-}
-
 GstBusSyncReply
 GStreamerReader::ErrorCb(GstBus *aBus, GstMessage *aMessage, gpointer aUserData)
 {
