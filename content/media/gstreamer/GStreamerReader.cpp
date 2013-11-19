@@ -58,8 +58,6 @@ typedef enum {
   GST_PLAY_FLAG_SOFT_COLORBALANCE = (1 << 10)
 } PlayFlags;
 
-static int sDroidEGLSinkInUse = 0;
-
 GStreamerReader::GStreamerReader(AbstractMediaDecoder* aDecoder)
   : MediaDecoderReader(aDecoder),
   mPlayBin(nullptr),
@@ -79,8 +77,7 @@ GStreamerReader::GStreamerReader(AbstractMediaDecoder* aDecoder)
   fpsNum(0),
   fpsDen(0),
   mPlaySink(nullptr),
-  mPlayingStartedOnce(false),
-  mDroidEGLSinkInUse(false)
+  mPlayingStartedOnce(false)
 {
   MOZ_COUNT_CTOR(GStreamerReader);
 
@@ -107,10 +104,6 @@ GStreamerReader::~GStreamerReader()
     if (mSource)
       gst_object_unref(mSource);
     gst_element_set_state(mPlayBin, GST_STATE_NULL);
-    if (mDroidEGLSinkInUse) {
-      sDroidEGLSinkInUse--;
-      mDroidEGLSinkInUse = false;
-    }
     gst_object_unref(mPlayBin);
     mPlayingStartedOnce = false;
     mPlayBin = nullptr;
@@ -217,21 +210,13 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
 void GStreamerReader::Play()
 {
   if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
-    if (!mDroidEGLSinkInUse && sDroidEGLSinkInUse == 0) {
-      sDroidEGLSinkInUse++;
-      mDroidEGLSinkInUse = true;
-      gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
-    }
+    gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
   }
 }
 
 void GStreamerReader::Pause()
 {
   if (mPlaySink && mPlayBin && mPlayingStartedOnce) {
-    if (mDroidEGLSinkInUse) {
-      sDroidEGLSinkInUse--;
-      mDroidEGLSinkInUse = false;
-    }
     gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
   }
 }
@@ -352,10 +337,6 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
 
     /* start the pipeline */
     gst_element_set_state(mPlayBin, GST_STATE_PAUSED);
-    if (mDroidEGLSinkInUse) {
-      sDroidEGLSinkInUse--;
-      mDroidEGLSinkInUse = false;
-    }
 
     /* Wait for ASYNC_DONE, which is emitted when the pipeline is built,
      * prerolled and ready to play. Also watch for errors.
@@ -432,12 +413,8 @@ nsresult GStreamerReader::ReadMetadata(VideoInfo* aInfo,
 
   /* set the pipeline to PLAYING so that it starts decoding and queueing data in
    * the appsinks */
-  if (!mDroidEGLSinkInUse && sDroidEGLSinkInUse == 0) {
-    sDroidEGLSinkInUse++;
-    mDroidEGLSinkInUse = true;
-    mPlayingStartedOnce = true;
-    gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
-  }
+  mPlayingStartedOnce = true;
+  gst_element_set_state(mPlayBin, GST_STATE_PLAYING);
 
   return NS_OK;
 }
