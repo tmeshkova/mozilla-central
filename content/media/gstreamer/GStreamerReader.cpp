@@ -59,11 +59,12 @@ typedef enum {
 } PlayFlags;
 
 void* sCurrentDecoderUser = nullptr;
+static bool sNoLimitOneGSTDecoder = getenv("NO_LIMIT_ONE_GST_DECODER") != 0;
 
 void ResetIfCurrentDecoderActive(void* aCaller)
 {
 #ifdef HAS_NEMO_INTERFACE
-  if (sCurrentDecoderUser == aCaller) {
+  if (!sNoLimitOneGSTDecoder && sCurrentDecoderUser == aCaller) {
     sCurrentDecoderUser = nullptr;
   }
 #endif
@@ -72,7 +73,7 @@ void ResetIfCurrentDecoderActive(void* aCaller)
 bool UpdateCurrentAsActiveIfNotBusy(void* aCaller)
 {
 #ifdef HAS_NEMO_INTERFACE
-  if (sCurrentDecoderUser != nullptr && sCurrentDecoderUser != aCaller)
+  if (!sNoLimitOneGSTDecoder && sCurrentDecoderUser != nullptr && sCurrentDecoderUser != aCaller)
   {
     return false;
   }
@@ -175,7 +176,11 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
   g_object_set(mPlayBin, "buffer-size", 0, nullptr);
   mBus = gst_pipeline_get_bus(GST_PIPELINE(mPlayBin));
 
+#ifndef HAS_NEMO_INTERFACE
   mVideoSink = gst_parse_bin_from_description("capsfilter name=filter ! "
+#else
+  mVideoSink = gst_parse_bin_from_description("colorconv ! capsfilter name=filter ! "
+#endif
       "appsink name=videosink sync=true max-buffers=1 "
       "caps=video/x-raw-yuv,format=(fourcc)I420"
       , TRUE, nullptr);
