@@ -2,7 +2,7 @@ Source: xulrunner
 Section: libs
 Priority: extra
 Maintainer: unknown <tmeshkova@github.com>
-Build-Depends: debhelper (>= 7),
+Build-Depends: debhelper (>= 5),
  autoconf2.13,
  python,
  unzip,
@@ -14,7 +14,11 @@ Build-Depends: debhelper (>= 7),
  libgstreamer0.10-dev,
  libgstreamer-plugins-base0.10-dev,
  libx11-dev,
- libxt-dev
+ libxt-dev,
+ quilt,
+ python2.7,
+ libqt4-dev,
+ libcairo2-dev
 Homepage: https://wiki.mozilla.org/Embedding/IPCLiteAPI
 
 Package: xulrunner
