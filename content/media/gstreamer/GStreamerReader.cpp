@@ -158,8 +158,8 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
     return NS_ERROR_FAILURE;
   }
 #ifdef HAS_NEMO_INTERFACE
-  static bool sDisableNemoIface = getenv("NO_GST_NEMO") != 0;
-  if (!sDisableNemoIface)
+  static bool sEnableNemoIface = getenv("DROID_SINK") != 0;
+  if (sEnableNemoIface)
   {
     static bool sBlockGstIfDecoderBusy = getenv("BLOCK_GST_INIT_IF_BUSY") != 0;
     if (sBlockGstIfDecoderBusy && sCurrentDecoderUser != nullptr && sCurrentDecoderUser != this) {
