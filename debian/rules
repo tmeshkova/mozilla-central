@@ -101,7 +101,7 @@ clean:
 	rm -f build-$(DEB_HOST_ARCH)-stamp
 	rm -f configure-$(DEB_HOST_ARCH)-stamp
 #	$(MAKE) distclean
-	rm -rf objdir-armel
+	rm -rf $(DEST_OBJ_DIR)
 ifneq (,$(findstring Maemo 5,$(shell cat /etc/issue)))
 	QUILT_PATCHES=debian/patches/fremantle quilt pop -a || true
 endif
