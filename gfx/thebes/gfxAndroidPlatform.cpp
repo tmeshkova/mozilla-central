@@ -333,7 +333,7 @@ gfxAndroidPlatform::MakePlatformFont(const gfxProxyFontEntry *aProxyEntry,
 TemporaryRef<ScaledFont>
 gfxAndroidPlatform::GetScaledFontForFont(DrawTarget* aTarget, gfxFont *aFont)
 {
-    return Factory::GetScaledFontForFontWithCairoSkia(aTarget, aFont);
+    return Factory::GetScaledFontForFontWithCairoSkia(aTarget, aFont->GetCairoScaledFont(), aFont->GetAdjustedSize());
 }
 
 bool

@@ -1030,7 +1030,7 @@ public:
 #endif
 
  static TemporaryRef<ScaledFont>
-   GetScaledFontForFontWithCairoSkia(DrawTarget* aTarget, gfxFont *aFont);
+   GetScaledFontForFontWithCairoSkia(DrawTarget* aTarget, cairo_scaled_font_t* aCairoFont, double aAdjustedSize);
 
 #ifdef WIN32
   static TemporaryRef<DrawTarget> CreateDrawTargetForD3D10Texture(ID3D10Texture2D *aTexture, SurfaceFormat aFormat);
