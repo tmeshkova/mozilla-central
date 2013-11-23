@@ -212,12 +212,6 @@ ifneq (,$(filter OS2 WINNT,$(OS_ARCH)))
 IMPORT_LIBRARY		:= $(LIB_PREFIX)$(SHARED_LIBRARY_NAME).$(IMPORT_LIB_SUFFIX)
 endif
 
-ifeq (OS2,$(OS_ARCH))
-ifdef SHORT_LIBNAME
-SHARED_LIBRARY_NAME	:= $(SHORT_LIBNAME)
-endif
-endif
-
 ifdef MAKE_FRAMEWORK
 SHARED_LIBRARY		:= $(SHARED_LIBRARY_NAME)
 else
@@ -463,20 +457,6 @@ EXTRA_DSO_LDOPTS += $(MOZ_COMPONENTS_VERSION_SCRIPT_LDFLAGS)
 endif # IS_COMPONENT
 
 #
-# Enforce the requirement that MODULE_NAME must be set
-# for components in static builds
-#
-ifdef IS_COMPONENT
-ifdef EXPORT_LIBRARY
-ifndef FORCE_SHARED_LIB
-ifndef MODULE_NAME
-$(error MODULE_NAME is required for components which may be used in static builds)
-endif
-endif
-endif
-endif
-
-#
 # MacOS X specific stuff
 #
 
@@ -510,7 +490,7 @@ endif
 
 ifeq ($(OS_ARCH),NetBSD)
 ifneq (,$(filter arc cobalt hpcmips mipsco newsmips pmax sgimips,$(OS_TEST)))
-ifeq ($(MODULE),layout)
+ifneq (,$(filter layout/%,$(relativesrcdir)))
 OS_CFLAGS += -Wa,-xgot
 OS_CXXFLAGS += -Wa,-xgot
 endif
@@ -797,6 +777,7 @@ endif
 else # !WINNT || GNU_CC
 	$(EXPAND_CCC) -o $@ $(CXXFLAGS) $(PROGOBJS) $(RESFILE) $(WIN32_EXE_LDFLAGS) $(LDFLAGS) $(WRAP_LDFLAGS) $(LIBS_DIR) $(LIBS) $(MOZ_GLUE_PROGRAM_LDFLAGS) $(OS_LIBS) $(EXTRA_LIBS) $(BIN_FLAGS) $(EXE_DEF_FILE) $(STLPORT_LIBS)
 	@$(call CHECK_STDCXX,$@)
+	@$(call LOCAL_CHECKS,$@)
 endif # WINNT && !GNU_CC
 
 ifdef ENABLE_STRIP
@@ -853,6 +834,7 @@ endif	# MSVC with manifest tool
 else
 	$(EXPAND_CCC) $(CXXFLAGS) -o $@ $< $(WIN32_EXE_LDFLAGS) $(LDFLAGS) $(WRAP_LDFLAGS) $(LIBS_DIR) $(LIBS) $(MOZ_GLUE_PROGRAM_LDFLAGS) $(OS_LIBS) $(EXTRA_LIBS) $(BIN_FLAGS) $(STLPORT_LIBS)
 	@$(call CHECK_STDCXX,$@)
+	@$(call LOCAL_CHECKS,$@)
 endif # WINNT && !GNU_CC
 
 ifdef ENABLE_STRIP
@@ -955,6 +937,7 @@ else # ! DTRACE_LIB_DEPENDENT
 	$(EXPAND_MKSHLIB) $(SHLIB_LDSTARTFILE) $(OBJS) $(SUB_SHLOBJS) $(RESFILE) $(LDFLAGS) $(WRAP_LDFLAGS) $(SHARED_LIBRARY_LIBS) $(EXTRA_DSO_LDOPTS) $(MOZ_GLUE_LDFLAGS) $(OS_LIBS) $(EXTRA_LIBS) $(DEF_FILE) $(SHLIB_LDENDFILE) $(if $(LIB_IS_C_ONLY),,$(STLPORT_LIBS))
 endif # DTRACE_LIB_DEPENDENT
 	@$(call CHECK_STDCXX,$@)
+	@$(call LOCAL_CHECKS,$@)
 
 ifeq (_WINNT,$(GNU_CC)_$(OS_ARCH))
 ifdef MSMANIFEST_TOOL
@@ -1689,7 +1672,6 @@ FREEZE_VARIABLES = \
   DIRS \
   LIBRARY \
   MODULE \
-  SHORT_LIBNAME \
   TIERS \
   EXTRA_COMPONENTS \
   EXTRA_PP_COMPONENTS \
@@ -1730,3 +1712,7 @@ include $(topsrcdir)/config/makefiles/autotargets.mk
 ifneq ($(NULL),$(AUTO_DEPS))
   default all libs tools export:: $(AUTO_DEPS)
 endif
+
+export:: $(GENERATED_FILES)
+
+GARBAGE += $(GENERATED_FILES)

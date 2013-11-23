@@ -299,7 +299,6 @@ TabChildHelper::HandleEvent(nsIDOMEvent* aEvent)
 
     FrameMetrics::ViewID viewId;
     uint32_t presShellId;
-    nsIScrollableFrame* scrollFrame = nullptr;
 
     nsCOMPtr<nsIContent> content;
     if (nsCOMPtr<nsIDocument> doc = do_QueryInterface(target))
@@ -313,27 +312,19 @@ TabChildHelper::HandleEvent(nsIDOMEvent* aEvent)
     if (!nsLayoutUtils::FindIDFor(content, &viewId))
       return NS_ERROR_UNEXPECTED;
 
-    // Note that we cannot use FindScrollableFrameFor(ROOT_SCROLL_ID) because
-    // it might return the root element from a different page in the case where
-    // that page is in the bfcache and this page is not run through layout
-    // before being drawn to the screen. Hence the code blocks below treat
-    // ROOT_SCROLL_ID separately from the non-ROOT_SCROLL_ID case.
+    nsIScrollableFrame* scrollFrame = nsLayoutUtils::FindScrollableFrameFor(viewId);
+    if (!scrollFrame)
+      return NS_OK;
 
-    CSSIntPoint scrollOffset;
-    if (viewId != FrameMetrics::ROOT_SCROLL_ID) {
-      scrollFrame = nsLayoutUtils::FindScrollableFrameFor(viewId);
-      if (!scrollFrame) {
-        return NS_OK;
-      }
-      scrollOffset = scrollFrame->GetScrollPositionCSSPixels();
-    } else {
+    CSSIntPoint scrollOffset = scrollFrame->GetScrollPositionCSSPixels();
+
+    if (viewId == mLastMetrics.mScrollId) {
       // For the root frame, we store the last metrics, including the last
       // scroll offset, sent by APZC. (This is updated in ProcessUpdateFrame()).
       // We use this here to avoid sending APZC back a scroll event that
       // originally came from APZC (besides being unnecessary, the event might
       // be slightly out of date by the time it reaches APZC).
       // We should probably do this for subframes, too.
-      utils->GetScrollXY(false, &scrollOffset.x, &scrollOffset.y);
       if (RoundedToInt(mLastMetrics.mScrollOffset) == scrollOffset) {
         return NS_OK;
       }
@@ -343,6 +334,7 @@ TabChildHelper::HandleEvent(nsIDOMEvent* aEvent)
       // gets a chance to update it.
       mLastMetrics.mScrollOffset = scrollOffset;
     }
+
     // TODO: currently presShellId, viewId are not used in EmbedLiteViewThread
     mView->SendUpdateScrollOffset(presShellId, viewId, scrollOffset);
   }
@@ -355,7 +347,7 @@ TabChildHelper::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
 {
   MOZ_ASSERT(aFrameMetrics.mScrollId != FrameMetrics::NULL_SCROLL_ID);
 
-  if (aFrameMetrics.mScrollId == FrameMetrics::ROOT_SCROLL_ID) {
+  if (aFrameMetrics.mIsRoot) {
     uint32_t presShellId;
     nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
     nsresult rv = utils->GetPresShellId(&presShellId);
@@ -365,8 +357,8 @@ TabChildHelper::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
       return ProcessUpdateFrame(aFrameMetrics);
     }
   } else {
-    // aFrameMetrics.mScrollId is not FrameMetrics::ROOT_SCROLL_ID,
-    // so we are trying to update a subframe. This requires special handling.
+    // aFrameMetrics.mIsRoot is false, so we are trying to update a subframe.
+    // This requires special handling.
     nsCOMPtr<nsIContent> content = nsLayoutUtils::FindContentFor(
                                       aFrameMetrics.mScrollId);
     if (content) {

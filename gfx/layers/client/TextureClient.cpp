@@ -390,6 +390,15 @@ DeprecatedTextureClient::~DeprecatedTextureClient()
   MOZ_ASSERT(mDescriptor.type() == SurfaceDescriptor::T__None, "Need to release surface!");
 }
 
+void
+DeprecatedTextureClient::OnActorDestroy()
+{
+  if (ISurfaceAllocator::IsShmem(&mDescriptor)) {
+    mDescriptor = SurfaceDescriptor();
+  }
+}
+
+
 DeprecatedTextureClientShmem::DeprecatedTextureClientShmem(CompositableForwarder* aForwarder,
                                        const TextureInfo& aTextureInfo)
   : DeprecatedTextureClient(aForwarder, aTextureInfo)
@@ -511,11 +520,12 @@ DeprecatedTextureClientShmem::LockDrawTarget()
 void
 DeprecatedTextureClientShmem::Unlock()
 {
-  mSurface = nullptr;
-  mSurfaceAsImage = nullptr;
+  if (mSurface) {
+    mSurface = nullptr;
+    mSurfaceAsImage = nullptr;
+    ShadowLayerForwarder::CloseDescriptor(mDescriptor);
+  }
   mDrawTarget = nullptr;
-
-  ShadowLayerForwarder::CloseDescriptor(mDescriptor);
 }
 
 gfxImageSurface*

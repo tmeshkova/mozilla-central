@@ -347,10 +347,6 @@ class MochiRemote(Mochitest):
             shutil.rmtree(os.path.join(options.profilePath, 'extensions', 'staged', 'worker-test@mozilla.org'))
             shutil.rmtree(os.path.join(options.profilePath, 'extensions', 'staged', 'workerbootstrap-test@mozilla.org'))
             os.remove(os.path.join(options.profilePath, 'userChrome.css'))
-            if os.path.exists(os.path.join(options.profilePath, 'tests.jar')):
-                os.remove(os.path.join(options.profilePath, 'tests.jar'))
-            if os.path.exists(os.path.join(options.profilePath, 'tests.manifest')):
-                os.remove(os.path.join(options.profilePath, 'tests.manifest'))
 
         try:
             self._dm.pushDir(options.profilePath, self.remoteProfile)
@@ -526,8 +522,8 @@ class MochiRemote(Mochitest):
         self._dm.pushFile(fHandle.name, os.path.join(deviceRoot, "robotium.config"))
         os.unlink(fHandle.name)
 
-    def buildBrowserEnv(self, options):
-        browserEnv = Mochitest.buildBrowserEnv(self, options)
+    def buildBrowserEnv(self, options, debugger=False):
+        browserEnv = Mochitest.buildBrowserEnv(self, options, debugger=debugger)
         self.buildRobotiumConfig(options, browserEnv)
         return browserEnv
 
@@ -584,6 +580,14 @@ def main():
     log.info("Android sdk version '%s'; will use this to filter manifests" % str(androidVersion))
     mozinfo.info['android_version'] = androidVersion
 
+    deviceRoot = dm.getDeviceRoot()
+    if options.dmdPath:
+        dmdLibrary = "libdmd.so"
+        dmdPathOnDevice = os.path.join(deviceRoot, dmdLibrary)
+        dm.removeFile(dmdPathOnDevice)
+        dm.pushFile(os.path.join(options.dmdPath, dmdLibrary), dmdPathOnDevice)
+        options.dmdPath = deviceRoot
+
     procName = options.app.split('/')[-1]
     if (dm.processExist(procName)):
         dm.killProcess(procName)
@@ -609,7 +613,6 @@ def main():
             my_tests = tests[start:end]
             log.info("Running tests %d-%d/%d", start+1, end, len(tests))
 
-        deviceRoot = dm.getDeviceRoot()      
         dm.removeFile(os.path.join(deviceRoot, "fennec_ids.txt"))
         fennec_ids = os.path.abspath("fennec_ids.txt")
         if not os.path.exists(fennec_ids) and options.robocopIds:

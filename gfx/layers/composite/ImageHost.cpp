@@ -86,6 +86,10 @@ ImageHost::Composite(EffectChain& aEffectChain,
   RefPtr<TexturedEffect> effect = CreateTexturedEffect(mFrontBuffer->GetFormat(),
                                                        source,
                                                        aFilter);
+  if (!effect) {
+    return;
+  }
+
   aEffectChain.mPrimaryEffect = effect;
   IntSize textureSize = source->GetSize();
   gfx::Rect gfxPictureRect
@@ -151,7 +155,6 @@ ImageHost::Composite(EffectChain& aEffectChain,
   mFrontBuffer->Unlock();
 }
 
-#ifdef MOZ_LAYERS_HAVE_LOG
 void
 ImageHost::PrintInfo(nsACString& aTo, const char* aPrefix)
 {
@@ -167,8 +170,6 @@ ImageHost::PrintInfo(nsACString& aTo, const char* aPrefix)
     mFrontBuffer->PrintInfo(aTo, pfx.get());
   }
 }
-#endif
-
 
 #ifdef MOZ_DUMP_PAINTING
 void
@@ -291,6 +292,9 @@ DeprecatedImageHostSingle::Composite(EffectChain& aEffectChain,
 
   RefPtr<TexturedEffect> effect =
     CreateTexturedEffect(mDeprecatedTextureHost, aFilter);
+  if (!effect) {
+    return;
+  }
 
   aEffectChain.mPrimaryEffect = effect;
 
@@ -335,7 +339,6 @@ DeprecatedImageHostSingle::Composite(EffectChain& aEffectChain,
   mDeprecatedTextureHost->Unlock();
 }
 
-#ifdef MOZ_LAYERS_HAVE_LOG
 void
 DeprecatedImageHostSingle::PrintInfo(nsACString& aTo, const char* aPrefix)
 {
@@ -351,7 +354,6 @@ DeprecatedImageHostSingle::PrintInfo(nsACString& aTo, const char* aPrefix)
     mDeprecatedTextureHost->PrintInfo(aTo, pfx.get());
   }
 }
-#endif
 
 bool
 DeprecatedImageHostBuffered::Update(const SurfaceDescriptor& aImage,

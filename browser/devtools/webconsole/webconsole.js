@@ -2721,7 +2721,7 @@ WebConsoleFrame.prototype = {
     locationNode.href = isScratchpad ? "#" : fullURL;
     locationNode.draggable = false;
     locationNode.setAttribute("title", aSourceURL);
-    locationNode.className = "location devtools-monospace";
+    locationNode.className = "location theme-link devtools-monospace";
 
     // Make the location clickable.
     this._addMessageLinkCallback(locationNode, () => {
@@ -3166,7 +3166,7 @@ JSTerm.prototype = {
       panelId: "webConsole_autocompletePopup",
       listBoxId: "webConsole_autocompletePopupListBox",
       position: "before_start",
-      theme: "light",
+      theme: "auto",
       direction: "ltr",
       autoSelect: true
     };
