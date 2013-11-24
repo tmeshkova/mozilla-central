@@ -136,7 +136,7 @@ class EmbedContentController : public GeckoContentController
      * |aContentRect| is in CSS pixels, relative to the current cssPage.
      * |aScrollableSize| is the current content width/height in CSS pixels.
      */
-    virtual void SendAsyncScrollDOMEvent(FrameMetrics::ViewID aScrollId,
+    virtual void SendAsyncScrollDOMEvent(bool aIsRoot,
                                          const CSSRect& aContentRect,
                                          const CSSSize& aScrollableSize) {
       if (MessageLoop::current() != mUILoop) {
@@ -145,7 +145,7 @@ class EmbedContentController : public GeckoContentController
         mUILoop->PostTask(
           FROM_HERE,
           NewRunnableMethod(this, &EmbedContentController::SendAsyncScrollDOMEvent,
-                            aScrollId, aContentRect, aScrollableSize));
+                            aIsRoot, aContentRect, aScrollableSize));
         return;
       }
       LOGNI("contentR[%g,%g,%g,%g], scrSize[%g,%g]",

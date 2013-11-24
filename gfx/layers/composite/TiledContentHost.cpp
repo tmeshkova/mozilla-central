@@ -184,6 +184,10 @@ TiledContentHost::RenderTile(const TiledTexture& aTile,
 
   RefPtr<TexturedEffect> effect =
     CreateTexturedEffect(aTile.mDeprecatedTextureHost, aFilter);
+  if (!effect) {
+    return;
+  }
+
   if (aTile.mDeprecatedTextureHost->Lock()) {
     aEffectChain.mPrimaryEffect = effect;
   } else {
@@ -306,7 +310,6 @@ TiledTexture::Validate(gfxReusableSurfaceWrapper* aReusableSurface, Compositor* 
   mDeprecatedTextureHost->Update(aReusableSurface, flags, gfx::IntSize(aSize, aSize));
 }
 
-#ifdef MOZ_LAYERS_HAVE_LOG
 void
 TiledContentHost::PrintInfo(nsACString& aTo, const char* aPrefix)
 {
@@ -314,7 +317,6 @@ TiledContentHost::PrintInfo(nsACString& aTo, const char* aPrefix)
   aTo += nsPrintfCString("TiledContentHost (0x%p)", this);
 
 }
-#endif
 
 #ifdef MOZ_DUMP_PAINTING
 void

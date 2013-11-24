@@ -48,6 +48,9 @@ JS_SetGrayGCRootsTracer(JSRuntime *rt, JSTraceDataOp traceOp, void *data);
 extern JS_FRIEND_API(JSString *)
 JS_GetAnonymousString(JSRuntime *rt);
 
+extern JS_FRIEND_API(void)
+JS_SetIsWorkerRuntime(JSRuntime *rt);
+
 extern JS_FRIEND_API(JSObject *)
 JS_FindCompilationScope(JSContext *cx, JSObject *obj);
 
@@ -540,6 +543,10 @@ SetFunctionNativeReserved(JSObject *fun, size_t which, const JS::Value &val);
 
 JS_FRIEND_API(bool)
 GetObjectProto(JSContext *cx, JS::Handle<JSObject*> obj, JS::MutableHandle<JSObject*> proto);
+
+JS_FRIEND_API(bool)
+GetOriginalEval(JSContext *cx, JS::HandleObject scope,
+                JS::MutableHandleObject eval);
 
 inline void *
 GetObjectPrivate(JSObject *obj)

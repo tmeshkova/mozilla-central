@@ -244,9 +244,8 @@ tas.edu.au
 vic.edu.au
 wa.edu.au
 act.gov.au
-// Removed at request of Shae.Donelan@services.nsw.gov.au, 2010-03-04
-// nsw.gov.au
-nt.gov.au
+// nsw.gov.au  Bug 547985 - Removed at request of <Shae.Donelan@services.nsw.gov.au>
+// nt.gov.au  Bug 940478 - Removed at request of Greg Connors <Greg.Connors@nt.gov.au>
 qld.gov.au
 sa.gov.au
 tas.gov.au
@@ -1099,16 +1098,18 @@ gov.ie
 // il : http://en.wikipedia.org/wiki/.il
 *.il
 
-// im : https://www.nic.im/pdfs/imfaqs.pdf
+// im : https://www.nic.im/
+// Submitted by registry <info@nic.im> 2013-11-15
 im
-co.im
-ltd.co.im
-plc.co.im
-net.im
-gov.im
-org.im
-nic.im
 ac.im
+co.im
+com.im
+ltd.co.im
+net.im
+org.im
+plc.co.im
+tt.im
+tv.im
 
 // in : http://en.wikipedia.org/wiki/.in
 // see also: http://www.inregistry.in/policies/

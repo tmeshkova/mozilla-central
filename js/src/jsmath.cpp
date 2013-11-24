@@ -294,16 +294,15 @@ js::math_atan2(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    if (args.length() <= 1) {
-        args.rval().setNaN();
-        return true;
-    }
-
-    double x, y;
-    if (!ToNumber(cx, args[0], &x) || !ToNumber(cx, args[1], &y))
+    double y;
+    if (!ToNumber(cx, args.get(0), &y))
         return false;
 
-    double z = ecmaAtan2(x, y);
+    double x;
+    if (!ToNumber(cx, args.get(1), &x))
+        return false;
+
+    double z = ecmaAtan2(y, x);
     args.rval().setDouble(z);
     return true;
 }
@@ -640,13 +639,12 @@ js_math_pow(JSContext *cx, unsigned argc, Value *vp)
 {
     CallArgs args = CallArgsFromVp(argc, vp);
 
-    if (args.length() <= 1) {
-        args.rval().setNaN();
-        return true;
-    }
+    double x;
+    if (!ToNumber(cx, args.get(0), &x))
+        return false;
 
-    double x, y;
-    if (!ToNumber(cx, args[0], &x) || !ToNumber(cx, args[1], &y))
+    double y;
+    if (!ToNumber(cx, args.get(1), &y))
         return false;
 
     /*
@@ -1491,7 +1489,7 @@ js_InitMathClass(JSContext *cx, HandleObject obj)
     if (!JS_DefineConstDoubles(cx, Math, math_constants))
         return nullptr;
 
-    obj->as<GlobalObject>().markStandardClassInitializedNoProto(&MathClass);
+    obj->as<GlobalObject>().setConstructor(JSProto_Math, ObjectValue(*Math));
 
     return Math;
 }
