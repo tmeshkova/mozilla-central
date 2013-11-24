@@ -6,12 +6,16 @@
 #include "mozilla/BackgroundHangMonitor.h"
 #include "mozilla/LinkedList.h"
 #include "mozilla/Monitor.h"
+#include "mozilla/Move.h"
 #include "mozilla/StaticPtr.h"
+#include "mozilla/Telemetry.h"
+#include "mozilla/ThreadHangStats.h"
 #include "mozilla/ThreadLocal.h"
 #include "nsStringGlue.h"
 
 #include "prinrval.h"
 #include "prthread.h"
+#include "ThreadStackHelper.h"
 
 #include <algorithm>
 
@@ -104,8 +108,6 @@ public:
     if (!sTlsKey.init()) {}
   }
 
-  // Name of the thread
-  const nsAutoCString mThreadName;
   // Hang timeout in ticks
   const PRIntervalTime mTimeout;
   // PermaHang timeout in ticks
@@ -118,6 +120,12 @@ public:
   bool mHanging;
   // Is the thread in a waiting state
   bool mWaiting;
+  // Platform-specific helper to get hang stacks
+  ThreadStackHelper mStackHelper;
+  // Stack of current hang
+  Telemetry::HangHistogram::Stack mHangStack;
+  // Statistics for telemetry
+  Telemetry::ThreadHangStats mStats;
 
   BackgroundHangThread(const char* aName,
                        uint32_t aTimeoutMs,
@@ -125,7 +133,7 @@ public:
   ~BackgroundHangThread();
 
   // Report a hang; aManager->mLock IS locked
-  void ReportHang(PRIntervalTime aHangTime) const;
+  void ReportHang(PRIntervalTime aHangTime);
   // Report a permanent hang; aManager->mLock IS locked
   void ReportPermaHang() const;
   // Called by BackgroundHangMonitor::NotifyActivity
@@ -252,6 +260,7 @@ BackgroundHangManager::RunMonitorThread()
       if (MOZ_LIKELY(!currentThread->mHanging)) {
         if (MOZ_UNLIKELY(hangTime >= currentThread->mTimeout)) {
           // A hang started
+          currentThread->mStackHelper.GetStack(currentThread->mHangStack);
           currentThread->mHangStart = interval;
           currentThread->mHanging = true;
         }
@@ -293,13 +302,13 @@ BackgroundHangThread::BackgroundHangThread(const char* aName,
                                            uint32_t aMaxTimeoutMs)
   : mManager(BackgroundHangManager::sInstance)
   , mThreadID(PR_GetCurrentThread())
-  , mThreadName(aName)
   , mTimeout(PR_MillisecondsToInterval(aTimeoutMs))
   , mMaxTimeout(PR_MillisecondsToInterval(aMaxTimeoutMs))
   , mInterval(mManager->mIntervalNow)
   , mHangStart(mInterval)
   , mHanging(false)
   , mWaiting(true)
+  , mStats(aName)
 {
   if (sTlsKey.initialized()) {
     sTlsKey.set(this);
@@ -325,15 +334,29 @@ BackgroundHangThread::~BackgroundHangThread()
   if (sTlsKey.initialized()) {
     sTlsKey.set(nullptr);
   }
+
+  // Move our copy of ThreadHangStats to Telemetry storage
+  Telemetry::RecordThreadHangStats(mStats);
 }
 
 void
-BackgroundHangThread::ReportHang(PRIntervalTime aHangTime) const
+BackgroundHangThread::ReportHang(PRIntervalTime aHangTime)
 {
   // Recovered from a hang; called on the monitor thread
   // mManager->mLock IS locked
 
-  // TODO: Add telemetry reporting for hangs
+  Telemetry::HangHistogram newHistogram(Move(mHangStack));
+  for (Telemetry::HangHistogram* oldHistogram = mStats.mHangs.begin();
+       oldHistogram != mStats.mHangs.end(); oldHistogram++) {
+    if (newHistogram == *oldHistogram) {
+      // New histogram matches old one
+      oldHistogram->Add(aHangTime);
+      return;
+    }
+  }
+  // Add new histogram
+  newHistogram.Add(aHangTime);
+  mStats.mHangs.append(Move(newHistogram));
 }
 
 void
@@ -357,6 +380,7 @@ BackgroundHangThread::NotifyActivity()
     mManager->Wakeup();
   } else {
     PRIntervalTime duration = intervalNow - mInterval;
+    mStats.mActivity.Add(duration);
     if (MOZ_UNLIKELY(duration >= mTimeout)) {
       /* Wake up the manager thread to tell it that a hang ended */
       mManager->Wakeup();
@@ -394,6 +418,7 @@ void
 BackgroundHangMonitor::Startup()
 {
   MOZ_ASSERT(!BackgroundHangManager::sInstance, "Already initialized");
+  ThreadStackHelper::Startup();
   BackgroundHangThread::Startup();
   BackgroundHangManager::sInstance = new BackgroundHangManager();
 }
@@ -407,6 +432,7 @@ BackgroundHangMonitor::Shutdown()
      we don't want to hold the lock when it's being destroyed. */
   BackgroundHangManager::sInstance->Shutdown();
   BackgroundHangManager::sInstance = nullptr;
+  ThreadStackHelper::Shutdown();
 }
 
 BackgroundHangMonitor::BackgroundHangMonitor(const char* aName,
@@ -439,6 +465,27 @@ void
 BackgroundHangMonitor::NotifyWait()
 {
   mThread->NotifyWait();
+}
+
+
+/* Because we are iterating through the BackgroundHangThread linked list,
+   we need to take a lock. Using MonitorAutoLock as a base class makes
+   sure all of that is taken care of for us. */
+BackgroundHangMonitor::ThreadHangStatsIterator::ThreadHangStatsIterator()
+  : MonitorAutoLock(BackgroundHangManager::sInstance->mLock)
+  , mThread(BackgroundHangManager::sInstance->mHangThreads.getFirst())
+{
+}
+
+Telemetry::ThreadHangStats*
+BackgroundHangMonitor::ThreadHangStatsIterator::GetNext()
+{
+  if (!mThread) {
+    return nullptr;
+  }
+  Telemetry::ThreadHangStats* stats = &mThread->mStats;
+  mThread = mThread->getNext();
+  return stats;
 }
 
 } // namespace mozilla
