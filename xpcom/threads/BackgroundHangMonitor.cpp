@@ -8,6 +8,7 @@
 #include "mozilla/Monitor.h"
 #include "mozilla/StaticPtr.h"
 #include "mozilla/ThreadLocal.h"
+#include "nsStringGlue.h"
 
 #include "prinrval.h"
 #include "prthread.h"
