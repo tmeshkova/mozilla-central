@@ -184,10 +184,10 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
   gst_pad_add_event_probe(sinkpad,
       G_CALLBACK(&GStreamerReader::EventProbeCb), this);
 
-#ifdef HAS_NEMO_INTERFACE
-  g_signal_connect(G_OBJECT(sinkpad), "notify::caps",
-                   G_CALLBACK(GStreamerReader::PlaySinkCapsNotify), this);
-#endif
+  if (mPlaySink) {
+    g_signal_connect(G_OBJECT(sinkpad), "notify::caps",
+                     G_CALLBACK(GStreamerReader::PlaySinkCapsNotify), this);
+  }
 
   gst_object_unref(sinkpad);
   gst_pad_set_bufferalloc_function(sinkpad, GStreamerReader::AllocateVideoBufferCb);
@@ -609,7 +609,6 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
     MediaResource* resource = mDecoder->GetResource();
     NS_ASSERTION(resource, "Decoder has no media resource");
 
-#ifdef HAS_NEMO_INTERFACE
     if (!EnsureGLContext())
       return false;
 
@@ -623,15 +622,6 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
     int64_t endTime = 1; // timestamp + GST_SYNC_DURATION(mPlaySink);
     bool isKeyframe = true; // !GST_SYNC_FLAG_IS_SET(mPlaySink, GST_SYNC_FLAG_DISCONT);
     int64_t timecode = -1; //
-#ifdef HAS_NEMO_INTERFACE
-    NemoGstVideoTextureFrameInfo info;
-    if (false && nemo_gst_video_texture_get_frame_info(NEMO_GST_VIDEO_TEXTURE(mPlaySink), &info))
-    {
-        timestamp = info.timestamp;
-        offset = info.offset;
-        endTime = timestamp + info.duration;
-    }
-#endif
     VideoData *v = VideoData::Create(mInfo.mVideo,
                                      mDecoder->GetImageContainer(),
                                      (void*)handle,
@@ -642,7 +632,7 @@ bool GStreamerReader::DecodeVideoFrame(bool &aKeyFrameSkip,
       return false;
 
     mVideoQueue.Push(v);
-#endif
+
     return true;
   }
 
