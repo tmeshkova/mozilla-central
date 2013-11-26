@@ -17,9 +17,6 @@
 #include "GStreamerLoader.h"
 #include "GLContextProvider.h"
 #include "GLContext.h"
-#ifdef HAS_NEMO_INTERFACE
-#include <gst/interfaces/nemovideotexture.h>
-#endif
 
 using namespace mozilla::gl;
 
@@ -63,7 +60,6 @@ typedef enum {
 } PlayFlags;
 
 static int sDroidEGLSinkInUse = 0;
-#ifdef HAS_NEMO_INTERFACE
 static nsRefPtr<GLContext> sPluginContext = nullptr;
 
 static bool EnsureGLContext()
@@ -76,7 +72,6 @@ static bool EnsureGLContext()
 
   return sPluginContext != nullptr;
 }
-#endif
 
 GStreamerReader::GStreamerReader(AbstractMediaDecoder* aDecoder)
   : MediaDecoderReader(aDecoder),
