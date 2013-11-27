@@ -43,7 +43,7 @@ class EmbedAsyncPanZoomController : public AsyncPanZoomController
       : AsyncPanZoomController(aLayersId, nullptr, aGeckoContentController, aGestures)
     { }
 
-    void HandlePanEnd() {
+    void NotifyTransformEnd() {
         ScheduleComposite();
         RequestContentRepaint();
     }
@@ -68,14 +68,13 @@ class EmbedContentController : public GeckoContentController
       aFrameMetrics));
     }
 
-    virtual void HandleDoubleTap(const CSSIntPoint& aPoint) MOZ_OVERRIDE {
+    virtual void HandleDoubleTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE {
       if (MessageLoop::current() != mUILoop) {
         // We have to send this message from the "UI thread" (main
         // thread).
         mUILoop->PostTask(
           FROM_HERE,
-          NewRunnableMethod(this, &EmbedContentController::HandleDoubleTap,
-        aPoint));
+          NewRunnableMethod(this, &EmbedContentController::HandleDoubleTap, aPoint, aModifiers));
         return;
       }
       EmbedLiteViewListener* listener = GetListener();
@@ -84,14 +83,13 @@ class EmbedContentController : public GeckoContentController
       }
     }
 
-    virtual void HandleSingleTap(const CSSIntPoint& aPoint) MOZ_OVERRIDE {
+    virtual void HandleSingleTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE {
       if (MessageLoop::current() != mUILoop) {
         // We have to send this message from the "UI thread" (main
         // thread).
         mUILoop->PostTask(
           FROM_HERE,
-          NewRunnableMethod(this, &EmbedContentController::HandleSingleTap,
-        aPoint));
+          NewRunnableMethod(this, &EmbedContentController::HandleSingleTap, aPoint, aModifiers));
         return;
       }
       EmbedLiteViewListener* listener = GetListener();
@@ -100,14 +98,13 @@ class EmbedContentController : public GeckoContentController
       }
     }
 
-    virtual void HandleLongTap(const CSSIntPoint& aPoint) MOZ_OVERRIDE {
+    virtual void HandleLongTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE {
       if (MessageLoop::current() != mUILoop) {
         // We have to send this message from the "UI thread" (main
         // thread).
         mUILoop->PostTask(
           FROM_HERE,
-          NewRunnableMethod(this, &EmbedContentController::HandleLongTap,
-        aPoint));
+          NewRunnableMethod(this, &EmbedContentController::HandleLongTap, aPoint, aModifiers));
         return;
       }
       EmbedLiteViewListener* listener = GetListener();
@@ -116,18 +113,18 @@ class EmbedContentController : public GeckoContentController
       }
     }
 
-    virtual void HandlePanEnd() MOZ_OVERRIDE {
+    virtual void NotifyTransformEnd() MOZ_OVERRIDE {
       if (MessageLoop::current() != mUILoop) {
         // We have to send this message from the "UI thread" (main
         // thread).
         mUILoop->PostTask(
           FROM_HERE,
-          NewRunnableMethod(this, &EmbedContentController::HandlePanEnd));
+          NewRunnableMethod(this, &EmbedContentController::NotifyTransformEnd));
         return;
       }
 
       if (mAsyncPanZoomController) {
-          mAsyncPanZoomController->HandlePanEnd();
+          mAsyncPanZoomController->NotifyTransformEnd();
       }
     }
 
@@ -816,7 +813,7 @@ EmbedLiteViewThreadParent::MousePress(int x, int y, int mstime, unsigned int but
 {
   LOGT("pt[%i,%i], t:%i, bt:%u, mod:%u", x, y, mstime, buttons, modifiers);
   if (mController) {
-    MultiTouchInput event(MultiTouchInput::MULTITOUCH_START, mstime);
+    MultiTouchInput event(MultiTouchInput::MULTITOUCH_START, mstime, modifiers);
     event.mTouches.AppendElement(SingleTouchData(0,
                                                  mozilla::ScreenIntPoint(x, y),
                                                  mozilla::ScreenSize(1, 1),
@@ -834,7 +831,7 @@ EmbedLiteViewThreadParent::MouseRelease(int x, int y, int mstime, unsigned int b
 {
   LOGT("pt[%i,%i], t:%i, bt:%u, mod:%u", x, y, mstime, buttons, modifiers);
   if (mController) {
-    MultiTouchInput event(MultiTouchInput::MULTITOUCH_END, mstime);
+    MultiTouchInput event(MultiTouchInput::MULTITOUCH_END, mstime, modifiers);
     event.mTouches.AppendElement(SingleTouchData(0,
                                                  mozilla::ScreenIntPoint(x, y),
                                                  mozilla::ScreenSize(1, 1),
@@ -852,7 +849,7 @@ EmbedLiteViewThreadParent::MouseMove(int x, int y, int mstime, unsigned int butt
 {
   LOGT("pt[%i,%i], t:%i, bt:%u, mod:%u", x, y, mstime, buttons, modifiers);
   if (mController) {
-    MultiTouchInput event(MultiTouchInput::MULTITOUCH_MOVE, mstime);
+    MultiTouchInput event(MultiTouchInput::MULTITOUCH_MOVE, mstime, modifiers);
     event.mTouches.AppendElement(SingleTouchData(0,
                                                  mozilla::ScreenIntPoint(x, y),
                                                  mozilla::ScreenSize(1, 1),

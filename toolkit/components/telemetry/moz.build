@@ -35,6 +35,7 @@ EXTRA_JS_MODULES += [
     'TelemetryFile.jsm',
     'TelemetryStopwatch.jsm',
     'ThirdPartyCookieProbe.jsm',
+    'UITelemetry.jsm',
 ]
 
 FAIL_ON_WARNINGS = True
@@ -44,3 +45,7 @@ MSVC_ENABLE_PGO = True
 include('/ipc/chromium/chromium-config.mozbuild')
 
 FINAL_LIBRARY = 'xul'
+
+GENERATED_FILES = [
+    'TelemetryHistogramData.inc',
+]

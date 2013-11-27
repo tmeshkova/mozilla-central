@@ -99,7 +99,9 @@ class MochitestRunner(MozbuildObject):
         self.mochitest_dir = os.path.join(self.tests_dir, 'testing', 'mochitest')
         self.lib_dir = os.path.join(self.topobjdir, 'dist', 'lib')
 
-    def run_b2g_test(self, test_file=None, b2g_home=None, xre_path=None, **kwargs):
+    def run_b2g_test(self, test_file=None, b2g_home=None, xre_path=None,
+                     total_chunks=None, this_chunk=None, no_window=None,
+                     **kwargs):
         """Runs a b2g mochitest.
 
         test_file is a path to a test file. It can be a relative path from the
@@ -144,6 +146,9 @@ class MochitestRunner(MozbuildObject):
 
         for k, v in kwargs.iteritems():
             setattr(options, k, v)
+        options.noWindow = no_window
+        options.totalChunks = total_chunks
+        options.thisChunk = this_chunk
 
         options.consoleLevel = 'INFO'
         if conditions.is_b2g_desktop(self):
@@ -314,7 +319,15 @@ class MochitestRunner(MozbuildObject):
                 print('You may need to run |mach build| to build the test files.')
                 return 1
 
-            options.testPath = test_path
+            # Handle test_path pointing at a manifest file so conditions in
+            # the manifest are processed.  This is a temporary solution
+            # pending bug 938019.
+            # The manifest basename is the same as |suite|, except for plain
+            manifest_base = 'mochitest' if suite == 'plain' else suite
+            if os.path.basename(test_root_file) == manifest_base + '.ini':
+                options.manifestFile = test_root_file
+            else:
+                options.testPath = test_path
 
         if rerun_failures:
             options.testManifest = failure_file_path

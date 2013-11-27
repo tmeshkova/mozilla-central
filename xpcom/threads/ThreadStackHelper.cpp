@@ -151,11 +151,14 @@ bool
 ThreadStackHelper::PrepareStackBuffer(Stack& aStack) {
   aStack.clear();
 #ifdef MOZ_ENABLE_PROFILER_SPS
-  if (!mPseudoStack)
-#endif
+  if (!mPseudoStack) {
     return false;
+  }
   mStackBuffer.clear();
   return mStackBuffer.reserve(mMaxStackSize);
+#else
+  return false;
+#endif
 }
 
 void

@@ -878,6 +878,9 @@ TRY_AGAIN_NO_SHARING:
 
     bool MakeCurrentImpl(bool aForce = false)
     {
+        if (mPlatformContext)
+            return true;
+
         bool succeeded = true;
 
         // With the ATI FGLRX driver, glxMakeCurrent is very slow even when the context doesn't change.
