@@ -148,11 +148,12 @@ IonBuilder::clearForBackEnd()
     JS_ASSERT(!analysisContext);
     baselineFrame_ = nullptr;
 
-    // The GSN cache allocates data from the malloc heap. Release this before
+    // The caches below allocate data from the malloc heap. Release this before
     // later phases of compilation to avoid leaks, as the top level IonBuilder
     // is not explicitly destroyed. Note that builders for inner scripts are
     // constructed on the stack and will release this memory on destruction.
     gsn.purge();
+    scopeCoordinateNameCache.purge();
 }
 
 bool
@@ -4045,22 +4046,13 @@ IonBuilder::makeInliningDecision(JSFunction *target, CallInfo &callInfo)
             return false;
         }
 
-        // Caller must be... somewhat hot. Ignore use counts when inlining for
-        // the definite properties analysis, as the caller has not run yet.
-        uint32_t callerUses = script()->getUseCount();
-        if (callerUses < js_IonOptions.usesBeforeInlining() &&
+        // Callee must have been called a few times to have somewhat stable
+        // type information, except for definite properties analysis,
+        // as the caller has not run yet.
+        if (targetScript->getUseCount() < js_IonOptions.usesBeforeInlining() &&
             info().executionMode() != DefinitePropertiesAnalysis)
         {
-            IonSpew(IonSpew_Inlining, "%s:%d - Vetoed: caller is insufficiently hot.",
-                    targetScript->filename(), targetScript->lineno);
-            return false;
-        }
-
-        // Callee must be hot relative to the caller.
-        if (targetScript->getUseCount() * js_IonOptions.inlineUseCountRatio < callerUses &&
-            info().executionMode() != DefinitePropertiesAnalysis)
-        {
-            IonSpew(IonSpew_Inlining, "%s:%d - Vetoed: callee is not hot.",
+            IonSpew(IonSpew_Inlining, "%s:%d - Vetoed: callee is insufficiently hot.",
                     targetScript->filename(), targetScript->lineno);
             return false;
         }
@@ -5528,7 +5520,9 @@ IonBuilder::jsop_initelem_array()
     MStoreElement *store = MStoreElement::New(alloc(), elements, id, value, /* needsHoleCheck = */ false);
     current->add(store);
 
-    // Update the length.
+    // Update the initialized length. (The template object for this array has
+    // the array's ultimate length, so the length field is already correct: no
+    // updating needed.)
     MSetInitializedLength *initLength = MSetInitializedLength::New(alloc(), elements, id);
     current->add(initLength);
 
@@ -6059,10 +6053,6 @@ IonBuilder::testSingletonPropertyTypes(MDefinition *obj, JSObject *singleton, Pr
     *testString = false;
 
     types::TemporaryTypeSet *types = obj->resultTypeSet();
-
-    if (!types && obj->type() != MIRType_String)
-        return false;
-
     if (types && types->unknownObject())
         return false;
 
@@ -6087,6 +6077,9 @@ IonBuilder::testSingletonPropertyTypes(MDefinition *obj, JSObject *singleton, Pr
 
       case MIRType_Object:
       case MIRType_Value: {
+        if (!types)
+            return false;
+
         if (types->hasType(types::Type::StringType())) {
             key = JSProto_String;
             *testString = true;
@@ -7774,7 +7767,9 @@ IonBuilder::jsop_rest()
                                       MNewArray::NewArray_Allocating);
     current->add(array);
 
-    if (numActuals <= numFormals) {
+    if (numRest == 0) {
+        // No more updating to do. (Note that in this one case the length from
+        // the template object is already correct.)
         current->push(array);
         return true;
     }
@@ -7795,10 +7790,18 @@ IonBuilder::jsop_rest()
         current->add(store);
     }
 
+    // The array's length is incorrectly 0 now, from the template object
+    // created by BaselineCompiler::emit_JSOP_REST() before the actual argument
+    // count was known. Set the correct length now that we know that count.
+    MSetArrayLength *length = MSetArrayLength::New(alloc(), elements, index);
+    current->add(length);
+
+    // Update the initialized length for all the (necessarily non-hole)
+    // elements added.
     MSetInitializedLength *initLength = MSetInitializedLength::New(alloc(), elements, index);
     current->add(initLength);
-    current->push(array);
 
+    current->push(array);
     return true;
 }
 
@@ -9380,7 +9383,7 @@ IonBuilder::jsop_getaliasedvar(ScopeCoordinate sc)
 {
     JSObject *call = nullptr;
     if (hasStaticScopeObject(sc, &call) && call) {
-        PropertyName *name = ScopeCoordinateName(script(), pc);
+        PropertyName *name = ScopeCoordinateName(scopeCoordinateNameCache, script(), pc);
         bool succeeded;
         if (!getStaticName(call, name, &succeeded))
             return false;
@@ -9420,7 +9423,7 @@ IonBuilder::jsop_setaliasedvar(ScopeCoordinate sc)
                 return false;
         }
         MDefinition *value = current->pop();
-        PropertyName *name = ScopeCoordinateName(script(), pc);
+        PropertyName *name = ScopeCoordinateName(scopeCoordinateNameCache, script(), pc);
 
         if (call) {
             // Push the object on the stack to match the bound object expected in
@@ -9721,7 +9724,8 @@ IonBuilder::loadTypedObjectElements(MDefinition *typedObj,
 
     // Scale to a different unit for compat with typed array MIRs.
     if (unit != 1) {
-        MDiv *scaledOffset = MDiv::NewAsmJS(alloc(), ownerOffset, constantInt(unit), MIRType_Int32);
+        MDiv *scaledOffset = MDiv::NewAsmJS(alloc(), ownerOffset, constantInt(unit), MIRType_Int32,
+                                            /* unsignd = */ false);
         current->add(scaledOffset);
         *ownerScaledOffset = scaledOffset;
     } else {

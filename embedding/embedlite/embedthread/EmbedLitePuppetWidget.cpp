@@ -25,7 +25,6 @@
 #include "Layers.h"
 #include "BasicLayers.h"
 #include "ClientLayerManager.h"
-#include "LayerManagerOGL.h"
 #include "GLContext.h"
 #include "GLContextProvider.h"
 #include "EmbedLiteCompositorParent.h"
@@ -489,6 +488,10 @@ EmbedLitePuppetWidget::GetLayerManager(PLayerTransactionChild* aShadowManager,
 
   if (useCompositor) {
     CreateCompositor();
+    if (mCompositorParent) {
+//      uint64_t rootLayerTreeId = mCompositorParent->RootLayerTreeId();
+//      CompositorParent::SetControllerForLayerTree(rootLayerTreeId, new ParentProcessController());
+    }
     if (mLayerManager) {
       return mLayerManager;
     }
@@ -497,40 +500,12 @@ EmbedLitePuppetWidget::GetLayerManager(PLayerTransactionChild* aShadowManager,
       mLayerManager = CreateBasicLayerManager();
       return mLayerManager;
     }
-
     // If we get here, then off main thread compositing failed to initialize.
     sFailedToCreateGLContext = true;
   }
 
-  if (!mUseLayersAcceleration ||
-      sFailedToCreateGLContext) {
-    printf_stderr(" -- creating basic, not accelerated\n");
-    mLayerManager = CreateBasicLayerManager();
-    return mLayerManager;
-  }
-
-  if (!mLayerManager) {
-    if (!sGLContext) {
-      // the window we give doesn't matter here
-      sGLContext = mozilla::gl::GLContextProvider::CreateForWindow(this);
-    }
-
-    if (sGLContext) {
-      nsRefPtr<mozilla::layers::LayerManagerOGL> layerManager =
-        new mozilla::layers::LayerManagerOGL(this);
-
-      if (layerManager && layerManager->Initialize(sGLContext)) {
-        mLayerManager = layerManager;
-      }
-      sValidSurface = true;
-    }
-
-    if (!sGLContext || !mLayerManager) {
-      sGLContext = nullptr;
-      sFailedToCreateGLContext = true;
-      mLayerManager = CreateBasicLayerManager();
-    }
-  }
+  mLayerManager = new ClientLayerManager(this);
+  mUseLayersAcceleration = false;
 
   return mLayerManager;
 }

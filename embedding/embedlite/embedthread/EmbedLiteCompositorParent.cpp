@@ -8,7 +8,6 @@
 
 #include "EmbedLiteCompositorParent.h"
 #include "EmbedLiteRenderTarget.h"
-#include "LayerManagerOGL.h"
 #include "BasicLayers.h"
 #include "EmbedLiteAppThreadParent.h"
 #include "EmbedLiteViewThreadParent.h"
