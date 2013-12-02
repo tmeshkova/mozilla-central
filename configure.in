@@ -5662,17 +5662,6 @@ if test "$MOZ_GSTREAMER"; then
                       gstreamer-plugins-base-$GST_API_VERSION, ,
                       AC_MSG_ERROR([gstreamer and gstreamer-plugins-base development packages are needed to build gstreamer backend. Install them or disable gstreamer support with --disable-gstreamer]))
 
-    PKG_CHECK_MODULES(NEMO_GST, nemo-gstreamer-interfaces-$GST_API_VERSION,
-                      HAS_NEMO_INTERFACE=1,
-                      HAS_NEMO_INTERFACE=)
-
-    if test "$HAS_NEMO_INTERFACE"; then
-        HAS_NEMO_INTERFACE=1
-        AC_DEFINE(HAS_NEMO_INTERFACE)
-        GSTREAMER_LIBS="$GSTREAMER_LIBS $NEMO_GST_LIBS"
-        GSTREAMER_CFLAGS="$GSTREAMER_CFLAGS $NEMO_GST_CFLAGS"
-    fi
-
     PKG_CHECK_MODULES(NEMO_RESOURCE, libresourceqt5,
                       HAS_NEMO_RESOURCE=1,
                       HAS_NEMO_RESOURCE=)
@@ -5701,7 +5690,6 @@ fi
 AC_SUBST(GSTREAMER_CFLAGS)
 AC_SUBST(GSTREAMER_LIBS)
 AC_SUBST(MOZ_GSTREAMER)
-AC_SUBST(HAS_NEMO_INTERFACE)
 AC_SUBST(HAS_NEMO_RESOURCE)
 
 if test -n "$MOZ_GSTREAMER"; then

@@ -60,8 +60,7 @@ public:
     return mInfo.HasVideo();
   }
 
-  virtual void Play();
-  virtual void Pause();
+  virtual void Suspend();
 
 private:
 
@@ -85,14 +84,6 @@ private:
                                    GParamSpec* pspec,
                                    gpointer aUserData);
   void PlayBinSourceSetup(GstAppSrc* aSource);
-
-  static void PlaySinkFrameSetupCb(GstElement* aPlayBin,
-                                   gint aFrame,
-                                   gpointer aUserData);
-  static void PlaySinkCapsNotify(GObject *obj,
-                                 GParamSpec *pspec,
-                                 gpointer aUserData);
-  void PlaySinkFrameSetup(gint aFrame);
 
   /* Called from appsrc when we need to read more data from the resource */
   static void NeedDataCb(GstAppSrc* aSrc, guint aLength, gpointer aUserData);
@@ -172,9 +163,6 @@ private:
   bool mReachedEos;
   int fpsNum;
   int fpsDen;
-  GstElement* mPlaySink;
-  bool mPlayingStartedOnce;
-  bool mDroidEGLSinkInUse;
 };
 
 } // namespace mozilla

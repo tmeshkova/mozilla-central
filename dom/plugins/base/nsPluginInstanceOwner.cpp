@@ -716,7 +716,6 @@ NS_IMETHODIMP nsPluginInstanceOwner::GetNetscapeWindow(void *value)
 #else
   return NS_ERROR_NOT_IMPLEMENTED;
 #endif
-
 }
 
 NS_IMETHODIMP nsPluginInstanceOwner::SetEventModel(int32_t eventModel)

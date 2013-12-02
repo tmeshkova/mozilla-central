@@ -31,20 +31,13 @@ GStreamerDecoder::Load(nsIStreamListener** aListener,
   return MediaDecoder::Load(aListener, aCloneDonor);
 }
 
-nsresult GStreamerDecoder::Play()
+void GStreamerDecoder::Suspend()
 {
-  if (mReader)
-    mReader->Play();
+  if (mReader) {
+    mReader->Suspend();
+  }
 
-  return MediaDecoder::Play();
-}
-
-void GStreamerDecoder::Pause()
-{
-  if (mReader)
-    mReader->Pause();
-
-  MediaDecoder::Pause();
+  MediaDecoder::Suspend();
 }
 
 bool
