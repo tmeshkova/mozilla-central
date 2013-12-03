@@ -1105,7 +1105,7 @@ vpx/vpx_encoder.h
 vpx/vp8cx.h
 vpx/vp8dx.h
 #endif
-#ifdef XP_WIN
+#ifdef GKMEDIAS_SHARED_LIBRARY
 vpx/vpx_codec.h
 vpx/vpx_decoder.h
 vpx/vpx_encoder.h
@@ -1148,3 +1148,4 @@ unicode/unum.h
 unicode/ustring.h
 unicode/utypes.h
 #endif
+libutil.h
