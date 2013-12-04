@@ -24,7 +24,6 @@ public:
   NS_DECL_NSIWINDOWCREATOR2
 
 private:
-  bool mOpenBlock;
   mozilla::embedlite::EmbedLiteAppThreadChild* mChild;
 };
 

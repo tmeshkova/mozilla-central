@@ -17,8 +17,7 @@
 using namespace mozilla::embedlite;
 
 WindowCreator::WindowCreator(EmbedLiteAppThreadChild* aChild)
-  : mOpenBlock(false)
-  , mChild(aChild)
+  : mChild(aChild)
 {
   LOGT();
 }
@@ -47,12 +46,6 @@ WindowCreator::CreateChromeWindow2(nsIWebBrowserChrome* aParent,
       See bug 80707
       Desktop FF allow to create popup window if aChromeFlags == 1670, aContextFlags == 0
   */
-
-  if (mOpenBlock) {
-    mOpenBlock = PR_FALSE;
-    *aCancel = true;
-    return NS_OK;
-  }
 
   nsCString spec;
   if (aURI) {

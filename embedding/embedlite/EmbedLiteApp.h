@@ -125,11 +125,6 @@ public:
   virtual void AddObservers(nsTArray<nsCString>& observersList);
   virtual void RemoveObservers(nsTArray<nsCString>& observersList);
 
-  // Internal
-  EmbedLiteAppListener* GetListener() {
-    return mListener;
-  }
-
   // Only one EmbedHelper object allowed
   static EmbedLiteApp* GetInstance();
 
@@ -147,6 +142,7 @@ private:
   void ViewDestroyed(uint32_t id);
   void ChildReadyToDestroy();
   uint32_t CreateWindowRequested(const uint32_t& chromeFlags, const char* uri, const uint32_t& contextFlags, const uint32_t& parentId);
+  EmbedLiteAppListener* GetListener();
 
   static EmbedLiteApp* sSingleton;
   EmbedLiteAppListener* mListener;
