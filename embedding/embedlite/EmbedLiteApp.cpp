@@ -44,9 +44,8 @@ EmbedLiteApp::GetInstance()
   return sSingleton;
 }
 
-class FakeListener : public EmbedLiteAppListener {};
 EmbedLiteApp::EmbedLiteApp()
-  : mListener(new FakeListener())
+  : mListener(NULL)
   , mUILoop(NULL)
   , mSubThread(NULL)
   , mEmbedType(EMBED_INVALID)
@@ -78,7 +77,23 @@ void
 EmbedLiteApp::SetListener(EmbedLiteAppListener* aListener)
 {
   LOGT();
+  // Assert with XOR that either mListener or aListener is NULL and not both.
+  NS_ASSERTION((!mListener != !aListener), "App listener is supposed to be set only once by embedder");
   mListener = aListener;
+}
+
+EmbedLiteAppListener*
+EmbedLiteApp::GetListener() {
+
+  if (!mListener) {
+    // No listener provided by embedder thus lazily create a stub object for EmbedLiteAppListener interface.
+    // TODO: the instance is not refcounted and is going to leak memory when EmbedLiteApp::SetListener()
+    //       is called. If embedder is supposed to set a listener always then it'd make sense
+    //       to be less defensive and to crash instead of creating a stub.
+    mListener = new EmbedLiteAppListener();
+  }
+
+  return mListener;
 }
 
 void*
@@ -107,8 +122,8 @@ EmbedLiteApp::StartChild(EmbedLiteApp* aApp)
 {
   LOGT();
   if (aApp->mEmbedType == EMBED_THREAD) {
-    if (!aApp->GetListener() ||
-        !aApp->GetListener()->ExecuteChildThread()) {
+    if (!aApp->mListener ||
+        !aApp->mListener->ExecuteChildThread()) {
       aApp->mSubThread = new EmbedLiteSubThread(aApp);
       if (!aApp->mSubThread->StartEmbedThread()) {
         LOGE("Failed to start child thread");
@@ -161,7 +176,7 @@ EmbedLiteApp::Start(EmbedType aEmbedType)
   if (mSubThread) {
     mSubThread->Stop();
     mSubThread = NULL;
-  } else {
+  } else if (mListener) {
     NS_ABORT_IF_FALSE(mListener->StopChildThread(),
                       "StopChildThread must be implemented when ExecuteChildThread defined");
   }
@@ -169,7 +184,11 @@ EmbedLiteApp::Start(EmbedType aEmbedType)
     delete mUILoop;
     mUILoop = NULL;
   }
-  mListener->Destroyed();
+
+  if (mListener) {
+    mListener->Destroyed();
+  }
+
   return true;
 }
 
@@ -245,7 +264,7 @@ EmbedLiteApp::Stop()
       if (mSubThread) {
         mSubThread->Stop();
         mSubThread = NULL;
-      } else {
+      } else if (mListener) {
         NS_ABORT_IF_FALSE(mListener->StopChildThread(),
                           "StopChildThread must be implemented when ExecuteChildThread defined");
       }
@@ -253,7 +272,10 @@ EmbedLiteApp::Stop()
         delete mUILoop;
       }
       mUILoop = NULL;
-      mListener->Destroyed();
+
+      if (mListener) {
+        mListener->Destroyed();
+      }
     }
   }
 }
@@ -357,7 +379,8 @@ EmbedLiteApp::CreateWindowRequested(const uint32_t& chromeFlags, const char* uri
       break;
     }
   }
-  return mListener->CreateNewWindowRequested(chromeFlags, uri, contextFlags, view);
+  uint32_t viewId = mListener ? mListener->CreateNewWindowRequested(chromeFlags, uri, contextFlags, view) : 0;
+  return viewId;
 }
 
 void
