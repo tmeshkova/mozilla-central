@@ -15,7 +15,6 @@ class nsIWebBrowserChrome;
 namespace mozilla {
 namespace embedlite {
 
-class EmbedLiteAppThreadParent;
 class EmbedLiteViewThreadChild;
 class EmbedLiteAppThreadChild : public PEmbedLiteAppChild,
                                 public nsIObserver
@@ -27,7 +26,7 @@ public:
   EmbedLiteAppThreadChild(MessageLoop* aParentLoop);
   virtual ~EmbedLiteAppThreadChild();
 
-  void Init(EmbedLiteAppThreadParent*);
+  void Init(MessageChannel* aParentChannel);
   static EmbedLiteAppThreadChild* GetInstance();
   EmbedLiteModulesService* ModulesService() {
     return mModulesService;
@@ -66,7 +65,6 @@ private:
 
 
   MessageLoop* mParentLoop;
-  RefPtr<EmbedLiteAppThreadParent> mThreadParent;
   nsRefPtr<EmbedLiteModulesService> mModulesService;
 
   std::map<uint32_t, EmbedLiteViewThreadChild*> mWeakViewMap;

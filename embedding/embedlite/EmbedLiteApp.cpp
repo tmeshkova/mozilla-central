@@ -223,7 +223,9 @@ EmbedLiteApp::StartChildThread()
   mAppParent = new EmbedLiteAppThreadParent(mUILoop);
   mAppChild = new EmbedLiteAppThreadChild(mUILoop);
   MessageLoop::current()->PostTask(FROM_HERE,
-                                   NewRunnableMethod(mAppChild.get(), &EmbedLiteAppThreadChild::Init, mAppParent));
+                                   NewRunnableMethod(mAppChild.get(),
+                                                     &EmbedLiteAppThreadChild::Init,
+                                                     mAppParent->GetIPCChannel()));
 
   return true;
 }

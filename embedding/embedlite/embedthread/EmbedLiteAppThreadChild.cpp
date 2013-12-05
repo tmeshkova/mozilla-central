@@ -16,7 +16,6 @@
 #include "nsIStyleSheetService.h"
 #include "nsNetUtil.h"
 
-#include "EmbedLiteAppThreadParent.h"
 #include "EmbedLiteViewThreadChild.h"
 #include "mozilla/unused.h"
 #include "mozilla/layers/ImageBridgeChild.h"
@@ -64,12 +63,11 @@ EmbedLiteAppThreadChild::Observe(nsISupports* aSubject,
 }
 
 void
-EmbedLiteAppThreadChild::Init(EmbedLiteAppThreadParent* aParent)
+EmbedLiteAppThreadChild::Init(MessageChannel* aParentChannel)
 {
   LOGT();
   InitWindowWatcher();
-  MessageChannel* parentChannel = aParent->GetIPCChannel();
-  Open(parentChannel, mParentLoop, ipc::ChildSide);
+  Open(aParentChannel, mParentLoop, ipc::ChildSide);
   RecvSetBoolPref(nsDependentCString("layers.offmainthreadcomposition.enabled"), true);
   mModulesService = new EmbedLiteModulesService();
   mModulesService->Init();
