@@ -45,7 +45,6 @@ SOURCES += [
     'embedthread/EmbedLiteViewThreadParent.cpp',
     'modules/EmbedLiteAppService.cpp',
     'modules/EmbedLiteJSON.cpp',
-    'modules/EmbedLiteModulesService.cpp',
     'utils/DirProvider.cpp',
     'utils/EmbedLiteXulAppInfo.cpp',
     'utils/EmbedLog.cpp',

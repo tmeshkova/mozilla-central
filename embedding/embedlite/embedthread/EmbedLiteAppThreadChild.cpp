@@ -8,6 +8,12 @@
 
 #include "EmbedLiteAppThreadChild.h"
 
+#include "nsIComponentRegistrar.h"             // for nsIComponentRegistrar
+#include "nsIComponentManager.h"               // for nsIComponentManager
+#include "mozilla/GenericFactory.h"            // for nsIFactory
+#include "EmbedLiteAppService.h"               // for EmbedLiteAppServiceConstructor
+#include "EmbedLiteJSON.h"                     // for EmbedLiteJSONConstructor
+#include "mozilla/ModuleUtils.h"               // for NS_GENERIC_FACTORY_CONSTRUCTOR
 #include "nsIPrefBranch.h"
 #include "nsIPrefService.h"
 #include "nsIWindowWatcher.h"
@@ -19,12 +25,13 @@
 #include "EmbedLiteViewThreadChild.h"
 #include "mozilla/unused.h"
 #include "mozilla/layers/ImageBridgeChild.h"
-#include "EmbedLiteModulesService.h"
-#include "EmbedLiteAppService.h"
 
 using namespace base;
 using namespace mozilla::ipc;
 using namespace mozilla::layers;
+
+NS_GENERIC_FACTORY_CONSTRUCTOR(EmbedLiteAppService)
+NS_GENERIC_FACTORY_CONSTRUCTOR(EmbedLiteJSON)
 
 namespace mozilla {
 namespace embedlite {
@@ -69,14 +76,57 @@ EmbedLiteAppThreadChild::Init(MessageChannel* aParentChannel)
   InitWindowWatcher();
   Open(aParentChannel, mParentLoop, ipc::ChildSide);
   RecvSetBoolPref(nsDependentCString("layers.offmainthreadcomposition.enabled"), true);
-  mModulesService = new EmbedLiteModulesService();
-  mModulesService->Init();
+
+  nsresult rv = InitAppService();
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
+
   SendInitialized();
   nsCOMPtr<nsIObserverService> observerService =
     do_GetService(NS_OBSERVERSERVICE_CONTRACTID);
+
   if (observerService) {
     observerService->NotifyObservers(nullptr, "embedliteInitialized", nullptr);
   }
+}
+
+nsresult
+EmbedLiteAppThreadChild::InitAppService()
+{
+  LOGT();
+
+  nsCOMPtr<nsIComponentRegistrar> cr;
+  nsresult rv = NS_GetComponentRegistrar(getter_AddRefs(cr));
+  NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
+
+  nsCOMPtr<nsIComponentManager> cm;
+  rv = NS_GetComponentManager (getter_AddRefs (cm));
+  NS_ENSURE_SUCCESS(rv, NS_ERROR_FAILURE);
+
+  {
+    nsCOMPtr<nsIFactory> f = new mozilla::GenericFactory(EmbedLiteAppServiceConstructor);
+    if (!f) {
+      NS_WARNING("Unable to create factory for component");
+      return NS_ERROR_FAILURE;
+    }
+
+    nsCID appCID = NS_EMBED_LITE_APP_SERVICE_CID;
+    rv = cr->RegisterFactory(appCID, NS_EMBED_LITE_APP_SERVICE_CLASSNAME,
+                             NS_EMBED_LITE_APP_CONTRACTID, f);
+  }
+
+  {
+    nsCOMPtr<nsIFactory> f = new mozilla::GenericFactory(EmbedLiteJSONConstructor);
+    if (!f) {
+      NS_WARNING("Unable to create factory for component");
+      return NS_ERROR_FAILURE;
+    }
+
+    nsCID appCID = NS_IEMBEDLITEJSON_IID;
+    rv = cr->RegisterFactory(appCID, NS_EMBED_LITE_JSON_SERVICE_CLASSNAME,
+                             NS_EMBED_LITE_JSON_CONTRACTID, f);
+  }
+
+  return NS_OK;
 }
 
 EmbedLiteAppService*
