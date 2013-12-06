@@ -6,8 +6,8 @@
 #ifndef MOZ_APP_EMBED_THREAD_CHILD_H
 #define MOZ_APP_EMBED_THREAD_CHILD_H
 
-#include "mozilla/embedlite/PEmbedLiteAppChild.h"
-#include "EmbedLiteModulesService.h"
+#include "mozilla/embedlite/PEmbedLiteAppChild.h"  // for PEmbedLiteAppChild
+#include "nsIObserver.h"                           // for nsIObserver
 
 class EmbedLiteAppService;
 class nsIWebBrowserChrome;
@@ -15,7 +15,6 @@ class nsIWebBrowserChrome;
 namespace mozilla {
 namespace embedlite {
 
-class EmbedLiteAppThreadParent;
 class EmbedLiteViewThreadChild;
 class EmbedLiteAppThreadChild : public PEmbedLiteAppChild,
                                 public nsIObserver
@@ -27,11 +26,8 @@ public:
   EmbedLiteAppThreadChild(MessageLoop* aParentLoop);
   virtual ~EmbedLiteAppThreadChild();
 
-  void Init(EmbedLiteAppThreadParent*);
+  void Init(MessageChannel* aParentChannel);
   static EmbedLiteAppThreadChild* GetInstance();
-  EmbedLiteModulesService* ModulesService() {
-    return mModulesService;
-  }
   EmbedLiteViewThreadChild* GetViewByID(uint32_t aId);
   ::EmbedLiteAppService* AppService();
   EmbedLiteViewThreadChild* GetViewByChromeParent(nsIWebBrowserChrome* aParent);
@@ -62,12 +58,11 @@ protected:
 
 private:
   void InitWindowWatcher();
+  nsresult InitAppService();
   friend class EmbedLiteViewThreadChild;
 
 
   MessageLoop* mParentLoop;
-  RefPtr<EmbedLiteAppThreadParent> mThreadParent;
-  nsRefPtr<EmbedLiteModulesService> mModulesService;
 
   std::map<uint32_t, EmbedLiteViewThreadChild*> mWeakViewMap;
 
