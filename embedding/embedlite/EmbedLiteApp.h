@@ -19,8 +19,9 @@ typedef void (*EMBEDTaskCallback)(void* userData);
 class EmbedLiteMessagePump;
 class EmbedLiteMessagePumpListener;
 class EmbedLiteUILoop;
+class EmbedLiteAppThreadChild;
+class EmbedLiteAppThreadParent;
 class EmbedLiteSubThread;
-class EmbedLiteAppThread;
 class EmbedLiteView;
 class EmbedLiteAppListener
 {
@@ -147,9 +148,12 @@ private:
   static EmbedLiteApp* sSingleton;
   EmbedLiteAppListener* mListener;
   EmbedLiteUILoop* mUILoop;
+
   RefPtr<EmbedLiteSubThread> mSubThread;
+  RefPtr<EmbedLiteAppThreadParent> mAppParent;
+  RefPtr<EmbedLiteAppThreadChild> mAppChild;
+
   EmbedType mEmbedType;
-  RefPtr<EmbedLiteAppThread> mAppThread;
   std::map<uint32_t, EmbedLiteView*> mViews;
   uint32_t mViewCreateID;
   bool mDestroying;

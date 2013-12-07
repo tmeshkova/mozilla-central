@@ -18,8 +18,8 @@
 #include "EmbedLiteSubThread.h"
 #include "GeckoLoader.h"
 
-#include "EmbedLiteAppThread.h"
 #include "EmbedLiteAppThreadParent.h"
+#include "EmbedLiteAppThreadChild.h"
 #include "EmbedLiteView.h"
 #include "nsXULAppAPI.h"
 #include "EmbedLiteMessagePump.h"
@@ -48,8 +48,9 @@ EmbedLiteApp::EmbedLiteApp()
   : mListener(NULL)
   , mUILoop(NULL)
   , mSubThread(NULL)
+  , mAppParent(NULL)
+  , mAppChild(NULL)
   , mEmbedType(EMBED_INVALID)
-  , mAppThread(NULL)
   , mViewCreateID(0)
   , mDestroying(false)
   , mRenderType(RENDER_AUTO)
@@ -195,7 +196,7 @@ EmbedLiteApp::Start(EmbedType aEmbedType)
 void
 EmbedLiteApp::AddManifestLocation(const char* manifest)
 {
-  if (!mAppThread) {
+  if (!mAppParent) {
     sComponentDirs.AppendElement(nsCString(manifest));
   } else {
     unused << STHREADAPP()->SendLoadComponentManifest(nsDependentCString(manifest));
@@ -209,14 +210,23 @@ EmbedLiteApp::StartChildThread()
   LOGT("mUILoop:%p, current:%p", mUILoop, MessageLoop::current());
   NS_ASSERTION(MessageLoop::current() != mUILoop,
                "Current message loop must be null and not equals to mUILoop");
+
   for (unsigned int i = 0; i < sComponentDirs.Length(); i++) {
     nsCOMPtr<nsIFile> f;
     NS_NewNativeLocalFile(sComponentDirs[i], true,
                           getter_AddRefs(f));
     XRE_AddManifestLocation(NS_COMPONENT_LOCATION, f);
   }
+
   GeckoLoader::InitEmbedding(mProfilePath);
-  mAppThread = new EmbedLiteAppThread(mUILoop);
+
+  mAppParent = new EmbedLiteAppThreadParent(mUILoop);
+  mAppChild = new EmbedLiteAppThreadChild(mUILoop);
+  MessageLoop::current()->PostTask(FROM_HERE,
+                                   NewRunnableMethod(mAppChild.get(),
+                                                     &EmbedLiteAppThreadChild::Init,
+                                                     mAppParent->GetIPCChannel()));
+
   return true;
 }
 
@@ -225,14 +235,19 @@ EmbedLiteApp::StopChildThread()
 {
   NS_ENSURE_TRUE(mEmbedType == EMBED_THREAD, false);
   LOGT("mUILoop:%p, current:%p", mUILoop, MessageLoop::current());
+
   if (!mUILoop || !MessageLoop::current() ||
       mUILoop == MessageLoop::current()) {
     NS_ERROR("Wrong thread? StartChildThread called? Stop() already called?");
     return false;
   }
-  mAppThread->Destroy();
-  mAppThread = nullptr;
+
+  mAppChild->Close();
+  mAppParent = nullptr;
+  mAppChild = nullptr;
+
   GeckoLoader::TermEmbedding();
+
   return true;
 }
 
