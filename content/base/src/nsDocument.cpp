@@ -4653,6 +4653,15 @@ nsDocument::DispatchContentLoadedEvents()
     mTiming->NotifyDOMContentLoadedStart(nsIDocument::GetDocumentURI());
   }
 
+  // Dispatch observer notification to notify observers document is interactive.
+  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+  nsIPrincipal *principal = GetPrincipal();
+  os->NotifyObservers(static_cast<nsIDocument*>(this),
+                      nsContentUtils::IsSystemPrincipal(principal) ?
+                        "chrome-document-interactive" :
+                        "content-document-interactive",
+                      nullptr);
+
   // Fire a DOM event notifying listeners that this document has been
   // loaded (excluding images and other loads initiated by this
   // document).
@@ -4983,13 +4992,13 @@ nsIDocument::CreateElementNS(const nsAString& aNamespaceURI,
     return nullptr;
   }
 
-  nsCOMPtr<nsIContent> content;
-  rv = NS_NewElement(getter_AddRefs(content), nodeInfo.forget(),
+  nsCOMPtr<Element> element;
+  rv = NS_NewElement(getter_AddRefs(element), nodeInfo.forget(),
                      NOT_FROM_PARSER);
   if (rv.Failed()) {
     return nullptr;
   }
-  return dont_AddRef(content.forget().get()->AsElement());
+  return element.forget();
 }
 
 NS_IMETHODIMP
@@ -6831,6 +6840,8 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
   switch (mViewportType) {
   case DisplayWidthHeight:
     return nsViewportInfo(aDisplaySize);
+  case DisplayWidthHeightNoZoom:
+    return nsViewportInfo(aDisplaySize, /* allowZoom */ false);
   case Unknown:
   {
     nsAutoString viewport;
@@ -6860,6 +6871,21 @@ nsDocument::GetViewportInfo(const ScreenIntSize& aDisplaySize)
       if (handheldFriendly.EqualsLiteral("true")) {
         mViewportType = DisplayWidthHeight;
         return nsViewportInfo(aDisplaySize);
+      }
+
+      // Bug 940036. This is bad. When FirefoxOS was built, apps installed
+      // where not using the AsyncPanZoom code. As a result a lot of apps
+      // in the marketplace does not use it yet and instead are built to
+      // render correctly in FirefoxOS only. For a smooth transition the above
+      // code force installed apps to render as if they have a viewport with
+      // content="width=device-width, height=device-height, user-scalable=no".
+      // This could be safely remove once it is known that most apps in the
+      // marketplace use it and that users does not use an old version of the
+      // app that does not use it.
+      nsCOMPtr<nsIDocShell> docShell(mDocumentContainer);
+      if (docShell && docShell->GetIsApp()) {
+        mViewportType = DisplayWidthHeightNoZoom;
+        return nsViewportInfo(aDisplaySize, /* allowZoom */ false);
       }
     }
 
@@ -7567,7 +7593,11 @@ nsDocument::CreateElem(const nsAString& aName, nsIAtom *aPrefix, int32_t aNamesp
                                 getter_AddRefs(nodeInfo));
   NS_ENSURE_TRUE(nodeInfo, NS_ERROR_OUT_OF_MEMORY);
 
-  return NS_NewElement(aResult, nodeInfo.forget(), NOT_FROM_PARSER);
+  nsCOMPtr<Element> element;
+  nsresult rv = NS_NewElement(getter_AddRefs(element), nodeInfo.forget(),
+                              NOT_FROM_PARSER);
+  element.forget(aResult);
+  return rv;
 }
 
 bool
@@ -8106,6 +8136,17 @@ nsDocument::OnPageShow(bool aPersisted,
   if (!target) {
     target = do_QueryInterface(GetWindow());
   }
+
+  // Dispatch observer notification to notify observers page is shown.
+  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+  nsIPrincipal *principal = GetPrincipal();
+  os->NotifyObservers(static_cast<nsIDocument*>(this),
+                      nsContentUtils::IsSystemPrincipal(principal) ?
+                        "chrome-page-shown" :
+                        "content-page-shown",
+                      nullptr);
+
+
   DispatchPageTransition(target, NS_LITERAL_STRING("pageshow"), aPersisted);
 }
 
@@ -8168,6 +8209,16 @@ nsDocument::OnPageHide(bool aPersisted,
   if (!target) {
     target = do_QueryInterface(GetWindow());
   }
+
+  // Dispatch observer notification to notify observers page is hidden.
+  nsCOMPtr<nsIObserverService> os = mozilla::services::GetObserverService();
+  nsIPrincipal *principal = GetPrincipal();
+  os->NotifyObservers(static_cast<nsIDocument*>(this),
+                      nsContentUtils::IsSystemPrincipal(principal) ?
+                        "chrome-page-hidden" :
+                        "content-page-hidden",
+                      nullptr);
+
   DispatchPageTransition(target, NS_LITERAL_STRING("pagehide"), aPersisted);
 
   mVisible = false;
@@ -8490,11 +8541,17 @@ FireOrClearDelayedEvents(nsTArray<nsCOMPtr<nsIDocument> >& aDocuments,
     return;
 
   for (uint32_t i = 0; i < aDocuments.Length(); ++i) {
+    // NB: Don't bother trying to fire delayed events on documents that were
+    // closed before this event ran.
     if (!aDocuments[i]->EventHandlingSuppressed()) {
       fm->FireDelayedEvents(aDocuments[i]);
       nsCOMPtr<nsIPresShell> shell = aDocuments[i]->GetShell();
       if (shell) {
-        shell->FireOrClearDelayedEvents(aFireEvents);
+        // Only fire events for active documents.
+        bool fire = aFireEvents &&
+                    aDocuments[i]->GetInnerWindow() &&
+                    aDocuments[i]->GetInnerWindow()->IsCurrentInnerWindow();
+        shell->FireOrClearDelayedEvents(fire);
       }
     }
   }
@@ -11399,9 +11456,7 @@ nsIDocument::WrapObject(JSContext *aCx, JS::Handle<JSObject*> aScope)
 
   NS_NAMED_LITERAL_STRING(doc_str, "document");
 
-  if (!JS_DefineUCProperty(aCx, JSVAL_TO_OBJECT(winVal),
-                           reinterpret_cast<const jschar *>
-                                           (doc_str.get()),
+  if (!JS_DefineUCProperty(aCx, JSVAL_TO_OBJECT(winVal), doc_str.get(),
                            doc_str.Length(), JS::ObjectValue(*obj),
                            JS_PropertyStub, JS_StrictPropertyStub,
                            JSPROP_READONLY | JSPROP_ENUMERATE)) {
@@ -11456,6 +11511,23 @@ nsIDocument::SetStateObject(nsIStructuredCloneContainer *scContainer)
 {
   mStateObjectContainer = scContainer;
   mStateObjectCached = nullptr;
+}
+
+already_AddRefed<Element>
+nsIDocument::CreateHTMLElement(nsIAtom* aTag)
+{
+  nsCOMPtr<nsINodeInfo> nodeInfo;
+  nodeInfo = mNodeInfoManager->GetNodeInfo(aTag, nullptr, kNameSpaceID_XHTML,
+                                           nsIDOMNode::ELEMENT_NODE);
+  MOZ_ASSERT(nodeInfo, "GetNodeInfo should never fail");
+
+  nsCOMPtr<Element> element;
+  DebugOnly<nsresult> rv = NS_NewHTMLElement(getter_AddRefs(element),
+                                             nodeInfo.forget(),
+                                             mozilla::dom::NOT_FROM_PARSER);
+
+  MOZ_ASSERT(NS_SUCCEEDED(rv), "NS_NewHTMLElement should never fail");
+  return element.forget();
 }
 
 bool

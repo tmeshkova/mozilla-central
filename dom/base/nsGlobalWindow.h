@@ -342,7 +342,7 @@ public:
 
   // nsIScriptGlobalObject
   virtual nsIScriptContext *GetContext();
-  JSObject *FastGetGlobalJSObject()
+  JSObject *FastGetGlobalJSObject() const
   {
     return mJSObject;
   }
@@ -1291,7 +1291,7 @@ protected:
 
   void PreloadLocalStorage();
 
-  // Returns device pixels.
+  // Returns device pixels.  Outer windows only.
   nsIntPoint GetScreenXY(mozilla::ErrorResult& aError);
 
   int32_t RequestAnimationFrame(const nsIDocument::FrameRequestCallbackHolder& aCallback,

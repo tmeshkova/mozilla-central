@@ -564,7 +564,8 @@ JS_FRIEND_API(bool)
 js::GetOriginalEval(JSContext *cx, HandleObject scope, MutableHandleObject eval)
 {
     assertSameCompartment(cx, scope);
-    return scope->global().getOrCreateEval(cx, eval);
+    Rooted<GlobalObject *> global(cx, &scope->global());
+    return GlobalObject::getOrCreateEval(cx, global, eval);
 }
 
 JS_FRIEND_API(void)
@@ -659,7 +660,7 @@ js::VisitGrayWrapperTargets(Zone *zone, GCThingCallback callback, void *closure)
     JSRuntime *rt = zone->runtimeFromMainThread();
     for (CompartmentsInZoneIter comp(zone); !comp.done(); comp.next()) {
         for (JSCompartment::WrapperEnum e(comp); !e.empty(); e.popFront()) {
-            gc::Cell *thing = e.front().key.wrapped;
+            gc::Cell *thing = e.front().key().wrapped;
             if (!IsInsideNursery(rt, thing) && thing->isMarked(gc::GRAY))
                 callback(closure, thing);
         }

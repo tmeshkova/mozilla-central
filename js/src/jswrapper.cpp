@@ -689,6 +689,25 @@ SecurityWrapper<Base>::defineProperty(JSContext *cx, HandleObject wrapper,
     return Base::defineProperty(cx, wrapper, id, desc);
 }
 
+template <class Base>
+bool
+SecurityWrapper<Base>::watch(JSContext *cx, HandleObject proxy,
+                             HandleId id, HandleObject callable)
+{
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_UNWRAP_DENIED);
+    return false;
+}
+
+template <class Base>
+bool
+SecurityWrapper<Base>::unwatch(JSContext *cx, HandleObject proxy,
+                               HandleId id)
+{
+    JS_ReportErrorNumber(cx, js_GetErrorMessage, nullptr, JSMSG_UNWRAP_DENIED);
+    return false;
+}
+
+
 template class js::SecurityWrapper<Wrapper>;
 template class js::SecurityWrapper<CrossCompartmentWrapper>;
 
@@ -893,7 +912,7 @@ js::NukeCrossCompartmentWrappers(JSContext* cx,
         for (JSCompartment::WrapperEnum e(c); !e.empty(); e.popFront()) {
             // Some cross-compartment wrappers are for strings.  We're not
             // interested in those.
-            const CrossCompartmentKey &k = e.front().key;
+            const CrossCompartmentKey &k = e.front().key();
             if (k.kind != CrossCompartmentKey::ObjectWrapper)
                 continue;
 
@@ -941,7 +960,7 @@ js::RemapWrapper(JSContext *cx, JSObject *wobjArg, JSObject *newTargetArg)
     // The old value should still be in the cross-compartment wrapper map, and
     // the lookup should return wobj.
     WrapperMap::Ptr p = wcompartment->lookupWrapper(origv);
-    JS_ASSERT(&p->value.unsafeGet()->toObject() == wobj);
+    JS_ASSERT(&p->value().unsafeGet()->toObject() == wobj);
     wcompartment->removeWrapper(p);
 
     // When we remove origv from the wrapper map, its wrapper, wobj, must
@@ -1025,7 +1044,7 @@ js::RecomputeWrappers(JSContext *cx, const CompartmentFilter &sourceFilter,
         // Iterate over the wrappers, filtering appropriately.
         for (JSCompartment::WrapperEnum e(c); !e.empty(); e.popFront()) {
             // Filter out non-objects.
-            const CrossCompartmentKey &k = e.front().key;
+            const CrossCompartmentKey &k = e.front().key();
             if (k.kind != CrossCompartmentKey::ObjectWrapper)
                 continue;
 

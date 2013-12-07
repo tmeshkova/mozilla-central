@@ -147,7 +147,6 @@ static const char *kPluginRegistryVersion = "0.16";
 // The minimum registry version we know how to read
 static const char *kMinimumRegistryVersion = "0.9";
 
-static NS_DEFINE_IID(kIPluginTagInfoIID, NS_IPLUGINTAGINFO_IID);
 static const char kDirectoryServiceContractID[] = "@mozilla.org/file/directory_service;1";
 
 #define kPluginRegistryFilename NS_LITERAL_CSTRING("pluginreg.dat")
@@ -788,14 +787,8 @@ nsPluginHost::InstantiatePluginInstance(const char *aMimeType, nsIURI* aURL,
     return rv;
   }
 
-  nsCOMPtr<nsIPluginTagInfo> pti;
-  rv = instanceOwner->QueryInterface(kIPluginTagInfoIID, getter_AddRefs(pti));
-  if (NS_FAILED(rv)) {
-    return rv;
-  }
-
   nsPluginTagType tagType;
-  rv = pti->GetTagType(&tagType);
+  rv = instanceOwner->GetTagType(&tagType);
   if (NS_FAILED(rv)) {
     return rv;
   }
@@ -2328,7 +2321,14 @@ nsPluginHost::WritePluginInfo()
     invalidPlugins = invalidPlugins->mNext;
   }
 
-  PR_Close(fd);
+  PRStatus prrc;
+  prrc = PR_Close(fd);
+  if (prrc != PR_SUCCESS) {
+    // we should obtain a refined value based on prrc;
+    rv = NS_ERROR_FAILURE;
+    MOZ_ASSERT(false, "PR_Close() failed.");
+    return rv;
+  }
   nsCOMPtr<nsIFile> parent;
   rv = pluginReg->GetParent(getter_AddRefs(parent));
   NS_ENSURE_SUCCESS(rv, rv);
@@ -2405,7 +2405,15 @@ nsPluginHost::ReadPluginInfo()
   rv = NS_ERROR_FAILURE;
 
   int32_t bread = PR_Read(fd, registry, flen);
-  PR_Close(fd);
+
+  PRStatus prrc;
+  prrc = PR_Close(fd);
+  if (prrc != PR_SUCCESS) {
+    // Strange error: this is one of those "Should not happen" error.
+    // we may want to report something more refined than  NS_ERROR_FAILURE.
+    MOZ_ASSERT(false, "PR_Close() failed.");
+    return rv;
+  }
 
   if (flen > bread)
     return rv;

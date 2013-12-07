@@ -10,7 +10,6 @@
 #ifdef MOZ_WIDGET_GONK
 #include "nsIAudioManager.h"
 #endif
-#include "nsIAppsService.h"
 #include "nsIDOMFile.h"
 #include "nsIEventTarget.h"
 #include "nsIUUIDGenerator.h"
@@ -21,8 +20,7 @@
 #include "nsIDocument.h"
 #include "nsISupportsPrimitives.h"
 #include "nsIInterfaceRequestorUtils.h"
-#include "nsIScriptSecurityManager.h"
-#include "mozilla/dom/TabChild.h"
+#include "mozilla/dom/ContentChild.h"
 #include "mozilla/dom/MediaStreamTrackBinding.h"
 #include "mozilla/dom/GetUserMediaRequestBinding.h"
 
@@ -143,88 +141,34 @@ static nsresult ValidateTrackConstraints(
   return NS_OK;
 }
 
-static already_AddRefed<nsHashPropertyBag>
-CreateRecordingDeviceEventsSubject(nsPIDOMWindow* aWindow,
-                                   const bool aIsAudio,
-                                   const bool aIsVideo)
-{
-  MOZ_ASSERT(aWindow);
-
-  nsRefPtr<nsHashPropertyBag> props = new nsHashPropertyBag();
-  props->SetPropertyAsBool(NS_LITERAL_STRING("isAudio"), aIsAudio);
-  props->SetPropertyAsBool(NS_LITERAL_STRING("isVideo"), aIsVideo);
-
-  nsCOMPtr<nsIDocShell> docShell = aWindow->GetDocShell();
-  if (docShell) {
-    bool isApp;
-    DebugOnly<nsresult> rv = docShell->GetIsApp(&isApp);
-    MOZ_ASSERT(NS_SUCCEEDED(rv));
-
-    nsString requestURL;
-    if (isApp) {
-      rv = docShell->GetAppManifestURL(requestURL);
-      MOZ_ASSERT(NS_SUCCEEDED(rv));
-    } else {
-      nsCString pageURL;
-      nsCOMPtr<nsIURI> docURI = aWindow->GetDocumentURI();
-      MOZ_ASSERT(docURI);
-
-      rv = docURI->GetSpec(pageURL);
-      MOZ_ASSERT(NS_SUCCEEDED(rv));
-
-      requestURL = NS_ConvertUTF8toUTF16(pageURL);
-    }
-
-    props->SetPropertyAsAString(NS_LITERAL_STRING("requestURL"), requestURL);
-    props->SetPropertyAsBool(NS_LITERAL_STRING("isApp"), isApp);
+ErrorCallbackRunnable::ErrorCallbackRunnable(
+  already_AddRefed<nsIDOMGetUserMediaSuccessCallback> aSuccess,
+  already_AddRefed<nsIDOMGetUserMediaErrorCallback> aError,
+  const nsAString& aErrorMsg, uint64_t aWindowID)
+  : mSuccess(aSuccess)
+  , mError(aError)
+  , mErrorMsg(aErrorMsg)
+  , mWindowID(aWindowID)
+  , mManager(MediaManager::GetInstance()) {
   }
 
-  return props.forget();
-}
-
-/**
- * Send an error back to content. The error is the form a string.
- * Do this only on the main thread. The success callback is also passed here
- * so it can be released correctly.
- */
-class ErrorCallbackRunnable : public nsRunnable
+NS_IMETHODIMP
+ErrorCallbackRunnable::Run()
 {
-public:
-  ErrorCallbackRunnable(
-    already_AddRefed<nsIDOMGetUserMediaSuccessCallback> aSuccess,
-    already_AddRefed<nsIDOMGetUserMediaErrorCallback> aError,
-    const nsAString& aErrorMsg, uint64_t aWindowID)
-    : mSuccess(aSuccess)
-    , mError(aError)
-    , mErrorMsg(aErrorMsg)
-    , mWindowID(aWindowID)
-    , mManager(MediaManager::GetInstance()) {}
+  // Only run if the window is still active.
+  NS_ASSERTION(NS_IsMainThread(), "Only call on main thread");
 
-  NS_IMETHOD
-  Run()
-  {
-    // Only run if the window is still active.
-    NS_ASSERTION(NS_IsMainThread(), "Only call on main thread");
+  nsCOMPtr<nsIDOMGetUserMediaSuccessCallback> success(mSuccess);
+  nsCOMPtr<nsIDOMGetUserMediaErrorCallback> error(mError);
 
-    nsCOMPtr<nsIDOMGetUserMediaSuccessCallback> success(mSuccess);
-    nsCOMPtr<nsIDOMGetUserMediaErrorCallback> error(mError);
-
-    if (!(mManager->IsWindowStillActive(mWindowID))) {
-      return NS_OK;
-    }
-    // This is safe since we're on main-thread, and the windowlist can only
-    // be invalidated from the main-thread (see OnNavigation)
-    error->OnError(mErrorMsg);
+  if (!(mManager->IsWindowStillActive(mWindowID))) {
     return NS_OK;
   }
-
-private:
-  already_AddRefed<nsIDOMGetUserMediaSuccessCallback> mSuccess;
-  already_AddRefed<nsIDOMGetUserMediaErrorCallback> mError;
-  const nsString mErrorMsg;
-  uint64_t mWindowID;
-  nsRefPtr<MediaManager> mManager; // get ref to this when creating the runnable
-};
+  // This is safe since we're on main-thread, and the windowlist can only
+  // be invalidated from the main-thread (see OnNavigation)
+  error->OnError(mErrorMsg);
+  return NS_OK;
+}
 
 /**
  * Invoke the "onSuccess" callback in content. The callback will take a
@@ -623,6 +567,7 @@ public:
     // when the page is invalidated (on navigation or close).
     mListener->Activate(stream.forget(), mAudioSource, mVideoSource);
 
+    // Note: includes JS callbacks; must be released on MainThread
     TracksAvailableCallback* tracksAvailableCallback =
       new TracksAvailableCallback(mManager, mSuccess, mWindowID, trackunion);
 
@@ -634,7 +579,8 @@ public:
     nsRefPtr<MediaOperationRunnable> runnable(
       new MediaOperationRunnable(MEDIA_START, mListener, trackunion,
                                  tracksAvailableCallback,
-                                 mAudioSource, mVideoSource, false, mWindowID));
+                                 mAudioSource, mVideoSource, false, mWindowID,
+                                 mError.forget()));
     mediaThread->Dispatch(runnable, NS_DISPATCH_NORMAL);
 
 #ifdef MOZ_WEBRTC
@@ -1153,6 +1099,68 @@ MediaManager::GetInstance()
   // so we can have non-refcounted getters
   nsRefPtr<MediaManager> service = MediaManager::Get();
   return service.forget();
+}
+
+/* static */ nsresult
+MediaManager::NotifyRecordingStatusChange(nsPIDOMWindow* aWindow,
+                                          const nsString& aMsg,
+                                          const bool& aIsAudio,
+                                          const bool& aIsVideo)
+{
+  NS_ENSURE_ARG(aWindow);
+
+  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
+  if (!obs) {
+    NS_WARNING("Could not get the Observer service for GetUserMedia recording notification.");
+    return NS_ERROR_FAILURE;
+  }
+
+  nsRefPtr<nsHashPropertyBag> props = new nsHashPropertyBag();
+  props->SetPropertyAsBool(NS_LITERAL_STRING("isAudio"), aIsAudio);
+  props->SetPropertyAsBool(NS_LITERAL_STRING("isVideo"), aIsVideo);
+
+  bool isApp = false;
+  nsString requestURL;
+
+  if (nsCOMPtr<nsIDocShell> docShell = aWindow->GetDocShell()) {
+    nsresult rv = docShell->GetIsApp(&isApp);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    if (isApp) {
+      rv = docShell->GetAppManifestURL(requestURL);
+      NS_ENSURE_SUCCESS(rv, rv);
+    }
+  }
+
+  if (!isApp) {
+    nsCString pageURL;
+    nsCOMPtr<nsIURI> docURI = aWindow->GetDocumentURI();
+    NS_ENSURE_TRUE(docURI, NS_ERROR_FAILURE);
+
+    nsresult rv = docURI->GetSpec(pageURL);
+    NS_ENSURE_SUCCESS(rv, rv);
+
+    requestURL = NS_ConvertUTF8toUTF16(pageURL);
+  }
+
+  props->SetPropertyAsBool(NS_LITERAL_STRING("isApp"), isApp);
+  props->SetPropertyAsAString(NS_LITERAL_STRING("requestURL"), requestURL);
+
+  obs->NotifyObservers(static_cast<nsIPropertyBag2*>(props),
+		       "recording-device-events",
+		       aMsg.get());
+
+  // Forward recording events to parent process.
+  // The events are gathered in chrome process and used for recording indicator
+  if (XRE_GetProcessType() != GeckoProcessType_Default) {
+    unused <<
+      dom::ContentChild::GetSingleton()->SendRecordingDeviceEvents(aMsg,
+                                                                   requestURL,
+                                                                   aIsAudio,
+                                                                   aIsVideo);
+  }
+
+  return NS_OK;
 }
 
 /**
@@ -1782,7 +1790,7 @@ GetUserMediaCallbackMediaStreamListener::Invalidate()
   runnable = new MediaOperationRunnable(MEDIA_STOP,
                                         this, nullptr, nullptr,
                                         mAudioSource, mVideoSource,
-                                        mFinished, mWindowID);
+                                        mFinished, mWindowID, nullptr);
   mMediaThread->Dispatch(runnable, NS_DISPATCH_NORMAL);
 }
 
@@ -1821,11 +1829,6 @@ GetUserMediaNotificationEvent::Run()
   // releasing DOMMediaStream off the main thread, which is not allowed.
   nsRefPtr<DOMMediaStream> stream = mStream.forget();
 
-  nsCOMPtr<nsIObserverService> obs = services::GetObserverService();
-  if (!obs) {
-    NS_WARNING("Could not get the Observer service for GetUserMedia recording notification.");
-    return NS_ERROR_FAILURE;
-  }
   nsString msg;
   switch (mStatus) {
   case STARTING:
@@ -1841,20 +1844,9 @@ GetUserMediaNotificationEvent::Run()
   }
 
   nsCOMPtr<nsPIDOMWindow> window = nsGlobalWindow::GetInnerWindowWithId(mWindowID);
-  MOZ_ASSERT(window);
+  NS_ENSURE_TRUE(window, NS_ERROR_FAILURE);
 
-  nsRefPtr<nsHashPropertyBag> props = 
-    CreateRecordingDeviceEventsSubject(window, mIsAudio, mIsVideo);
-
-  obs->NotifyObservers(static_cast<nsIPropertyBag2*>(props),
-		       "recording-device-events",
-		       msg.get());
-  // Forward recording events to parent process.
-  // The events are gathered in chrome process and used for recording indicator
-  if (XRE_GetProcessType() != GeckoProcessType_Default) {
-    unused << dom::TabChild::GetFrom(window)->SendRecordingDeviceEvents(msg, mIsAudio, mIsVideo);
-  }
-  return NS_OK;
+  return MediaManager::NotifyRecordingStatusChange(window, msg, mIsAudio, mIsVideo);
 }
 
 } // namespace mozilla

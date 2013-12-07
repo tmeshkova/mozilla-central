@@ -1221,7 +1221,8 @@ RadioInterface.prototype = {
         break;
       case "sms-received":
         let ackOk = this.handleSmsReceived(message);
-        if (ackOk) {
+        // Note: ACK has been done by modem for NEW_SMS_ON_SIM
+        if (ackOk && message.simStatus === undefined) {
           this.workerMessenger.send("ackSMS", { result: RIL.PDU_FCS_OK });
         }
         return;
@@ -2062,10 +2063,13 @@ RadioInterface.prototype = {
       let success = Components.isSuccessCode(rv);
 
       // Acknowledge the reception of the SMS.
-      this.workerMessenger.send("ackSMS", {
-        result: (success ? RIL.PDU_FCS_OK
-                         : RIL.PDU_FCS_MEMORY_CAPACITY_EXCEEDED)
-      });
+      // Note: Ack has been done by modem for NEW_SMS_ON_SIM
+      if (message.simStatus === undefined) {
+        this.workerMessenger.send("ackSMS", {
+          result: (success ? RIL.PDU_FCS_OK
+                           : RIL.PDU_FCS_MEMORY_CAPACITY_EXCEEDED)
+        });
+      }
 
       if (!success) {
         // At this point we could send a message to content to notify the user
@@ -2334,7 +2338,12 @@ RadioInterface.prototype = {
 
   handleStkProactiveCommand: function handleStkProactiveCommand(message) {
     if (DEBUG) this.debug("handleStkProactiveCommand " + JSON.stringify(message));
-    gSystemMessenger.broadcastMessage("icc-stkcommand", message);
+    let iccId = this.rilContext.iccInfo && this.rilContext.iccInfo.iccid;
+    if (iccId) {
+      gSystemMessenger.broadcastMessage("icc-stkcommand",
+                                        {iccId: iccId,
+                                         command: message});
+    }
     gMessageManager.sendIccMessage("RIL:StkCommand", this.clientId, message);
   },
 

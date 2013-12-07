@@ -14,6 +14,7 @@
 #include "nsGkAtoms.h"
 #include "nsINodeInfo.h"
 #include "nsINameSpaceManager.h"
+#include "nsThemeConstants.h"
 #include "mozilla/BasicEvents.h"
 #include "nsContentUtils.h"
 #include "nsContentCreatorFunctions.h"
@@ -175,7 +176,7 @@ nsNumberControlFrame::AttributeChanged(int32_t  aNameSpaceID,
 }
 
 nsresult
-nsNumberControlFrame::MakeAnonymousElement(nsIContent** aResult,
+nsNumberControlFrame::MakeAnonymousElement(Element** aResult,
                                            nsTArray<ContentInfo>& aElements,
                                            nsIAtom* aTagName,
                                            nsCSSPseudoElements::Type aPseudoType,
@@ -183,15 +184,7 @@ nsNumberControlFrame::MakeAnonymousElement(nsIContent** aResult,
 {
   // Get the NodeInfoManager and tag necessary to create the anonymous divs.
   nsCOMPtr<nsIDocument> doc = mContent->GetDocument();
-
-  nsCOMPtr<nsINodeInfo> nodeInfo;
-  nodeInfo = doc->NodeInfoManager()->GetNodeInfo(aTagName, nullptr,
-                                                 kNameSpaceID_XHTML,
-                                                 nsIDOMNode::ELEMENT_NODE);
-  NS_ENSURE_TRUE(nodeInfo, NS_ERROR_OUT_OF_MEMORY);
-  nsresult rv = NS_NewHTMLElement(aResult, nodeInfo.forget(),
-                                  dom::NOT_FROM_PARSER);
-  NS_ENSURE_SUCCESS(rv, rv);
+  nsRefPtr<Element> resultElement = doc->CreateHTMLElement(aTagName);
 
   // If we legitimately fail this assertion and need to allow
   // non-pseudo-element anonymous children, then we'll need to add a branch
@@ -200,7 +193,6 @@ nsNumberControlFrame::MakeAnonymousElement(nsIContent** aResult,
   NS_ASSERTION(aPseudoType != nsCSSPseudoElements::ePseudo_NotPseudoElement,
                "Expecting anonymous children to all be pseudo-elements");
   // Associate the pseudo-element with the anonymous child
-  Element* resultElement = (*aResult)->AsElement();
   nsRefPtr<nsStyleContext> newStyleContext =
     PresContext()->StyleSet()->ResolvePseudoElementStyle(mContent->AsElement(),
                                                          aPseudoType,
@@ -210,6 +202,8 @@ nsNumberControlFrame::MakeAnonymousElement(nsIContent** aResult,
   if (!aElements.AppendElement(ContentInfo(resultElement, newStyleContext))) {
     return NS_ERROR_OUT_OF_MEMORY;
   }
+
+  resultElement.forget(aResult);
   return NS_OK;
 }
 
@@ -325,6 +319,49 @@ nsNumberControlFrame::GetAnonTextControl()
   return mTextField ? HTMLInputElement::FromContent(mTextField) : nullptr;
 }
 
+/* static */ nsNumberControlFrame*
+nsNumberControlFrame::GetNumberControlFrameForTextField(nsIFrame* aFrame)
+{
+  // If aFrame is the anon text field for an <input type=number> then we expect
+  // the frame of its mContent's grandparent to be that input's frame. We
+  // have to check for this via the content tree because we don't know whether
+  // extra frames will be wrapped around any of the elements between aFrame and
+  // the nsNumberControlFrame that we're looking for (e.g. flex wrappers).
+  nsIContent* content = aFrame->GetContent();
+  if (content->IsInNativeAnonymousSubtree() &&
+      content->GetParent() && content->GetParent()->GetParent()) {
+    nsIContent* grandparent = content->GetParent()->GetParent();
+    if (grandparent->IsHTML(nsGkAtoms::input) &&
+        grandparent->AttrValueIs(kNameSpaceID_None, nsGkAtoms::type,
+                                 nsGkAtoms::number, eCaseMatters)) {
+      return do_QueryFrame(grandparent->GetPrimaryFrame());
+    }
+  }
+  return nullptr;
+}
+
+/* static */ nsNumberControlFrame*
+nsNumberControlFrame::GetNumberControlFrameForSpinButton(nsIFrame* aFrame)
+{
+  // If aFrame is a spin button for an <input type=number> then we expect the
+  // frame of its mContent's great-grandparent to be that input's frame. We
+  // have to check for this via the content tree because we don't know whether
+  // extra frames will be wrapped around any of the elements between aFrame and
+  // the nsNumberControlFrame that we're looking for (e.g. flex wrappers).
+  nsIContent* content = aFrame->GetContent();
+  if (content->IsInNativeAnonymousSubtree() &&
+      content->GetParent() && content->GetParent()->GetParent() &&
+      content->GetParent()->GetParent()->GetParent()) {
+    nsIContent* greatgrandparent = content->GetParent()->GetParent()->GetParent();
+    if (greatgrandparent->IsHTML(nsGkAtoms::input) &&
+        greatgrandparent->AttrValueIs(kNameSpaceID_None, nsGkAtoms::type,
+                                      nsGkAtoms::number, eCaseMatters)) {
+      return do_QueryFrame(greatgrandparent->GetPrimaryFrame());
+    }
+  }
+  return nullptr;
+}
+
 int32_t
 nsNumberControlFrame::GetSpinButtonForPointerEvent(WidgetGUIEvent* aEvent) const
 {
@@ -337,7 +374,62 @@ nsNumberControlFrame::GetSpinButtonForPointerEvent(WidgetGUIEvent* aEvent) const
   if (aEvent->originalTarget == mSpinDown) {
     return eSpinButtonDown;
   }
+  if (aEvent->originalTarget == mSpinBox) {
+    // In the case that the up/down buttons are hidden (display:none) we use
+    // just the spin box element, spinning up if the pointer is over the top
+    // half of the element, or down if it's over the bottom half. This is
+    // important to handle since this is the state things are in for the
+    // default UA style sheet. See the comment in forms.css for why.
+    LayoutDeviceIntPoint absPoint = aEvent->refPoint;
+    nsPoint point =
+      nsLayoutUtils::GetEventCoordinatesRelativeTo(aEvent,
+                       LayoutDeviceIntPoint::ToUntyped(absPoint),
+                       mSpinBox->GetPrimaryFrame());
+    if (point != nsPoint(NS_UNCONSTRAINEDSIZE, NS_UNCONSTRAINEDSIZE)) {
+      if (point.y < mSpinBox->GetPrimaryFrame()->GetSize().height / 2) {
+        return eSpinButtonUp;
+      }
+      return eSpinButtonDown;
+    }
+  }
   return eSpinButtonNone;
+}
+
+void
+nsNumberControlFrame::SpinnerStateChanged() const
+{
+  nsIFrame* spinUpFrame = mSpinUp->GetPrimaryFrame();
+  if (spinUpFrame && spinUpFrame->IsThemed()) {
+    spinUpFrame->InvalidateFrame();
+  }
+  nsIFrame* spinDownFrame = mSpinDown->GetPrimaryFrame();
+  if (spinDownFrame && spinDownFrame->IsThemed()) {
+    spinDownFrame->InvalidateFrame();
+  }
+}
+
+bool
+nsNumberControlFrame::SpinnerUpButtonIsDepressed() const
+{
+  return HTMLInputElement::FromContent(mContent)->
+           NumberSpinnerUpButtonIsDepressed();
+}
+
+bool
+nsNumberControlFrame::SpinnerDownButtonIsDepressed() const
+{
+  return HTMLInputElement::FromContent(mContent)->
+           NumberSpinnerDownButtonIsDepressed();
+}
+
+bool
+nsNumberControlFrame::IsFocused() const
+{
+  // Normally this depends on the state of our anonymous text control (which
+  // takes focus for us), but in the case that it does not have a frame we will
+  // have focus ourself.
+  return mTextField->AsElement()->State().HasState(NS_EVENT_STATE_FOCUS) ||
+         mContent->AsElement()->State().HasState(NS_EVENT_STATE_FOCUS);
 }
 
 void
@@ -347,6 +439,27 @@ nsNumberControlFrame::HandleFocusEvent(WidgetEvent* aEvent)
     // Move focus to our text field
     HTMLInputElement::FromContent(mTextField)->Focus();
   }
+}
+
+#define STYLES_DISABLING_NATIVE_THEMING \
+  NS_AUTHOR_SPECIFIED_BACKGROUND | \
+  NS_AUTHOR_SPECIFIED_PADDING | \
+  NS_AUTHOR_SPECIFIED_BORDER
+
+bool
+nsNumberControlFrame::ShouldUseNativeStyleForSpinner() const
+{
+  nsIFrame* spinUpFrame = mSpinUp->GetPrimaryFrame();
+  nsIFrame* spinDownFrame = mSpinDown->GetPrimaryFrame();
+
+  return spinUpFrame &&
+    spinUpFrame->StyleDisplay()->mAppearance == NS_THEME_SPINNER_UP_BUTTON &&
+    !PresContext()->HasAuthorSpecifiedRules(spinUpFrame,
+                                            STYLES_DISABLING_NATIVE_THEMING) &&
+    spinDownFrame &&
+    spinDownFrame->StyleDisplay()->mAppearance == NS_THEME_SPINNER_DOWN_BUTTON &&
+    !PresContext()->HasAuthorSpecifiedRules(spinDownFrame,
+                                            STYLES_DISABLING_NATIVE_THEMING);
 }
 
 void
@@ -377,4 +490,30 @@ nsNumberControlFrame::UpdateForValueChange(const nsAString& aValue)
   // since the default value is ignored once a user types into the text
   // control.
   HTMLInputElement::FromContent(mTextField)->SetValue(aValue);
+}
+
+Element*
+nsNumberControlFrame::GetPseudoElement(nsCSSPseudoElements::Type aType)
+{
+  if (aType == nsCSSPseudoElements::ePseudo_mozNumberWrapper) {
+    return mOuterWrapper;
+  }
+
+  if (aType == nsCSSPseudoElements::ePseudo_mozNumberText) {
+    return mTextField;
+  }
+
+  if (aType == nsCSSPseudoElements::ePseudo_mozNumberSpinBox) {
+    return mSpinBox;
+  }
+
+  if (aType == nsCSSPseudoElements::ePseudo_mozNumberSpinUp) {
+    return mSpinUp;
+  }
+
+  if (aType == nsCSSPseudoElements::ePseudo_mozNumberSpinDown) {
+    return mSpinDown;
+  }
+
+  return nsContainerFrame::GetPseudoElement(aType);
 }

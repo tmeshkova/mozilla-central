@@ -210,6 +210,7 @@
 #include "mozilla/dom/WindowBinding.h"
 #include "nsITabChild.h"
 #include "nsIDOMMediaQueryList.h"
+#include "mozilla/dom/DOMJSClass.h"
 
 #ifdef MOZ_WEBSPEECH
 #include "mozilla/dom/SpeechSynthesis.h"
@@ -4726,7 +4727,7 @@ nsGlobalWindow::SetOuterHeight(int32_t aOuterHeight)
 nsIntPoint
 nsGlobalWindow::GetScreenXY(ErrorResult& aError)
 {
-  FORWARD_TO_OUTER_OR_THROW(GetScreenXY, (aError), aError, nsIntPoint(0, 0));
+  MOZ_ASSERT(IsOuterWindow());
 
   nsCOMPtr<nsIBaseWindow> treeOwnerAsWin = GetTreeOwnerWindow();
   if (!treeOwnerAsWin) {
@@ -4742,6 +4743,8 @@ nsGlobalWindow::GetScreenXY(ErrorResult& aError)
 int32_t
 nsGlobalWindow::GetScreenX(ErrorResult& aError)
 {
+  FORWARD_TO_OUTER_OR_THROW(GetScreenX, (aError), aError, 0);
+
   return DevToCSSIntPixels(GetScreenXY(aError).x);
 }
 
@@ -5091,6 +5094,8 @@ nsGlobalWindow::SetScreenX(int32_t aScreenX)
 int32_t
 nsGlobalWindow::GetScreenY(ErrorResult& aError)
 {
+  FORWARD_TO_OUTER_OR_THROW(GetScreenY, (aError), aError, 0);
+
   return DevToCSSIntPixels(GetScreenXY(aError).y);
 }
 
@@ -8185,10 +8190,8 @@ nsGlobalWindow::EnterModalState()
     NS_ASSERTION(!mSuspendedDoc, "Shouldn't have mSuspendedDoc here!");
 
     mSuspendedDoc = topWin->GetExtantDoc();
-    if (mSuspendedDoc && mSuspendedDoc->EventHandlingSuppressed()) {
+    if (mSuspendedDoc) {
       mSuspendedDoc->SuppressEventHandling();
-    } else {
-      mSuspendedDoc = nullptr;
     }
   }
   topWin->mModalStateDepth++;
@@ -12697,6 +12700,13 @@ nsGlobalWindow::AddSizeOfIncludingThis(nsWindowSizes* aWindowSizes) const
     const_cast<nsTHashtable<nsPtrHashKey<nsDOMEventTargetHelper> >*>
       (&mEventTargetObjects)->EnumerateEntries(CollectSizeAndListenerCount,
                                                aWindowSizes);
+
+  JSObject* global = FastGetGlobalJSObject();
+  if (IsInnerWindow() && global) {
+    ProtoAndIfaceArray* cache = GetProtoAndIfaceArray(global);
+    aWindowSizes->mProtoIfaceCacheSize +=
+      cache->SizeOfIncludingThis(aWindowSizes->mMallocSizeOf);
+  }
 }
 
 

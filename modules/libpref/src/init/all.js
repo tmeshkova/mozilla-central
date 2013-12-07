@@ -404,7 +404,6 @@ pref("gfx.content.azure.backends", "cairo");
 pref("gfx.content.azure.backends", "cairo");
 #endif
 #ifdef ANDROID
-pref("gfx.textures.poweroftwo.force-enabled", false);
 pref("gfx.content.azure.backends", "cairo");
 #endif
 
@@ -590,7 +589,6 @@ pref("browser.fixup.alternate.enabled", true);
 pref("browser.fixup.alternate.prefix", "www.");
 pref("browser.fixup.alternate.suffix", ".com");
 pref("browser.fixup.hide_user_pass", true);
-pref("browser.fixup.use-utf8", false);
 
 // Location Bar AutoComplete
 pref("browser.urlbar.autocomplete.enabled", true);
@@ -962,6 +960,11 @@ pref("security.fileuri.strict_origin_policy", true);
 // telemetry is also enabled as otherwise there is no way to report
 // the results
 pref("network.allow-experiments", true);
+#if defined(EARLY_BETA_OR_EARLIER)
+pref("network.dns.allow-srv-experiment", true);
+#else
+pref("network.dns.allow-srv-experiment", false);
+#endif
 
 // Transmit UDP busy-work to the LAN when anticipating low latency
 // network reads and on wifi to mitigate 802.11 Power Save Polling delays
@@ -1641,7 +1644,7 @@ pref("signed.applets.codebase_principal_support", false);
 pref("security.checkloaduri", true);
 pref("security.xpconnect.plugin.unrestricted", true);
 // security-sensitive dialogs should delay button enabling. In milliseconds.
-pref("security.dialog_enable_delay", 2000);
+pref("security.dialog_enable_delay", 1000);
 pref("security.notification_enable_delay", 500);
 
 pref("security.csp.enable", true);
@@ -4244,6 +4247,10 @@ pref("layers.draw-bigimage-borders", false);
 pref("layers.frame-counter", false);
 // Max number of layers per container. See Overwrite in mobile prefs.
 pref("layers.max-active", -1);
+// When a layer is moving it will add a scroll graph to measure the smoothness
+// of the movement. NOTE: This pref triggers composites to refresh
+// the graph.
+pref("layers.scroll-graph", false);
 
 // Set the default values, and then override per-platform as needed
 pref("layers.offmainthreadcomposition.enabled", false);

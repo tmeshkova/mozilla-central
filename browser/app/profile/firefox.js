@@ -1090,7 +1090,7 @@ pref("devtools.commands.dir", "");
 // Enable the app manager
 pref("devtools.appmanager.enabled", true);
 pref("devtools.appmanager.lastTab", "help");
-pref("devtools.appmanager.manifestEditor.enabled", false);
+pref("devtools.appmanager.manifestEditor.enabled", true);
 
 // Toolbox preferences
 pref("devtools.toolbox.footer.height", 250);
@@ -1335,3 +1335,6 @@ pref("network.disable.ipc.security", true);
 
 // CustomizableUI debug logging.
 pref("browser.uiCustomization.debug", false);
+
+// The URL of the Firefox Accounts auth server backend
+pref("identity.fxaccounts.auth.uri", "https://api-accounts.dev.lcip.org/v1");
