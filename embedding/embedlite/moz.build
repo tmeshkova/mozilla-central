@@ -37,6 +37,7 @@ SOURCES += [
     'EmbedLiteMessagePump.cpp',
     'EmbedLiteRenderTarget.cpp',
     'EmbedLiteView.cpp',
+    'embedthread/EmbedContentController.cpp',
     'embedthread/EmbedLiteAppThreadChild.cpp',
     'embedthread/EmbedLiteAppThreadParent.cpp',
     'embedthread/EmbedLiteCompositorParent.cpp',
