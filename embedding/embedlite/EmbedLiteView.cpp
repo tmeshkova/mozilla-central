@@ -28,7 +28,6 @@ EmbedLiteView::EmbedLiteView(EmbedLiteApp* aApp, uint32_t aUniqueID, uint32_t aP
   : mApp(aApp)
   , mListener(new FakeListener())
   , mViewImpl(NULL)
-  , mPanControlType(PanZoomControlType::GECKO_TOUCH)
   , mUniqueID(aUniqueID)
   , mParent(aParent)
 {
@@ -60,15 +59,6 @@ EmbedLiteView::SetListener(EmbedLiteViewListener* aListener)
    if (!mListener) {
      mListener = new FakeListener();
    }
-}
-
-void
-EmbedLiteView::SetPanZoomControlType(PanZoomControlType aType)
-{
-  mPanControlType = aType;
-  if (mViewImpl) {
-    mViewImpl->UpdateScrollController();
-  }
 }
 
 void

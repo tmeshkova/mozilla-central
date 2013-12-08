@@ -92,9 +92,6 @@ public:
   virtual void Reload(bool hard);
 
   // Input Interface
-  enum PanZoomControlType { EXTERNAL, GECKO_SIMPLE, GECKO_TOUCH };
-  virtual void SetPanZoomControlType(PanZoomControlType aType);
-
   virtual void SendTextEvent(const char* composite, const char* preEdit);
   virtual void SendKeyPress(int domKeyCode, int gmodifiers, int charCode);
   virtual void SendKeyRelease(int domKeyCode, int gmodifiers, int charCode);
@@ -156,12 +153,10 @@ private:
   friend class EmbedLiteCompositorParent;
   void SetImpl(EmbedLiteViewImplIface*);
   EmbedLiteViewImplIface* GetImpl();
-  PanZoomControlType GetPanZoomControlType() { return mPanControlType; }
 
   EmbedLiteApp* mApp;
   EmbedLiteViewListener* mListener;
   EmbedLiteViewImplIface* mViewImpl;
-  PanZoomControlType mPanControlType;
   uint32_t mUniqueID;
   uint32_t mParent;
 };

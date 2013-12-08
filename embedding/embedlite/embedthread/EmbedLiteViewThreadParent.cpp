@@ -99,21 +99,11 @@ EmbedLiteViewThreadParent::UpdateScrollController()
   }
 
   NS_ENSURE_TRUE(mView, );
-  if (mView->GetPanZoomControlType() != EmbedLiteView::PanZoomControlType::EXTERNAL) {
-    AsyncPanZoomController::GestureBehavior type;
-    if (mView->GetPanZoomControlType() == EmbedLiteView::PanZoomControlType::GECKO_SIMPLE) {
-      type = AsyncPanZoomController::DEFAULT_GESTURES;
-    } else if (mView->GetPanZoomControlType() == EmbedLiteView::PanZoomControlType::GECKO_TOUCH) {
-      type = AsyncPanZoomController::USE_GESTURE_DETECTOR;
-    } else {
-      return;
-    }
 #warning "Maybe Need to switch to APZCTreeManager"
-    mController = new EmbedAsyncPanZoomController(0, mGeckoController, type);
-    mController->SetCompositorParent(mCompositor);
-    mController->UpdateCompositionBounds(ScreenIntRect(0, 0, mViewSize.width, mViewSize.height));
-    mGeckoController->SetAsyncPanZoomController(mController);
-  }
+  mController = new EmbedAsyncPanZoomController(0, mGeckoController, AsyncPanZoomController::USE_GESTURE_DETECTOR);
+  mController->SetCompositorParent(mCompositor);
+  mController->UpdateCompositionBounds(ScreenIntRect(0, 0, mViewSize.width, mViewSize.height));
+  mGeckoController->SetAsyncPanZoomController(mController);
 }
 
 AsyncPanZoomController*
