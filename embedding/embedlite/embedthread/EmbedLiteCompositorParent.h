@@ -36,10 +36,6 @@ public:
   void SetClipping(const gfxRect& aClipRect);
 
   virtual bool RecvStop() MOZ_OVERRIDE;
-  virtual void ShadowLayersUpdated(mozilla::layers::LayerTransactionParent* aLayerTree,
-                                   const mozilla::layers::TargetConfig& aTargetConfig,
-                                   bool isFirstPaint) MOZ_OVERRIDE;
-
   virtual void SetChildCompositor(mozilla::layers::CompositorChild*, MessageLoop*);
   mozilla::layers::CompositorChild* GetChildCompositor() {
     return mChildCompositor;

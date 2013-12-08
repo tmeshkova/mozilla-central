@@ -177,20 +177,6 @@ bool EmbedLiteCompositorParent::RecvStop()
   return true;
 }
 
-void EmbedLiteCompositorParent::ShadowLayersUpdated(mozilla::layers::LayerTransactionParent* aLayerTree,
-                                                    const TargetConfig& aTargetConfig,
-                                                    bool isFirstPaint)
-{
-  LOGF();
-  CompositorParent::ShadowLayersUpdated(aLayerTree,
-                                        aTargetConfig,
-                                        isFirstPaint);
-
-  Layer* shadowRoot = aLayerTree->GetRoot();
-  if (ContainerLayer* root = shadowRoot->AsContainerLayer()) {
-  }
-}
-
 void EmbedLiteCompositorParent::ScheduleTask(CancelableTask* task, int time)
 {
   LOGF();
