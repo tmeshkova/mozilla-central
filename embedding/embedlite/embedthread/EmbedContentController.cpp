@@ -8,15 +8,19 @@
 #include "EmbedLiteView.h"
 #include "mozilla/unused.h"
 #include "EmbedLiteViewThreadParent.h"
+#include "mozilla/layers/CompositorParent.h"
+#include "mozilla/layers/APZCTreeManager.h"
+#include "EmbedLiteCompositorParent.h"
 
 using namespace mozilla::embedlite;
 using namespace mozilla::gfx;
 using namespace mozilla::layers;
 
-void EmbedAsyncPanZoomController::NotifyTransformEnd()
+EmbedContentController::EmbedContentController(EmbedLiteViewThreadParent* aRenderFrame, CompositorParent* aCompositor)
+  : mUILoop(MessageLoop::current())
+  , mRenderFrame(aRenderFrame)
 {
-    ScheduleComposite();
-    RequestContentRepaint();
+  mAPZC = CompositorParent::GetAPZCTreeManager(aCompositor->RootLayerTreeId());
 }
 
 void EmbedContentController::RequestContentRepaint(const FrameMetrics& aFrameMetrics)
@@ -75,22 +79,6 @@ void EmbedContentController::HandleLongTap(const CSSIntPoint& aPoint, int32_t aM
     EmbedLiteViewListener* listener = GetListener();
     if (listener && !listener->HandleLongTap(nsIntPoint(aPoint.x, aPoint.y))) {
         unused << mRenderFrame->SendHandleLongTap(nsIntPoint(aPoint.x, aPoint.y));
-    }
-}
-
-void EmbedContentController::NotifyTransformEnd()
-{
-    if (MessageLoop::current() != mUILoop) {
-        // We have to send this message from the "UI thread" (main
-        // thread).
-        mUILoop->PostTask(
-            FROM_HERE,
-            NewRunnableMethod(this, &EmbedContentController::NotifyTransformEnd));
-        return;
-    }
-
-    if (mAsyncPanZoomController) {
-        mAsyncPanZoomController->NotifyTransformEnd();
     }
 }
 
@@ -157,11 +145,6 @@ void EmbedContentController::PostDelayedTask(Task* aTask, int aDelayMs)
     MessageLoop::current()->PostDelayedTask(FROM_HERE, aTask, aDelayMs);
 }
 
-void EmbedContentController::SetAsyncPanZoomController(EmbedAsyncPanZoomController* aEmbedAsyncPanZoomController)
-{
-    mAsyncPanZoomController = aEmbedAsyncPanZoomController;
-}
-
 EmbedLiteViewListener* EmbedContentController::GetListener()
 {
     return mRenderFrame && mRenderFrame->mView ?
@@ -174,4 +157,24 @@ void EmbedContentController::DoRequestContentRepaint(const FrameMetrics& aFrameM
     if (listener && !listener->RequestContentRepaint()) {
         unused << mRenderFrame->SendUpdateFrame(aFrameMetrics);
     }
+}
+
+nsEventStatus
+EmbedContentController::ReceiveInputEvent(const InputData& aEvent,
+                                          ScrollableLayerGuid* aOutTargetGuid)
+{
+  MOZ_ASSERT(aEvent);
+
+  if (!mAPZC) {
+    return nsEventStatus_eIgnore;
+  }
+
+  return mAPZC->ReceiveInputEvent(aEvent, aOutTargetGuid);
+}
+
+gfxPoint
+EmbedContentController::GetTempScrollOffset(const ScrollableLayerGuid& aGuid)
+{
+  nsRefPtr<AsyncPanZoomController> apzc = mAPZC->GetTargetAPZC(aGuid);
+  return apzc ? apzc->GetTempScrollOffset() : gfxPoint();
 }

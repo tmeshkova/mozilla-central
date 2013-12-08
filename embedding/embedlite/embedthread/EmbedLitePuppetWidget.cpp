@@ -488,10 +488,6 @@ EmbedLitePuppetWidget::GetLayerManager(PLayerTransactionChild* aShadowManager,
 
   if (useCompositor) {
     CreateCompositor();
-    if (mCompositorParent) {
-//      uint64_t rootLayerTreeId = mCompositorParent->RootLayerTreeId();
-//      CompositorParent::SetControllerForLayerTree(rootLayerTreeId, new ParentProcessController());
-    }
     if (mLayerManager) {
       return mLayerManager;
     }

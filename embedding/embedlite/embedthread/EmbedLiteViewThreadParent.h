@@ -10,15 +10,11 @@
 #include "EmbedLiteViewImplIface.h"
 
 namespace mozilla {
-namespace layers {
-class AsyncPanZoomController;
-}
 namespace embedlite {
 
 class EmbedLiteView;
 class EmbedLiteCompositorParent;
 class EmbedContentController;
-class EmbedAsyncPanZoomController;
 class EmbedLiteViewThreadParent : public PEmbedLiteViewParent,
   public EmbedLiteViewImplIface
 {
@@ -62,8 +58,9 @@ public:
   virtual void AddMessageListeners(const nsTArray<nsString>&);
   virtual void RemoveMessageListeners(const nsTArray<nsString>&);
 
-  mozilla::layers::AsyncPanZoomController* GetDefaultPanZoomController();
   EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget(int width, int height);
+
+  EmbedLiteCompositorParent* GetCompositor() { return mCompositor.get(); };
 
 protected:
   virtual void ActorDestroy(ActorDestroyReason aWhy) MOZ_OVERRIDE;
@@ -146,15 +143,15 @@ private:
   gfx::Point mScrollOffset;
   float mLastScale;
 
-  RefPtr<EmbedAsyncPanZoomController> mController;
-  RefPtr<EmbedContentController> mGeckoController;
-
-  gfxSize mViewSize;
+  ScreenIntSize mViewSize;
   gfxSize mGLViewPortSize;
   bool mInTouchProcess;
   MessageLoop* mUILoop;
   int mLastIMEState;
   float mLastResolution;
+
+  uint64_t mRootLayerTreeId;
+  nsRefPtr<EmbedContentController> mController;
 
   DISALLOW_EVIL_CONSTRUCTORS(EmbedLiteViewThreadParent);
 };

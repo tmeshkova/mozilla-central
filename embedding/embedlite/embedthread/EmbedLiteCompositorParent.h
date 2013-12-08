@@ -44,7 +44,6 @@ public:
   mozilla::layers::CompositorChild* GetChildCompositor() {
     return mChildCompositor;
   }
-  virtual mozilla::layers::AsyncPanZoomController* GetEmbedPanZoomController();
   virtual bool RequestHasHWAcceleratedContext();
 protected:
   virtual PLayerTransactionParent*

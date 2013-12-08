@@ -16,6 +16,7 @@
 #include "EmbedLiteRenderTarget.h"
 #include "mozilla/unused.h"
 #include "EmbedContentController.h"
+#include "mozilla/layers/APZCTreeManager.h"
 
 using namespace mozilla::layers;
 using namespace mozilla::widget;
@@ -38,23 +39,14 @@ EmbedLiteViewThreadParent::EmbedLiteViewThreadParent(const uint32_t& id, const u
   MOZ_COUNT_CTOR(EmbedLiteViewThreadParent);
   MOZ_ASSERT(mView, "View destroyed during OMTC view construction");
   mView->SetImpl(this);
-  mGeckoController = new EmbedContentController(this);
 }
 
 EmbedLiteViewThreadParent::~EmbedLiteViewThreadParent()
 {
   MOZ_COUNT_DTOR(EmbedLiteViewThreadParent);
-  LOGT("mView:%p, mGeckoController:%p, mController:%p, mCompositor:%p", mView, mGeckoController.get(), mController.get(), mCompositor.get());
+  LOGT("mView:%p, mCompositor:%p", mView, mCompositor.get());
   bool mHadCompositor = mCompositor.get() != nullptr;
-  if (mGeckoController) {
-    mGeckoController->ClearRenderFrame();
-    mGeckoController->SetAsyncPanZoomController(0);
-  }
-  if (mController) {
-    mController->SetCompositorParent(nullptr);
-    mController->Destroy();
-    mController = nullptr;
-  }
+  mController = nullptr;
 
   if (mView) {
     mView->SetImpl(NULL);
@@ -70,14 +62,7 @@ void
 EmbedLiteViewThreadParent::ActorDestroy(ActorDestroyReason aWhy)
 {
   LOGT("reason:%i", aWhy);
-  if (mGeckoController) {
-    mGeckoController->ClearRenderFrame();
-    mGeckoController->SetAsyncPanZoomController(0);
-  }
-  if (mController) {
-    mController->Destroy();
-    mController = nullptr;
-  }
+  mController = nullptr;
 }
 
 void
@@ -99,17 +84,12 @@ EmbedLiteViewThreadParent::UpdateScrollController()
   }
 
   NS_ENSURE_TRUE(mView, );
-#warning "Maybe Need to switch to APZCTreeManager"
-  mController = new EmbedAsyncPanZoomController(0, mGeckoController, AsyncPanZoomController::USE_GESTURE_DETECTOR);
-  mController->SetCompositorParent(mCompositor);
-  mController->UpdateCompositionBounds(ScreenIntRect(0, 0, mViewSize.width, mViewSize.height));
-  mGeckoController->SetAsyncPanZoomController(mController);
-}
 
-AsyncPanZoomController*
-EmbedLiteViewThreadParent::GetDefaultPanZoomController()
-{
-  return mController;
+  if (mCompositor) {
+    mRootLayerTreeId = mCompositor->RootLayerTreeId();
+    mController = new EmbedContentController(this, mCompositor);
+    CompositorParent::SetControllerForLayerTree(mRootLayerTreeId, mController);
+  }
 }
 
 // Child notification
@@ -261,10 +241,10 @@ EmbedLiteViewThreadParent::RecvOnTitleChanged(const nsString& aTitle)
 }
 
 bool
-EmbedLiteViewThreadParent::RecvUpdateZoomConstraints(const bool& val, const float& min, const float& max)
+EmbedLiteViewThreadParent::RecvUpdateZoomConstraints(const bool& aAllowZoom, const float& min, const float& max)
 {
   if (mController) {
-    mController->UpdateZoomConstraints(val, CSSToScreenScale(min), CSSToScreenScale(max));
+    mController->GetManager()->UpdateZoomConstraints(ScrollableLayerGuid(mRootLayerTreeId, 0, 0), aAllowZoom, CSSToScreenScale(min), CSSToScreenScale(max));
   }
   return true;
 }
@@ -275,8 +255,7 @@ EmbedLiteViewThreadParent::RecvUpdateScrollOffset(const uint32_t& aPresShellId,
                                   const CSSIntPoint& aScrollOffset)
 {
   if (mController) {
-    // TODO: currently aPresShelId and aViewId aren't used (But they're used in TabChild to dispatch many APZCs).
-    mController->UpdateScrollOffset(aScrollOffset);
+    mController->GetManager()->UpdateScrollOffset(ScrollableLayerGuid(mRootLayerTreeId, aPresShellId, 0), aScrollOffset);
   }
   return true;
 }
@@ -285,7 +264,7 @@ bool
 EmbedLiteViewThreadParent::RecvZoomToRect(const CSSRect& aRect)
 {
   if (mController) {
-    mController->ZoomToRect(aRect);
+    mController->GetManager()->ZoomToRect(ScrollableLayerGuid(mRootLayerTreeId, 0, 0), aRect);
   }
   return true;
 }
@@ -294,7 +273,7 @@ bool
 EmbedLiteViewThreadParent::RecvContentReceivedTouch(const bool& aPreventDefault)
 {
   if (mController) {
-    mController->ContentReceivedTouch(aPreventDefault);
+    mController->GetManager()->ContentReceivedTouch(ScrollableLayerGuid(mRootLayerTreeId, 0, 0), aPreventDefault);
   }
   return true;
 }
@@ -499,10 +478,11 @@ void
 EmbedLiteViewThreadParent::SetViewSize(int width, int height)
 {
   LOGT("sz[%i,%i]", width, height);
-  mViewSize = gfxSize(width, height);
-  unused << SendSetViewSize(mViewSize);
+  mViewSize = ScreenIntSize(width, height);
+  unused << SendSetViewSize(gfxSize(width, height));
   if (mController) {
-    mController->UpdateCompositionBounds(ScreenIntRect(0, 0, width, height));
+    const ScreenIntRect r(ScreenIntPoint(), mViewSize);
+    mController->GetManager()->UpdateRootCompositionBounds(mRootLayerTreeId, r);
   }
 }
 
@@ -556,7 +536,8 @@ void
 EmbedLiteViewThreadParent::ReceiveInputEvent(const InputData& aEvent)
 {
   if (mController) {
-    mController->ReceiveInputEvent(aEvent);
+    ScrollableLayerGuid guid;
+    mController->ReceiveInputEvent(aEvent, &guid);
     if (aEvent.mInputType == MULTITOUCH_INPUT) {
       const MultiTouchInput& multiTouchInput = aEvent.AsMultiTouchInput();
       mozilla::CSSToScreenScale sz(mLastResolution, mLastResolution);
@@ -567,7 +548,7 @@ EmbedLiteViewThreadParent::ReceiveInputEvent(const InputData& aEvent)
                  multiTouchInput.mType == MultiTouchInput::MULTITOUCH_LEAVE) {
         mInTouchProcess = false;
       }
-      gfxPoint diff = mController->GetTempScrollOffset();
+      gfxPoint diff = mController->GetTempScrollOffset(guid);
       if (multiTouchInput.mType == MultiTouchInput::MULTITOUCH_MOVE) {
         unused << SendInputDataTouchMoveEvent(multiTouchInput, gfxSize(sz.scale, sz.scale), diff);
       } else {
@@ -621,7 +602,7 @@ EmbedLiteViewThreadParent::MousePress(int x, int y, int mstime, unsigned int but
                                                  mozilla::ScreenSize(1, 1),
                                                  180.0f,
                                                  1.0f));
-    mController->ReceiveInputEvent(event);
+    mController->ReceiveInputEvent(event, nullptr);
     unused << SendMouseEvent(NS_LITERAL_STRING("mousedown"),
                              x, y, buttons, 1, modifiers,
                              true);
@@ -639,7 +620,7 @@ EmbedLiteViewThreadParent::MouseRelease(int x, int y, int mstime, unsigned int b
                                                  mozilla::ScreenSize(1, 1),
                                                  180.0f,
                                                  1.0f));
-    mController->ReceiveInputEvent(event);
+    mController->ReceiveInputEvent(event, nullptr);
     unused << SendMouseEvent(NS_LITERAL_STRING("mouseup"),
                              x, y, buttons, 1, modifiers,
                              true);
@@ -657,7 +638,7 @@ EmbedLiteViewThreadParent::MouseMove(int x, int y, int mstime, unsigned int butt
                                                  mozilla::ScreenSize(1, 1),
                                                  180.0f,
                                                  1.0f));
-    mController->ReceiveInputEvent(event);
+    mController->ReceiveInputEvent(event, nullptr);
     unused << SendMouseEvent(NS_LITERAL_STRING("mousemove"),
                              x, y, buttons, 1, modifiers,
                              true);

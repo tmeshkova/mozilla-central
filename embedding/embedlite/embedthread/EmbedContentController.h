@@ -11,30 +11,13 @@
 #include "FrameMetrics.h"
 
 namespace mozilla {
+namespace layers {
+class APZCTreeManager;
+class CompositorParent;
+}
 namespace embedlite {
 class EmbedLiteViewListener;
 class EmbedLiteViewThreadParent;
-
-/**
- * Currently EmbedAsyncPanZoomController is needed because we need to do extra steps when panning ends.
- * This is not optimal way to implement HandlePanEnd as AsyncPanZoomController
- * invokes GeckoContentController::HandlePanEnd and overridden EmbedContentController::HandlePanEnd invokes
- * a method of EmbedAsyncPanZoomController so that we can call protected methods of ASyncPanZoomController.
- * There could be a virtual method that would allow us to do the same thing.
- *
- * Regardless of above, this helps us to keep AsyncPanZoomZontroller clean from
- * embedlite specifc fixes.
- */
-class EmbedAsyncPanZoomController : public mozilla::layers::AsyncPanZoomController
-{
-  public:
-    EmbedAsyncPanZoomController(uint64_t aLayersId,
-                                mozilla::layers::GeckoContentController* aGeckoContentController,
-                                GestureBehavior aGestures)
-      : AsyncPanZoomController(aLayersId, nullptr, aGeckoContentController, aGestures)
-    {}
-    void NotifyTransformEnd();
-};
 
 class EmbedContentController : public mozilla::layers::GeckoContentController
 {
@@ -42,32 +25,46 @@ class EmbedContentController : public mozilla::layers::GeckoContentController
   typedef mozilla::layers::ScrollableLayerGuid ScrollableLayerGuid;
 
 public:
-    EmbedContentController(EmbedLiteViewThreadParent* aRenderFrame)
-      : mUILoop(MessageLoop::current())
-      , mRenderFrame(aRenderFrame)
-      , mAsyncPanZoomController(0)
-    {}
+  EmbedContentController(EmbedLiteViewThreadParent* aRenderFrame, mozilla::layers::CompositorParent* aCompositor);
 
-    virtual void RequestContentRepaint(const FrameMetrics& aFrameMetrics) MOZ_OVERRIDE;
-    virtual void HandleDoubleTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE;
-    virtual void HandleSingleTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE;
-    virtual void HandleLongTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE;
-    virtual void NotifyTransformEnd() MOZ_OVERRIDE;
-    virtual void SendAsyncScrollDOMEvent(bool aIsRoot,
-                                         const CSSRect& aContentRect,
-                                         const CSSSize& aScrollableSize) MOZ_OVERRIDE;
-    virtual void ScrollUpdate(const CSSPoint& aPosition, const float aResolution) MOZ_OVERRIDE;
-    void ClearRenderFrame();
-    virtual void PostDelayedTask(Task* aTask, int aDelayMs) MOZ_OVERRIDE;
-    void SetAsyncPanZoomController(EmbedAsyncPanZoomController* aEmbedAsyncPanZoomController);
+  // GeckoContentController interface
+  virtual void RequestContentRepaint(const FrameMetrics& aFrameMetrics) MOZ_OVERRIDE;
+  virtual void HandleDoubleTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE;
+  virtual void HandleSingleTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE;
+  virtual void HandleLongTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE;
+  virtual void SendAsyncScrollDOMEvent(bool aIsRoot,
+                                       const CSSRect& aContentRect,
+                                       const CSSSize& aScrollableSize) MOZ_OVERRIDE;
+  virtual void ScrollUpdate(const CSSPoint& aPosition, const float aResolution) MOZ_OVERRIDE;
+  void ClearRenderFrame();
+  virtual void PostDelayedTask(Task* aTask, int aDelayMs) MOZ_OVERRIDE;
 
+  // EXTRA
+  void UpdateScrollOffset(const mozilla::layers::ScrollableLayerGuid& aScrollLayerId, CSSIntPoint& aScrollOffset);
+
+  bool HitTestAPZC(mozilla::ScreenIntPoint& aPoint);
+  void TransformCoordinateToGecko(const mozilla::ScreenIntPoint& aPoint,
+                                  LayoutDeviceIntPoint* aRefPointOut);
+  void ContentReceivedTouch(const ScrollableLayerGuid& aGuid, bool aPreventDefault);
+  nsEventStatus ReceiveInputEvent(const InputData& aEvent,
+                                  ScrollableLayerGuid* aOutTargetGuid);
+
+  mozilla::layers::APZCTreeManager* GetManager() { return mAPZC; }
+  gfxPoint GetTempScrollOffset(const ScrollableLayerGuid& aGuid);
 private:
-    EmbedLiteViewListener* GetListener();
-    void DoRequestContentRepaint(const FrameMetrics& aFrameMetrics);
+  EmbedLiteViewListener* GetListener();
+  void DoRequestContentRepaint(const FrameMetrics& aFrameMetrics);
 
-    MessageLoop* mUILoop;
-    EmbedLiteViewThreadParent* mRenderFrame;
-    EmbedAsyncPanZoomController* mAsyncPanZoomController;
+  MessageLoop* mUILoop;
+  EmbedLiteViewThreadParent* mRenderFrame;
+
+  // Extra
+  ScrollableLayerGuid mLastScrollLayerGuid;
+  CSSIntPoint mLastScrollOffset;
+
+public:
+  // todo: make this a member variable as prep for multiple views
+  nsRefPtr<mozilla::layers::APZCTreeManager> mAPZC;
 };
 
 }}

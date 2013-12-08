@@ -13,7 +13,6 @@
 #include "EmbedLiteViewThreadParent.h"
 #include "EmbedLiteApp.h"
 #include "EmbedLiteView.h"
-#include "mozilla/layers/AsyncPanZoomController.h"
 #include "mozilla/layers/LayerManagerComposite.h"
 #include "mozilla/layers/AsyncCompositionManager.h"
 #include "mozilla/layers/LayerTransactionParent.h"
@@ -189,11 +188,6 @@ void EmbedLiteCompositorParent::ShadowLayersUpdated(mozilla::layers::LayerTransa
 
   Layer* shadowRoot = aLayerTree->GetRoot();
   if (ContainerLayer* root = shadowRoot->AsContainerLayer()) {
-    AsyncPanZoomController* controller = GetEmbedPanZoomController();
-    if (controller) {
-        root->SetAsyncPanZoomController(controller);
-        controller->NotifyLayersUpdated(root->GetFrameMetrics(), isFirstPaint);
-    }
   }
 }
 
@@ -209,16 +203,6 @@ void EmbedLiteCompositorParent::ScheduleTask(CancelableTask* task, int time)
   if (!list || !list->Invalidate()) {
     CompositorParent::ScheduleTask(task, time);
   }
-}
-
-AsyncPanZoomController*
-EmbedLiteCompositorParent::GetEmbedPanZoomController()
-{
-  EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
-  NS_ASSERTION(view, "View is not available");
-  EmbedLiteViewThreadParent* pview = view ? static_cast<EmbedLiteViewThreadParent*>(view->GetImpl()) : nullptr;
-  NS_ASSERTION(pview, "PView is not available");
-  return pview ? pview->GetDefaultPanZoomController() : nullptr;
 }
 
 void

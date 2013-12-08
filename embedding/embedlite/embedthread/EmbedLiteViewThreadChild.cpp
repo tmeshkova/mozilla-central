@@ -26,7 +26,6 @@
 #include "nsIDocument.h"
 #include "nsIDOMDocument.h"
 #include "nsIPresShell.h"
-#include "mozilla/layers/AsyncPanZoomController.h"
 #include "nsIScriptSecurityManager.h"
 #include "mozilla/Preferences.h"
 #include "EmbedLiteAppService.h"
