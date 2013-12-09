@@ -11,7 +11,6 @@
 #include "EmbedLiteApp.h"
 
 #include "mozilla/unused.h"
-#include "EmbedLiteCompositorParent.h"
 
 using namespace base;
 using namespace mozilla::ipc;
@@ -21,18 +20,12 @@ namespace embedlite {
 
 static EmbedLiteAppThreadParent* sAppThreadParent = nullptr;
 
-EmbedLiteAppThreadParent*
-EmbedLiteAppThreadParent::GetInstance()
-{
-  return sAppThreadParent;
-}
-
-EmbedLiteAppThreadParent::EmbedLiteAppThreadParent(MessageLoop* aParentLoop)
+EmbedLiteAppThreadParent::EmbedLiteAppThreadParent()
   : mApp(EmbedLiteApp::GetInstance())
-  , mParentLoop(aParentLoop)
 {
   LOGT();
   MOZ_COUNT_CTOR(EmbedLiteAppThreadParent);
+  NS_ASSERTION(!sAppThreadParent, "Only one instance of EmbedLiteAppThreadParent is allowed");
   sAppThreadParent = this;
 }
 

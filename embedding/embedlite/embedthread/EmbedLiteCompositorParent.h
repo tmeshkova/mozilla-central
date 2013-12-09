@@ -55,6 +55,8 @@ protected:
                                 nsIntPoint& aScrollOffset, float& aScaleX, float& aScaleY,
                                 gfx::Margin& aFixedLayerMargins);
 
+  void DeferredDestroyCompositor();
+
   bool IsGLBackend();
 
   RefPtr<EmbedLiteViewThreadParent> mView;

@@ -9,7 +9,6 @@
 #include "EmbedLiteCompositorParent.h"
 #include "EmbedLiteRenderTarget.h"
 #include "BasicLayers.h"
-#include "EmbedLiteAppThreadParent.h"
 #include "EmbedLiteViewThreadParent.h"
 #include "EmbedLiteApp.h"
 #include "EmbedLiteView.h"
@@ -139,23 +138,23 @@ void EmbedLiteCompositorParent::SetClipping(const gfxRect& aClipRect)
   gfxUtils::GfxRectToIntRect(aClipRect, &mActiveClipping);
 }
 
-static void DeferredDestroyCompositor(EmbedLiteCompositorParent* aCompositorParent, uint32_t id)
+void EmbedLiteCompositorParent::DeferredDestroyCompositor()
 {
-  if (aCompositorParent->GetChildCompositor()) {
+  if (GetChildCompositor()) {
     // First iteration, if child compositor available
     // Destroy it from current Child Message Loop and
     // Post task for Parent Compositor destroy in Parent MessageLoop
-    NS_ASSERTION(MessageLoop::current() != EmbedLiteAppThreadParent::GetInstance()->GetParentLoop(),
+    NS_ASSERTION(MessageLoop::current() != EmbedLiteApp::GetInstance()->GetUILoop(),
                  "CompositorChild must be destroyed from Child Message Loop");
-    aCompositorParent->GetChildCompositor()->Release();
-    aCompositorParent->SetChildCompositor(nullptr, nullptr);
-    EmbedLiteAppThreadParent::GetInstance()->GetParentLoop()->PostTask(FROM_HERE,
-        NewRunnableFunction(DeferredDestroyCompositor, aCompositorParent, id));
+    GetChildCompositor()->Release();
+    SetChildCompositor(nullptr, nullptr);
+    EmbedLiteApp::GetInstance()->GetUILoop()->PostTask(FROM_HERE,
+        NewRunnableMethod(this, &EmbedLiteCompositorParent::DeferredDestroyCompositor));
   } else {
-    NS_ASSERTION(MessageLoop::current() == EmbedLiteAppThreadParent::GetInstance()->GetParentLoop(),
+    NS_ASSERTION(MessageLoop::current() == EmbedLiteApp::GetInstance()->GetUILoop(),
                  "CompositorParent must be destroyed from Parent Message Loop");
     // Finally destroy Parent compositor
-    aCompositorParent->Release();
+    Release();
   }
 }
 
@@ -173,7 +172,7 @@ bool EmbedLiteCompositorParent::RecvStop()
   Destroy();
   // Delegate destroy of Child/Parent compositor in delayed task in order to avoid Child loop having dead objects
   mChildMessageLoop->PostTask(FROM_HERE,
-                              NewRunnableFunction(DeferredDestroyCompositor, this, mId));
+                              NewRunnableMethod(this, &EmbedLiteCompositorParent::DeferredDestroyCompositor));
   return true;
 }
 
