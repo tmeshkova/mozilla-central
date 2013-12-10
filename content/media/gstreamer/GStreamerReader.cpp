@@ -208,16 +208,6 @@ nsresult GStreamerReader::Init(MediaDecoderReader* aCloneDonor)
   return NS_OK;
 }
 
-void GStreamerReader::Suspend()
-{
-#ifdef HAS_NEMO_RESOURCE
-  if (mPlayBin) {
-    gst_element_set_state(mPlayBin, GST_STATE_NULL);
-    ResetIfCurrentDecoderActive(this);
-  }
-#endif
-}
-
 GstBusSyncReply
 GStreamerReader::ErrorCb(GstBus *aBus, GstMessage *aMessage, gpointer aUserData)
 {
