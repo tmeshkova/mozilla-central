@@ -62,23 +62,6 @@ MDefinition::PrintOpcodeName(FILE *fp, MDefinition::Opcode op)
         fprintf(fp, "%c", tolower(name[i]));
 }
 
-// If one of the inputs to any non-phi are in a block that will abort, then there is
-// no point in processing this instruction, since control flow cannot reach here.
-bool
-MDefinition::earlyAbortCheck()
-{
-    if (isPhi())
-        return false;
-    for (size_t i = 0, e = numOperands(); i < e; i++) {
-        if (getOperand(i)->block()->earlyAbort()) {
-            block()->setEarlyAbort();
-            IonSpew(IonSpew_Range, "Ignoring value from block %d because instruction %d is in a block that aborts", block()->id(), getOperand(i)->id());
-            return true;
-        }
-    }
-    return false;
-}
-
 static inline bool
 EqualValues(bool useGVN, MDefinition *left, MDefinition *right)
 {
@@ -1723,6 +1706,9 @@ MCompare::inputType()
         return MIRType_Boolean;
       case Compare_UInt32:
       case Compare_Int32:
+      case Compare_Int32MaybeCoerceBoth:
+      case Compare_Int32MaybeCoerceLHS:
+      case Compare_Int32MaybeCoerceRHS:
         return MIRType_Int32;
       case Compare_Double:
       case Compare_DoubleMaybeCoerceLHS:
@@ -1809,7 +1795,7 @@ MCompare::infer(BaselineInspector *inspector, jsbytecode *pc)
     if ((lhs == MIRType_Int32 && rhs == MIRType_Int32) ||
         (lhs == MIRType_Boolean && rhs == MIRType_Boolean))
     {
-        compareType_ = Compare_Int32;
+        compareType_ = Compare_Int32MaybeCoerceBoth;
         return;
     }
 
@@ -1818,7 +1804,7 @@ MCompare::infer(BaselineInspector *inspector, jsbytecode *pc)
         (lhs == MIRType_Int32 || lhs == MIRType_Boolean) &&
         (rhs == MIRType_Int32 || rhs == MIRType_Boolean))
     {
-        compareType_ = Compare_Int32;
+        compareType_ = Compare_Int32MaybeCoerceBoth;
         return;
     }
 

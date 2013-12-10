@@ -386,8 +386,6 @@ class MDefinition : public MNode
     virtual bool truncate();
     virtual bool isOperandTruncated(size_t index) const;
 
-    bool earlyAbortCheck();
-
     // Compute an absolute or symbolic range for the value of this node.
     virtual void computeRange(TempAllocator &alloc) {
     }
@@ -1279,6 +1277,9 @@ class MTest
     static MTest *New(TempAllocator &alloc, MDefinition *ins,
                       MBasicBlock *ifTrue, MBasicBlock *ifFalse);
 
+    MDefinition *input() const {
+        return getOperand(0);
+    }
     MBasicBlock *ifTrue() const {
         return getSuccessor(0);
     }
@@ -2192,6 +2193,9 @@ class MCompare
         // Int32   compared to Int32
         // Boolean compared to Boolean
         Compare_Int32,
+        Compare_Int32MaybeCoerceBoth,
+        Compare_Int32MaybeCoerceLHS,
+        Compare_Int32MaybeCoerceRHS,
 
         // Int32 compared as unsigneds
         Compare_UInt32,
@@ -2258,6 +2262,12 @@ class MCompare
     CompareType compareType() const {
         return compareType_;
     }
+    bool isInt32Comparison() const {
+        return compareType() == Compare_Int32 ||
+               compareType() == Compare_Int32MaybeCoerceBoth ||
+               compareType() == Compare_Int32MaybeCoerceLHS ||
+               compareType() == Compare_Int32MaybeCoerceRHS;
+    }
     bool isDoubleComparison() const {
         return compareType() == Compare_Double ||
                compareType() == Compare_DoubleMaybeCoerceLHS ||
@@ -2301,6 +2311,8 @@ class MCompare
 
     void trySpecializeFloat32(TempAllocator &alloc);
     bool isFloat32Commutative() const { return true; }
+    bool truncate();
+    bool isOperandTruncated(size_t index) const;
 
 # ifdef DEBUG
     bool isConsistentFloat32Use() const {
@@ -3041,10 +3053,12 @@ class MToInt32
     public ToInt32Policy
 {
     bool canBeNegativeZero_;
+    MacroAssembler::IntConversionInputKind conversion_;
 
-    MToInt32(MDefinition *def)
+    MToInt32(MDefinition *def, MacroAssembler::IntConversionInputKind conversion)
       : MUnaryInstruction(def),
-        canBeNegativeZero_(true)
+        canBeNegativeZero_(true),
+        conversion_(conversion)
     {
         setResultType(MIRType_Int32);
         setMovable();
@@ -3052,9 +3066,11 @@ class MToInt32
 
   public:
     INSTRUCTION_HEADER(ToInt32)
-    static MToInt32 *New(TempAllocator &alloc, MDefinition *def)
+    static MToInt32 *New(TempAllocator &alloc, MDefinition *def,
+                         MacroAssembler::IntConversionInputKind conversion =
+                             MacroAssembler::IntConversion_Any)
     {
-        return new(alloc) MToInt32(def);
+        return new(alloc) MToInt32(def, conversion);
     }
 
     MDefinition *foldsTo(TempAllocator &alloc, bool useValueNumbers);
@@ -3071,6 +3087,10 @@ class MToInt32
 
     TypePolicy *typePolicy() {
         return this;
+    }
+
+    MacroAssembler::IntConversionInputKind conversion() const {
+        return conversion_;
     }
 
     bool congruentTo(MDefinition *ins) const {

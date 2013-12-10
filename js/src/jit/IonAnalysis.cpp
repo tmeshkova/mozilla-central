@@ -88,7 +88,7 @@ jit::EliminateDeadResumePointOperands(MIRGenerator *mir, MIRGraph &graph)
             // parameter passing might be live. Rewriting uses of these terms
             // in resume points may affect the interpreter's behavior. Rather
             // than doing a more sophisticated analysis, just ignore these.
-            if (ins->isUnbox() || ins->isParameter() || ins->isTypeBarrier())
+            if (ins->isUnbox() || ins->isParameter() || ins->isTypeBarrier() || ins->isComputeThis())
                 continue;
 
             // If the instruction's behavior has been constant folded into a
@@ -1288,7 +1288,7 @@ void
 jit::AssertGraphCoherency(MIRGraph &graph)
 {
 #ifdef DEBUG
-    if (!js_IonOptions.assertGraphConsistency)
+    if (!js_IonOptions.checkGraphConsistency)
         return;
     AssertBasicGraphCoherency(graph);
     AssertReversePostOrder(graph);
@@ -1303,7 +1303,7 @@ jit::AssertExtendedGraphCoherency(MIRGraph &graph)
     // are split)
 
 #ifdef DEBUG
-    if (!js_IonOptions.assertGraphConsistency)
+    if (!js_IonOptions.checkGraphConsistency)
         return;
     AssertGraphCoherency(graph);
 
@@ -1449,7 +1449,7 @@ jit::ExtractLinearInequality(MTest *test, BranchDirection direction,
     MDefinition *rhs = compare->getOperand(1);
 
     // TODO: optimize Compare_UInt32
-    if (compare->compareType() != MCompare::Compare_Int32)
+    if (!compare->isInt32Comparison())
         return false;
 
     JS_ASSERT(lhs->type() == MIRType_Int32);

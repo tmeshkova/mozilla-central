@@ -2084,7 +2084,7 @@ CSSParserImpl::ParseMozDocumentRule(RuleAppendFunc aAppendFunc, void* aData)
            (mToken.mIdent.LowerCaseEqualsLiteral("url-prefix") ||
             mToken.mIdent.LowerCaseEqualsLiteral("domain") ||
             mToken.mIdent.LowerCaseEqualsLiteral("regexp"))))) {
-      REPORT_UNEXPECTED_TOKEN(PEMozDocRuleBadFunc);
+      REPORT_UNEXPECTED_TOKEN(PEMozDocRuleBadFunc2);
       UngetToken();
       delete urls;
       return false;
@@ -2789,9 +2789,9 @@ CSSParserImpl::ParseSupportsConditionInParens(bool& aConditionMet)
   }
 
   if (!(ExpectSymbol(')', true))) {
-    REPORT_UNEXPECTED_TOKEN(PESupportsConditionExpectedCloseParen);
     SkipUntil(')');
-    return false;
+    aConditionMet = false;
+    return true;
   }
 
   return true;
