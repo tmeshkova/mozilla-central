@@ -11,6 +11,8 @@
 #include <stdint.h>
 #include <map>
 
+class MessageLoop;
+
 namespace mozilla {
 namespace embedlite {
 
@@ -139,11 +141,13 @@ private:
   friend class EmbedLiteViewThreadParent;
   friend class EmbedLiteCompositorParent;
   friend class EmbedLitePuppetWidget;
+
   EmbedLiteView* GetViewByID(uint32_t id);
   void ViewDestroyed(uint32_t id);
   void ChildReadyToDestroy();
   uint32_t CreateWindowRequested(const uint32_t& chromeFlags, const char* uri, const uint32_t& contextFlags, const uint32_t& parentId);
   EmbedLiteAppListener* GetListener();
+  MessageLoop* GetUILoop();
 
   static EmbedLiteApp* sSingleton;
   EmbedLiteAppListener* mListener;
