@@ -540,6 +540,7 @@ EmbedLiteViewThreadParent::ReceiveInputEvent(const InputData& aEvent)
     mController->ReceiveInputEvent(aEvent, &guid);
     if (aEvent.mInputType == MULTITOUCH_INPUT) {
       const MultiTouchInput& multiTouchInput = aEvent.AsMultiTouchInput();
+      // FIXME switch to APZC TransformCoordinateToGecko API instead of resolution calculation
       mozilla::CSSToScreenScale sz(mLastResolution, mLastResolution);
       if (multiTouchInput.mType == MultiTouchInput::MULTITOUCH_START ||
           multiTouchInput.mType == MultiTouchInput::MULTITOUCH_ENTER) {
@@ -548,7 +549,7 @@ EmbedLiteViewThreadParent::ReceiveInputEvent(const InputData& aEvent)
                  multiTouchInput.mType == MultiTouchInput::MULTITOUCH_LEAVE) {
         mInTouchProcess = false;
       }
-      gfxPoint diff = mController->GetTempScrollOffset(guid);
+      gfxPoint diff; // = mController->GetTempScrollOffset(guid);
       if (multiTouchInput.mType == MultiTouchInput::MULTITOUCH_MOVE) {
         unused << SendInputDataTouchMoveEvent(multiTouchInput, gfxSize(sz.scale, sz.scale), diff);
       } else {

@@ -238,11 +238,6 @@ public:
   void SendAsyncScrollEvent();
 
   /**
-   * Get Difference between layout scroll offset and AZPC layers temp scroll offset
-   */
-  gfxPoint GetTempScrollOffset();
-
-  /**
    * Handler for events which should not be intercepted by the touch listener.
    * Does the work for ReceiveInputEvent().
    */

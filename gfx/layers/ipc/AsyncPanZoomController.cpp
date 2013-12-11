@@ -1412,17 +1412,6 @@ bool AsyncPanZoomController::SampleContentTransformForFrame(const TimeStamp& aSa
   return requestAnimationFrame;
 }
 
-gfxPoint
-AsyncPanZoomController::GetTempScrollOffset()
-{
-  CSSPoint diff;
-  {
-    ReentrantMonitorAutoEnter lock(mMonitor);
-    diff = mLastContentPaintMetrics.mScrollOffset - mFrameMetrics.mScrollOffset;
-  }
-  return gfxPoint(diff.x, diff.y);
-}
-
 ViewTransform AsyncPanZoomController::GetCurrentAsyncTransform() {
   ReentrantMonitorAutoEnter lock(mMonitor);
 
@@ -1718,6 +1707,8 @@ void AsyncPanZoomController::SendAsyncScrollEvent() {
   bool isRoot;
   CSSRect contentRect;
   CSSSize scrollableSize;
+  CSSToScreenScale resolution;
+  CSSPoint scrollOffset;
   {
     ReentrantMonitorAutoEnter lock(mMonitor);
 
@@ -1725,9 +1716,12 @@ void AsyncPanZoomController::SendAsyncScrollEvent() {
     scrollableSize = mFrameMetrics.mScrollableRect.Size();
     contentRect = mFrameMetrics.CalculateCompositedRectInCssPixels();
     contentRect.MoveTo(mCurrentAsyncScrollOffset);
+    resolution = mFrameMetrics.mZoom;
+    scrollOffset = mFrameMetrics.mScrollOffset;
   }
 
   controller->SendAsyncScrollDOMEvent(isRoot, contentRect, scrollableSize);
+  controller->ScrollUpdate(scrollOffset, resolution.scale);
 }
 
 void AsyncPanZoomController::UpdateScrollOffset(const CSSPoint& aScrollOffset)

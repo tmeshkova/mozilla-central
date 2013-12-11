@@ -171,10 +171,3 @@ EmbedContentController::ReceiveInputEvent(const InputData& aEvent,
 
   return mAPZC->ReceiveInputEvent(aEvent, aOutTargetGuid);
 }
-
-gfxPoint
-EmbedContentController::GetTempScrollOffset(const ScrollableLayerGuid& aGuid)
-{
-  nsRefPtr<AsyncPanZoomController> apzc = mAPZC->GetTargetAPZC(aGuid);
-  return apzc ? apzc->GetTempScrollOffset() : gfxPoint();
-}

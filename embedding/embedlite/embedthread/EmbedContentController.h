@@ -50,7 +50,6 @@ public:
                                   ScrollableLayerGuid* aOutTargetGuid);
 
   mozilla::layers::APZCTreeManager* GetManager() { return mAPZC; }
-  gfxPoint GetTempScrollOffset(const ScrollableLayerGuid& aGuid);
 private:
   EmbedLiteViewListener* GetListener();
   void DoRequestContentRepaint(const FrameMetrics& aFrameMetrics);
