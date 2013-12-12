@@ -640,7 +640,6 @@ ToWidgetPoint(float aX, float aY, const nsPoint& aOffset,
 
 bool
 TabChildHelper::ConvertMutiTouchInputToEvent(const mozilla::MultiTouchInput& aData,
-                                             const gfxSize& res, const gfxPoint& diff,
                                              WidgetTouchEvent& aEvent)
 {
   uint32_t msg = NS_USER_DEFINED_EVENT;
@@ -693,14 +692,8 @@ TabChildHelper::ConvertMutiTouchInputToEvent(const mozilla::MultiTouchInput& aDa
   aEvent.touches.SetCapacity(aData.mTouches.Length());
   for (uint32_t i = 0; i < aData.mTouches.Length(); ++i) {
     const SingleTouchData& data = aData.mTouches[i];
-    gfx::Point pt(data.mScreenPoint.x, data.mScreenPoint.y);
-    pt.x = pt.x / res.width;
-    pt.y = pt.y / res.height;
-    nsIntPoint tpt = ToWidgetPoint(pt.x, pt.y, offset, presContext);
-    tpt.x -= diff.x;
-    tpt.y -= diff.y;
     nsRefPtr<Touch> t = new Touch(data.mIdentifier,
-                                  tpt,
+                                  nsIntPoint(data.mScreenPoint.x, data.mScreenPoint.y),
                                   nsIntPoint(data.mRadius.width, data.mRadius.height),
                                   data.mRotationAngle,
                                   data.mForce);

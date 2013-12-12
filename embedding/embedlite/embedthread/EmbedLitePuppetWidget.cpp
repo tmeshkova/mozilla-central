@@ -46,7 +46,6 @@ const size_t EmbedLitePuppetWidget::kMaxDimension = 4000;
 static nsTArray<EmbedLitePuppetWidget*> gTopLevelWindows;
 static bool sFailedToCreateGLContext = false;
 static nsRefPtr<gl::GLContext> sGLContext;
-static bool sValidSurface = false;
 
 NS_IMPL_ISUPPORTS_INHERITED1(EmbedLitePuppetWidget, nsBaseWidget,
                              nsISupportsWeakReference)

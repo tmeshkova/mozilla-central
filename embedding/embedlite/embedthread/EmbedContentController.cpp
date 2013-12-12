@@ -16,8 +16,8 @@ using namespace mozilla::embedlite;
 using namespace mozilla::gfx;
 using namespace mozilla::layers;
 
-EmbedContentController::EmbedContentController(EmbedLiteViewThreadParent* aRenderFrame, CompositorParent* aCompositor)
-  : mUILoop(MessageLoop::current())
+EmbedContentController::EmbedContentController(EmbedLiteViewThreadParent* aRenderFrame, CompositorParent* aCompositor, MessageLoop* aUILoop)
+  : mUILoop(aUILoop)
   , mRenderFrame(aRenderFrame)
 {
   mAPZC = CompositorParent::GetAPZCTreeManager(aCompositor->RootLayerTreeId());
@@ -163,8 +163,6 @@ nsEventStatus
 EmbedContentController::ReceiveInputEvent(const InputData& aEvent,
                                           ScrollableLayerGuid* aOutTargetGuid)
 {
-  MOZ_ASSERT(aEvent);
-
   if (!mAPZC) {
     return nsEventStatus_eIgnore;
   }

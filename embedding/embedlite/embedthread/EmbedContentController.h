@@ -25,7 +25,7 @@ class EmbedContentController : public mozilla::layers::GeckoContentController
   typedef mozilla::layers::ScrollableLayerGuid ScrollableLayerGuid;
 
 public:
-  EmbedContentController(EmbedLiteViewThreadParent* aRenderFrame, mozilla::layers::CompositorParent* aCompositor);
+  EmbedContentController(EmbedLiteViewThreadParent* aRenderFrame, mozilla::layers::CompositorParent* aCompositor, MessageLoop* aUILoop);
 
   // GeckoContentController interface
   virtual void RequestContentRepaint(const FrameMetrics& aFrameMetrics) MOZ_OVERRIDE;

@@ -68,7 +68,6 @@ protected:
   nsEventStatus DispatchWidgetEvent(WidgetGUIEvent& event);
   // Sends a simulated mouse event from a touch event for compatibility.
   bool ConvertMutiTouchInputToEvent(const mozilla::MultiTouchInput& aData,
-                                    const gfxSize& res, const gfxPoint& diff,
                                     WidgetTouchEvent& aEvent);
   void DispatchSynthesizedMouseEvent(uint32_t aMsg, uint64_t aTime,
                                      const nsIntPoint& aRefPoint);

@@ -91,8 +91,8 @@ protected:
   virtual bool RecvHandleTextEvent(const nsString& commit, const nsString& preEdit);
   virtual bool RecvHandleKeyPressEvent(const int& domKeyCode, const int& gmodifiers, const int& charCode);
   virtual bool RecvHandleKeyReleaseEvent(const int& domKeyCode, const int& gmodifiers, const int& charCode);
-  virtual bool RecvInputDataTouchEvent(const mozilla::MultiTouchInput&, const gfxSize& res, const gfxPoint& diff);
-  virtual bool RecvInputDataTouchMoveEvent(const mozilla::MultiTouchInput&, const gfxSize& res, const gfxPoint& diff);
+  virtual bool RecvInputDataTouchEvent(const mozilla::MultiTouchInput&);
+  virtual bool RecvInputDataTouchMoveEvent(const mozilla::MultiTouchInput&);
 
   virtual bool
   RecvAddMessageListener(const nsCString&);

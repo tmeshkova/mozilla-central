@@ -781,10 +781,10 @@ EmbedLiteViewThreadChild::RecvMouseEvent(const nsString& aType,
 }
 
 bool
-EmbedLiteViewThreadChild::RecvInputDataTouchEvent(const mozilla::MultiTouchInput& aData, const gfxSize& res, const gfxPoint& diff)
+EmbedLiteViewThreadChild::RecvInputDataTouchEvent(const mozilla::MultiTouchInput& aData)
 {
   WidgetTouchEvent localEvent;
-  if (mHelper->ConvertMutiTouchInputToEvent(aData, res, diff, localEvent)) {
+  if (mHelper->ConvertMutiTouchInputToEvent(aData, localEvent)) {
     nsEventStatus status =
       mHelper->DispatchWidgetEvent(localEvent);
     nsCOMPtr<nsPIDOMWindow> outerWindow = do_GetInterface(mWebNavigation);
@@ -816,9 +816,9 @@ EmbedLiteViewThreadChild::RecvInputDataTouchEvent(const mozilla::MultiTouchInput
 }
 
 bool
-EmbedLiteViewThreadChild::RecvInputDataTouchMoveEvent(const mozilla::MultiTouchInput& aData, const gfxSize& res, const gfxPoint& diff)
+EmbedLiteViewThreadChild::RecvInputDataTouchMoveEvent(const mozilla::MultiTouchInput& aData)
 {
-  return RecvInputDataTouchEvent(aData, res, diff);
+  return RecvInputDataTouchEvent(aData);
 }
 
 NS_IMETHODIMP

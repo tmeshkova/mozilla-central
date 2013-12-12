@@ -78,16 +78,16 @@ EmbedLiteViewThreadParent::SetCompositor(EmbedLiteCompositorParent* aCompositor)
 void
 EmbedLiteViewThreadParent::UpdateScrollController()
 {
-  mController = nullptr;
   if (mViewAPIDestroyed) {
     return;
   }
 
   NS_ENSURE_TRUE(mView, );
 
+  mController = nullptr;
   if (mCompositor) {
     mRootLayerTreeId = mCompositor->RootLayerTreeId();
-    mController = new EmbedContentController(this, mCompositor);
+    mController = new EmbedContentController(this, mCompositor, mUILoop);
     CompositorParent::SetControllerForLayerTree(mRootLayerTreeId, mController);
   }
 }
@@ -540,8 +540,6 @@ EmbedLiteViewThreadParent::ReceiveInputEvent(const InputData& aEvent)
     mController->ReceiveInputEvent(aEvent, &guid);
     if (aEvent.mInputType == MULTITOUCH_INPUT) {
       const MultiTouchInput& multiTouchInput = aEvent.AsMultiTouchInput();
-      // FIXME switch to APZC TransformCoordinateToGecko API instead of resolution calculation
-      mozilla::CSSToScreenScale sz(mLastResolution, mLastResolution);
       if (multiTouchInput.mType == MultiTouchInput::MULTITOUCH_START ||
           multiTouchInput.mType == MultiTouchInput::MULTITOUCH_ENTER) {
         mInTouchProcess = true;
@@ -549,11 +547,20 @@ EmbedLiteViewThreadParent::ReceiveInputEvent(const InputData& aEvent)
                  multiTouchInput.mType == MultiTouchInput::MULTITOUCH_LEAVE) {
         mInTouchProcess = false;
       }
-      gfxPoint diff; // = mController->GetTempScrollOffset(guid);
+      LayoutDeviceIntPoint lpt;
+      MultiTouchInput translatedEvent(multiTouchInput.mType, multiTouchInput.mTime, multiTouchInput.modifiers);
+      for (uint32_t i = 0; i < multiTouchInput.mTouches.Length(); ++i) {
+        const SingleTouchData& data = multiTouchInput.mTouches[i];
+        mController->GetManager()->TransformCoordinateToGecko(ScreenIntPoint(data.mScreenPoint.x, data.mScreenPoint.y), &lpt);
+        SingleTouchData newData = multiTouchInput.mTouches[i];
+        newData.mScreenPoint.x = lpt.x;
+        newData.mScreenPoint.y = lpt.y;
+        translatedEvent.mTouches.AppendElement(newData);
+      }
       if (multiTouchInput.mType == MultiTouchInput::MULTITOUCH_MOVE) {
-        unused << SendInputDataTouchMoveEvent(multiTouchInput, gfxSize(sz.scale, sz.scale), diff);
+        unused << SendInputDataTouchMoveEvent(translatedEvent);
       } else {
-        unused << SendInputDataTouchEvent(multiTouchInput, gfxSize(sz.scale, sz.scale), diff);
+        unused << SendInputDataTouchEvent(translatedEvent);
       }
     }
   }
