@@ -696,7 +696,7 @@ EmbedLiteViewThreadParent::GetUniqueID()
 EmbedLiteRenderTarget*
 EmbedLiteViewThreadParent::CreateEmbedLiteRenderTarget(int width, int height)
 {
-  return new EmbedLiteRenderTarget(width, height, mCompositor->GetLayerManager());
+  return new EmbedLiteRenderTarget(width, height, mCompositor);
 }
 
 

@@ -82,6 +82,10 @@ void EmbedContentController::HandleLongTap(const CSSIntPoint& aPoint, int32_t aM
     }
 }
 
+void EmbedContentController::HandleLongTapUp(const CSSIntPoint& aPoint, int32_t aModifiers)
+{
+}
+
 /**
  * Requests sending a mozbrowserasyncscroll domevent to embedder.
  * |aContentRect| is in CSS pixels, relative to the current cssPage.
