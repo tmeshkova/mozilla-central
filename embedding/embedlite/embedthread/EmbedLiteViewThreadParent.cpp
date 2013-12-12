@@ -34,7 +34,6 @@ EmbedLiteViewThreadParent::EmbedLiteViewThreadParent(const uint32_t& id, const u
   , mInTouchProcess(false)
   , mUILoop(MessageLoop::current())
   , mLastIMEState(0)
-  , mLastResolution(1.0f)
 {
   MOZ_COUNT_CTOR(EmbedLiteViewThreadParent);
   MOZ_ASSERT(mView, "View destroyed during OMTC view construction");
@@ -694,11 +693,6 @@ uint32_t
 EmbedLiteViewThreadParent::GetUniqueID()
 {
   return mId;
-}
-
-void EmbedLiteViewThreadParent::UpdateLastResolution(const float aResolution)
-{
-  mLastResolution = aResolution;
 }
 
 EmbedLiteRenderTarget*

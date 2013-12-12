@@ -123,9 +123,6 @@ void EmbedContentController::ScrollUpdate(const CSSPoint& aPosition, const float
         return;
     }
     EmbedLiteViewListener* listener = GetListener();
-    if (mRenderFrame) {
-        mRenderFrame->UpdateLastResolution(aResolution);
-    }
     if (listener) {
         listener->ScrollUpdate(gfxPoint(aPosition.x, aPosition.y), aResolution);
     }

@@ -130,7 +130,6 @@ protected:
                                    const int32_t& aCause,
                                    const int32_t& aFocusChange);
   virtual bool RecvGetGLViewSize(gfxSize* aSize);
-  void UpdateLastResolution(const float aResolution);
 
 private:
   friend class EmbedContentController;
@@ -148,7 +147,6 @@ private:
   bool mInTouchProcess;
   MessageLoop* mUILoop;
   int mLastIMEState;
-  float mLastResolution;
 
   uint64_t mRootLayerTreeId;
   nsRefPtr<EmbedContentController> mController;
