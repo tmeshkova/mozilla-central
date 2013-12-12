@@ -1,4 +1,4 @@
-%define greversion 26.0
+%define greversion 29.0a1
 
 Name:       xulrunner-qt5
 Summary:    XUL runner
@@ -16,6 +16,7 @@ BuildRequires:  pkgconfig(Qt5Widgets)
 BuildRequires:  pkgconfig(Qt5PrintSupport)
 BuildRequires:  pkgconfig(pango)
 BuildRequires:  pkgconfig(alsa)
+BuildRequires:  pkgconfig(libpulse)
 BuildRequires:  pkgconfig(gstreamer-0.10)
 BuildRequires:  pkgconfig(gstreamer-app-0.10)
 BuildRequires:  pkgconfig(gstreamer-plugins-base-0.10)
