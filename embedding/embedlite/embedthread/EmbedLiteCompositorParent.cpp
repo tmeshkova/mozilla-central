@@ -52,9 +52,9 @@ EmbedLiteCompositorParent::AllocPLayerTransactionParent(const nsTArray<LayersBac
                                                         bool *aSuccess)
 {
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
-  EmbedLiteViewListener* list = view ? view->GetListener() : nullptr;
-  if (list) {
-    list->CompositorCreated();
+  EmbedLiteViewListener* listener = view ? view->GetListener() : nullptr;
+  if (listener) {
+    listener->CompositorCreated();
   }
   return CompositorParent::AllocPLayerTransactionParent(aBackendHints,
                                                         aId,
@@ -117,9 +117,7 @@ bool
 EmbedLiteCompositorParent::RequestHasHWAcceleratedContext()
 {
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
-  if (view && view->GetListener())
-    return view->GetListener()->RequestCurrentGLContext();
-  return false;
+  return view ? view->GetListener()->RequestCurrentGLContext() : false;
 }
 
 void EmbedLiteCompositorParent::SetSurfaceSize(int width, int height)
@@ -184,8 +182,7 @@ void EmbedLiteCompositorParent::ScheduleTask(CancelableTask* task, int time)
     LOGE("view not available.. forgot SuspendComposition call?");
     return;
   }
-  EmbedLiteViewListener* list = view->GetListener();
-  if (!list || !list->Invalidate()) {
+  if (!view->GetListener()->Invalidate()) {
     CompositorParent::ScheduleTask(task, time);
   }
 }

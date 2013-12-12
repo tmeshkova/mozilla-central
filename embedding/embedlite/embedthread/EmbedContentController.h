@@ -51,7 +51,7 @@ public:
 
   mozilla::layers::APZCTreeManager* GetManager() { return mAPZC; }
 private:
-  EmbedLiteViewListener* GetListener();
+  EmbedLiteViewListener* const GetListener() const;
   void DoRequestContentRepaint(const FrameMetrics& aFrameMetrics);
 
   MessageLoop* mUILoop;
