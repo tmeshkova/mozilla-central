@@ -1061,6 +1061,11 @@ GLContextProviderGLX::CreateForWindow(nsIWidget *aWidget)
     // is a relatively safe intermediate step.
 
     Display *display = (Display*)aWidget->GetNativeData(NS_NATIVE_DISPLAY);
+    if (!display) {
+        NS_ERROR("X Display required for GLX Context provider");
+        return nullptr;
+    }
+
     int xscreen = DefaultScreen(display);
     Window window = GET_NATIVE_WINDOW(aWidget);
 
