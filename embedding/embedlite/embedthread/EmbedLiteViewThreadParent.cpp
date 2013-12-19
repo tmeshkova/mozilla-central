@@ -17,6 +17,26 @@
 #include "mozilla/unused.h"
 #include "EmbedContentController.h"
 #include "mozilla/layers/APZCTreeManager.h"
+#include "EmbedLiteContextWrapper.h"
+
+#include "GLContext.h"                  // for GLContext
+#include "GLScreenBuffer.h"             // for GLScreenBuffer
+#include "SharedSurfaceEGL.h"           // for SurfaceFactory_EGLImage
+#include "SharedSurfaceGL.h"            // for SurfaceFactory_GLTexture, etc
+#include "SurfaceStream.h"              // for SurfaceStream, etc
+#include "SurfaceTypes.h"               // for SurfaceStreamType
+#include "ClientLayerManager.h"         // for ClientLayerManager, etc
+
+#include "BasicLayers.h"
+#include "mozilla/layers/LayerManagerComposite.h"
+#include "mozilla/layers/AsyncCompositionManager.h"
+#include "mozilla/layers/LayerTransactionParent.h"
+#include "mozilla/layers/CompositorOGL.h"
+#include "gfxUtils.h"
+
+
+using namespace mozilla::gfx;
+using namespace mozilla::gl;
 
 using namespace mozilla::layers;
 using namespace mozilla::widget;
@@ -699,6 +719,95 @@ EmbedLiteViewThreadParent::CreateEmbedLiteRenderTarget(int width, int height)
   return new EmbedLiteRenderTarget(width, height, mCompositor);
 }
 
+bool EmbedLiteViewThreadParent::PrepareTexture(void* aContextWrapper)
+{
+    return false;
+    if (!mCompositor) {
+        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No Compositor\n", __FUNCTION__, __LINE__);
+        return false;
+    }
+    const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(mCompositor->RootLayerTreeId());
+    if (!state) {
+        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No State\n", __FUNCTION__, __LINE__);
+        return false;
+    }
+
+    GLContext* context = static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->gl();
+    if (!context) {
+        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No GLContext\n", __FUNCTION__, __LINE__);
+        return false;
+    }
+
+    GLContext* consumerContext = static_cast<EmbedLiteContextWrapper*>(aContextWrapper)->GetConsumerContext();
+    consumerContext->MakeCurrent();
+
+    bool published = context->PublishFrame();
+    SharedSurface* sharedSurf = context->RequestFrame();
+    while (sharedSurf->Type() == SharedSurfaceType::Basic) {
+        published = context->PublishFrame();
+        sharedSurf = context->RequestFrame();
+    }
+    // printf(">>>>>>Func EmbedLiteCompositorParent:%s::%d Image: ctx:%p, publ:%i\n", __FUNCTION__, __LINE__, context, published);
+
+    return true;
+}
+
+bool EmbedLiteViewThreadParent::GetPendingTexture(void* aContextWrapper, int* textureID, int* width, int* height)
+{
+    if (!mCompositor) {
+        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No Compositor\n", __FUNCTION__, __LINE__);
+        return false;
+    }
+    const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(mCompositor->RootLayerTreeId());
+    if (!state) {
+        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No State\n", __FUNCTION__, __LINE__);
+        return false;
+    }
+    GLContext* context = static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->gl();
+    if (!context) {
+        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No GLContext\n", __FUNCTION__, __LINE__);
+        return false;
+    }
+
+    GLContext* consumerContext = static_cast<EmbedLiteContextWrapper*>(aContextWrapper)->GetConsumerContext();
+//    consumerContext->MakeCurrent();
+
+    SharedSurface* sharedSurf = context->RequestFrame();
+
+    if (!sharedSurf) {
+        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No sharedSurface\n", __FUNCTION__, __LINE__);
+        return false;
+    }
+
+    // printf(">>>>>>Func EmbedLiteCompositorParent:%s::%d Image: type:%d, sz[%i,%i] ctx:%p\n", __FUNCTION__, __LINE__, sharedSurf->Type(), sharedSurf->Size().width, sharedSurf->Size().height, context);
+
+
+    if (sharedSurf->Type() == SharedSurfaceType::EGLImageShare) {
+        SharedSurface_EGLImage* eglImageSurf =
+            SharedSurface_EGLImage::Cast(sharedSurf);
+        GLint mTextureHandle = eglImageSurf->AcquireConsumerTexture(consumerContext);
+        GLint mTextureTarget = eglImageSurf->TextureTarget();
+        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d Create EGL Share Image: tex:%d, sz[%i,%i] ctx:%p consCtx:%p\n", __FUNCTION__, __LINE__, mTextureHandle, sharedSurf->Size().width, sharedSurf->Size().height, context, consumerContext);
+        *width = sharedSurf->Size().width;
+        *height = sharedSurf->Size().height;
+        *textureID = mTextureHandle;
+        return true;
+    } else if (sharedSurf->Type() == SharedSurfaceType::GLTextureShare) {
+        SharedSurface_GLTexture* glTexSurf = SharedSurface_GLTexture::Cast(sharedSurf);
+        glTexSurf->SetConsumerGL(consumerContext);
+        GLint mTextureHandle = glTexSurf->Texture();
+        GLint mTextureTarget = glTexSurf->TextureTarget();
+        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d Create GL Share Image: tex:%d, sz[%i,%i] ctx:%p consCtx:%p\n", __FUNCTION__, __LINE__, mTextureHandle, sharedSurf->Size().width, sharedSurf->Size().height, context, consumerContext);
+        *width = sharedSurf->Size().width;
+        *height = sharedSurf->Size().height;
+        *textureID = mTextureHandle;
+        return true;
+    }
+
+    // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d Failed Create EGL Share Image: type:%d, sz[%i,%i] ctx:%p consCtx:%p\n", __FUNCTION__, __LINE__, sharedSurf->Type(), sharedSurf->Size().width, sharedSurf->Size().height, context, consumerContext);
+
+    return false;
+}
 
 } // namespace embedlite
 } // namespace mozilla

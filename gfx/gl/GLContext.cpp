@@ -2468,6 +2468,7 @@ bool
 GLContext::CreateScreenBufferImpl(const gfxIntSize& size, const SurfaceCaps& caps)
 {
     GLScreenBuffer* newScreen = GLScreenBuffer::Create(this, size, caps);
+    // printf(">>>>>>Func GLContext:%s::%d, gl:%p, screen:%p\n", __FUNCTION__, __LINE__, this, newScreen);
     if (!newScreen)
         return false;
 

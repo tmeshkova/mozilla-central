@@ -58,7 +58,9 @@ public:
   virtual void AddMessageListeners(const nsTArray<nsString>&);
   virtual void RemoveMessageListeners(const nsTArray<nsString>&);
 
-  EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget(int width, int height);
+  virtual EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget(int width, int height);
+  virtual bool GetPendingTexture(void* aContextWrapper, int* textureID, int* width, int* height);
+  virtual bool PrepareTexture(void* aContextWrapper);
 
   EmbedLiteCompositorParent* GetCompositor() { return mCompositor.get(); };
 

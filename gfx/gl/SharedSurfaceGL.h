@@ -171,10 +171,13 @@ class SurfaceFactory_Basic
 public:
     SurfaceFactory_Basic(GLContext* gl, const SurfaceCaps& caps)
         : SurfaceFactory_GL(gl, SharedSurfaceType::Basic, caps)
-    {}
+    {
+        // printf(">>>>>>Func SharedSurfaceGL:%s::%d\n", __FUNCTION__, __LINE__);
+    }
 
     virtual SharedSurface* CreateShared(const gfxIntSize& size) {
         bool hasAlpha = mReadCaps.alpha;
+        // printf(">>>>>>Func SharedSurfaceGL:%s::%d\n", __FUNCTION__, __LINE__);
         return SharedSurface_Basic::Create(mGL, mFormats, size, hasAlpha);
     }
 };
@@ -192,6 +195,7 @@ public:
                                            bool hasAlpha);
 
     static SharedSurface_GLTexture* Cast(SharedSurface* surf) {
+        // printf(">>>>>>Func SharedSurfaceGL:%s::%d\n", __FUNCTION__, __LINE__);
         MOZ_ASSERT(surf->Type() == SharedSurfaceType::GLTextureShare);
 
         return (SharedSurface_GLTexture*)surf;
@@ -218,6 +222,7 @@ protected:
         , mSync(0)
         , mMutex("SharedSurface_GLTexture mutex")
     {
+        // printf(">>>>>>Func SharedSurfaceGL:%s::%d\n", __FUNCTION__, __LINE__);
     }
 
 public:
@@ -255,11 +260,13 @@ public:
         : SurfaceFactory_GL(prodGL, SharedSurfaceType::GLTextureShare, caps)
         , mConsGL(consGL)
     {
+        // printf(">>>>>>Func SharedSurfaceGL:%s::%d\n", __FUNCTION__, __LINE__);
         MOZ_ASSERT(consGL != prodGL);
     }
 
     virtual SharedSurface* CreateShared(const gfxIntSize& size) {
         bool hasAlpha = mReadCaps.alpha;
+        // printf(">>>>>>Func SharedSurfaceGL:%s::%d\n", __FUNCTION__, __LINE__);
         return SharedSurface_GLTexture::Create(mGL, mConsGL, mFormats, size, hasAlpha);
     }
 };

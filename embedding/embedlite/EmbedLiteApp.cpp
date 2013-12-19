@@ -24,6 +24,7 @@
 #include "EmbedLiteView.h"
 #include "nsXULAppAPI.h"
 #include "EmbedLiteMessagePump.h"
+#include "EmbedLiteContextWrapper.h"
 
 #include "EmbedLiteCompositorParent.h"
 
@@ -71,6 +72,12 @@ EmbedLiteApp::~EmbedLiteApp()
     free(mProfilePath);
     mProfilePath = nullptr;
   }
+}
+
+EmbedLiteContextWrapper*
+EmbedLiteApp::CreateEmbedLiteContextWrapper()
+{
+  return new EmbedLiteContextWrapper();
 }
 
 void

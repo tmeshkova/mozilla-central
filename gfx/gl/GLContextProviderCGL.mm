@@ -207,6 +207,12 @@ GetGlobalContextCGL()
 }
 
 already_AddRefed<GLContext>
+GLContextProviderCGL::CreateForEmbedded()
+{
+    return nullptr;
+}
+
+already_AddRefed<GLContext>
 GLContextProviderCGL::CreateForWindow(nsIWidget *aWidget)
 {
     if (!sCGLLibrary.EnsureInitialized()) {

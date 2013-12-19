@@ -147,6 +147,8 @@ public:
 
   virtual uint32_t GetUniqueID();
   virtual EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget(int width, int height);
+  virtual bool GetPendingTexture(void* aContextWrapper, int* textureID, int* width, int* height);
+  virtual bool PrepareTexture(void* aContextWrapper);
 
 private:
   friend class EmbedLiteViewThreadParent;

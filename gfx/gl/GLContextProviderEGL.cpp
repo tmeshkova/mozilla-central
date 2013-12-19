@@ -738,7 +738,7 @@ CreateConfig(EGLConfig* aConfig)
 }
 
 already_AddRefed<GLContext>
-GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
+GLContextProviderEGL::CreateForEmbedded()
 {
     if (!sEGLLibrary.EnsureInitialized()) {
         MOZ_CRASH("Failed to load EGL library!\n");
@@ -746,10 +746,8 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
     }
 
     bool doubleBuffered = true;
-
-    bool hasNativeContext = aWidget->HasGLContext();
     EGLContext eglContext = sEGLLibrary.fGetCurrentContext();
-    if (hasNativeContext && eglContext) {
+    if (eglContext) {
         void* platformContext = eglContext;
         SurfaceCaps caps = SurfaceCaps::Any();
         int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
@@ -770,6 +768,22 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
         glContext->SetPlatformContext(platformContext);
 
         return glContext.forget();
+    }
+    return nullptr;
+}
+
+already_AddRefed<GLContext>
+GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
+{
+    if (!sEGLLibrary.EnsureInitialized()) {
+        MOZ_CRASH("Failed to load EGL library!\n");
+        return nullptr;
+    }
+
+    bool doubleBuffered = true;
+
+    if (aWidget->HasGLContext()) {
+        return CreateForEmbedded();
     }
 
     EGLConfig config;

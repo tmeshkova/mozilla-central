@@ -417,5 +417,20 @@ EmbedLiteView::GetUniqueID()
   return mUniqueID;
 }
 
+bool
+EmbedLiteView::GetPendingTexture(void* aContextWrapper, int* textureID, int* width, int* height)
+{
+  NS_ENSURE_TRUE(mViewImpl, false);
+  return mViewImpl->GetPendingTexture(aContextWrapper, textureID, width, height);
+}
+
+bool
+EmbedLiteView::PrepareTexture(void* aContextWrapper)
+{
+  NS_ENSURE_TRUE(mViewImpl, false);
+  return mViewImpl->PrepareTexture(aContextWrapper);
+}
+
+
 } // namespace embedlite
 } // namespace mozilla

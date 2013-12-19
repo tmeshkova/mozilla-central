@@ -52,11 +52,20 @@
 #include "GfxInfo.h"
 #endif
 
+#include "GLContext.h"                  // for GLContext
+#include "GLScreenBuffer.h"             // for GLScreenBuffer
+#include "SharedSurfaceEGL.h"           // for SurfaceFactory_EGLImage
+#include "SharedSurfaceGL.h"            // for SurfaceFactory_GLTexture, etc
+#include "SurfaceStream.h"              // for SurfaceStream, etc
+#include "SurfaceTypes.h"               // for SurfaceStreamType
+#include "ClientLayerManager.h"         // for ClientLayerManager, etc
+
 #define BUFFER_OFFSET(i) ((char *)nullptr + (i))
 
 namespace mozilla {
 
 using namespace gfx;
+using namespace gl;
 
 namespace layers {
 
@@ -276,6 +285,12 @@ CompositorOGL::CreateContext()
   }
 #endif
 
+  if (PR_GetEnv("MOZ_LAYERS_PREFER_OFFSCREEN")) {
+    SurfaceCaps caps = SurfaceCaps::ForRGB();
+    gl::ContextFlags flag = gl::ContextFlagsNone;
+    context = gl::GLContextProvider::CreateOffscreen(gfxIntSize(mSurfaceSize.width, mSurfaceSize.height), caps, flag);
+  }
+
   if (!context)
     context = gl::GLContextProvider::CreateForWindow(mWidget);
 
@@ -402,9 +417,32 @@ CompositorOGL::Initialize()
   if (!mGLContext)
     return false;
 
-  mGLContext->SetFlipped(true);
+//  if (!mGLContext->IsOffscreen())
+    mGLContext->SetFlipped(true);
 
   MakeCurrent();
+
+  if (mGLContext->IsOffscreen()) {
+    printf(">>>>>>Func CompositorOGL:%s::%d ctx:%p\n", __FUNCTION__, __LINE__, mGLContext.get());
+    GLScreenBuffer* screen = mGLContext->Screen();
+    if (screen) {
+      SurfaceStreamType streamType =
+        SurfaceStream::ChooseGLStreamType(SurfaceStream::OffMainThread,
+                                          screen->PreserveBuffer());
+      SurfaceFactory_GL* factory = nullptr;
+      if (mGLContext->GetEGLContext()) {
+        // [Basic/OGL Layers, OMTC] WebGL layer init.
+        factory = SurfaceFactory_EGLImage::Create(mGLContext, screen->Caps());
+      } else {
+        // [Basic Layers, OMTC] WebGL layer init.
+        // Well, this *should* work...
+        factory = new SurfaceFactory_GLTexture(mGLContext, nullptr, screen->Caps());
+      }
+      if (factory) {
+        screen->Morph(factory, streamType);
+      }
+    }
+  }
 
   mHasBGRA =
     mGLContext->IsExtensionSupported(gl::GLContext::EXT_texture_format_BGRA8888) ||

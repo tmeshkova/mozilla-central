@@ -56,6 +56,8 @@ class EmbedLiteViewImplIface
     virtual void ViewAPIDestroyed() {}
     virtual uint32_t GetUniqueID() { return 0; }
     virtual EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget(int width, int height) { return 0; }
+    virtual bool GetPendingTexture(void* aContextWrapper, int* textureID, int* width, int* height) { return false; }
+    virtual bool PrepareTexture(void* aContextWrapper) { return false; }
 };
 
 } // namespace embedlite

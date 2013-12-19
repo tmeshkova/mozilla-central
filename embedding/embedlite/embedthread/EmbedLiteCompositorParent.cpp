@@ -18,7 +18,17 @@
 #include "mozilla/layers/CompositorOGL.h"
 #include "gfxUtils.h"
 
+#include "GLContext.h"                  // for GLContext
+#include "GLScreenBuffer.h"             // for GLScreenBuffer
+#include "SharedSurfaceEGL.h"           // for SurfaceFactory_EGLImage
+#include "SharedSurfaceGL.h"            // for SurfaceFactory_GLTexture, etc
+#include "SurfaceStream.h"              // for SurfaceStream, etc
+#include "SurfaceTypes.h"               // for SurfaceStreamType
+#include "ClientLayerManager.h"         // for ClientLayerManager, etc
+
 using namespace mozilla::layers;
+using namespace mozilla::gfx;
+using namespace mozilla::gl;
 
 namespace mozilla {
 namespace embedlite {
@@ -91,6 +101,7 @@ bool EmbedLiteCompositorParent::RenderGL(mozilla::embedlite::EmbedLiteRenderTarg
 
   const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(RootLayerTreeId());
 
+  GLContext* context = static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->gl();
   if (state && IsGLBackend() && aTarget) {
     static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->SetUserRenderTarget(aTarget->GetRenderSurface());
   }
@@ -109,6 +120,13 @@ bool EmbedLiteCompositorParent::RenderGL(mozilla::embedlite::EmbedLiteRenderTarg
 
   if (state && IsGLBackend() && aTarget) {
     static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->SetUserRenderTarget(nullptr);
+  }
+
+  bool published = context->PublishFrame();
+  SharedSurface* sharedSurf = context->RequestFrame();
+  while (sharedSurf->Type() == SharedSurfaceType::Basic) {
+    published = context->PublishFrame();
+    sharedSurf = context->RequestFrame();
   }
 
   return retval;

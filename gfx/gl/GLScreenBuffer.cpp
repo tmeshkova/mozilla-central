@@ -63,7 +63,9 @@ GLScreenBuffer::Create(GLContext* gl,
         gl,
         nullptr);
 
-    return new GLScreenBuffer(gl, caps, factory, stream);
+    GLScreenBuffer* p = new GLScreenBuffer(gl, caps, factory, stream);
+    // printf(">>>>>>Func GLScreenBuffer:%s::%d gl:%p, buffer:%p, stream:%p\n", __FUNCTION__, __LINE__, gl, p, stream);
+    return p;
 }
 
 GLScreenBuffer::~GLScreenBuffer()
