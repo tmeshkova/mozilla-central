@@ -477,7 +477,7 @@ bool
 EmbedLiteViewThreadParent::RenderGL(mozilla::embedlite::EmbedLiteRenderTarget* aTarget)
 {
   if (mCompositor) {
-    return mCompositor->RenderGL(aTarget);
+    return mCompositor->RenderGL();
   }
   return false;
 }

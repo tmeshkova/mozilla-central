@@ -48,6 +48,7 @@ public:
   virtual void CompositorCreated() { }
   //   Invalidate notification
   virtual bool Invalidate() { return false; }
+  virtual void CompositingFinished() { }
   virtual void SetFirstPaintViewport(const nsIntPoint& aOffset, float aZoom,
                                      const nsIntRect& aPageRect, const gfxRect& aCssPageRect) {}
   virtual void SyncViewportInfo(const nsIntRect& aDisplayPort,

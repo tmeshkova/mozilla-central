@@ -40,6 +40,7 @@ EmbedLiteCompositorParent::EmbedLiteCompositorParent(nsIWidget* aWidget,
                                                      uint32_t id)
   : CompositorParent(aWidget, aRenderToEGLSurface, aSurfaceWidth, aSurfaceHeight)
   , mId(id)
+  , mCurrentCompositeTask(nullptr)
 {
   AddRef();
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
@@ -93,19 +94,18 @@ bool EmbedLiteCompositorParent::RenderToContext(gfxContext* aContext)
   return true;
 }
 
-bool EmbedLiteCompositorParent::RenderGL(mozilla::embedlite::EmbedLiteRenderTarget* aTarget)
+bool EmbedLiteCompositorParent::RenderGL()
 {
   LOGF();
+
+  mCurrentCompositeTask = nullptr;
+
   bool retval = true;
   NS_ENSURE_TRUE(IsGLBackend(), false);
 
   const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(RootLayerTreeId());
 
   GLContext* context = static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->gl();
-  if (state && IsGLBackend() && aTarget) {
-    static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->SetUserRenderTarget(aTarget->GetRenderSurface());
-  }
-
   if (state && state->mLayerManager && state->mLayerManager->GetRoot()) {
     retval = false;
   }
@@ -118,15 +118,16 @@ bool EmbedLiteCompositorParent::RenderGL(mozilla::embedlite::EmbedLiteRenderTarg
   }
   CompositorParent::Composite();
 
-  if (state && IsGLBackend() && aTarget) {
-    static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->SetUserRenderTarget(nullptr);
-  }
-
   bool published = context->PublishFrame();
   SharedSurface* sharedSurf = context->RequestFrame();
   while (sharedSurf->Type() == SharedSurfaceType::Basic) {
     published = context->PublishFrame();
     sharedSurf = context->RequestFrame();
+ }
+
+  EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
+  if (view) {
+    view->GetListener()->CompositingFinished();
   }
 
   return retval;
@@ -201,8 +202,10 @@ void EmbedLiteCompositorParent::ScheduleTask(CancelableTask* task, int time)
     LOGE("view not available.. forgot SuspendComposition call?");
     return;
   }
+  task->Cancel();
   if (!view->GetListener()->Invalidate()) {
-    CompositorParent::ScheduleTask(task, time);
+    mCurrentCompositeTask = NewRunnableMethod(this, &EmbedLiteCompositorParent::RenderGL);
+    CompositorParent::ScheduleTask(mCurrentCompositeTask, time);
   }
 }
 
