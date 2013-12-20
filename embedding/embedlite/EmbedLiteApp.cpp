@@ -24,7 +24,7 @@
 #include "EmbedLiteView.h"
 #include "nsXULAppAPI.h"
 #include "EmbedLiteMessagePump.h"
-#include "EmbedLiteContextWrapper.h"
+#include "EmbedLiteRenderTarget.h"
 
 #include "EmbedLiteCompositorParent.h"
 
@@ -74,10 +74,10 @@ EmbedLiteApp::~EmbedLiteApp()
   }
 }
 
-EmbedLiteContextWrapper*
-EmbedLiteApp::CreateEmbedLiteContextWrapper()
+EmbedLiteRenderTarget*
+EmbedLiteApp::CreateEmbedLiteRenderTarget()
 {
-  return new EmbedLiteContextWrapper();
+  return new EmbedLiteRenderTarget();
 }
 
 void

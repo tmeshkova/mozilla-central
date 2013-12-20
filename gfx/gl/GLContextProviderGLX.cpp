@@ -879,6 +879,10 @@ TRY_AGAIN_NO_SHARING:
 
     bool Init()
     {
+        if (mInitialized) {
+            return true;
+        }
+
         SetupLookupFunction();
         if (!InitWithPrefix("gl", true)) {
             return false;
@@ -892,9 +896,6 @@ TRY_AGAIN_NO_SHARING:
 
     bool MakeCurrentImpl(bool aForce = false)
     {
-//        if (mPlatformContext)
-//            return true;
-
         bool succeeded = true;
 
         // With the ATI FGLRX driver, glxMakeCurrent is very slow even when the context doesn't change.
@@ -912,9 +913,6 @@ TRY_AGAIN_NO_SHARING:
     }
 
     virtual bool IsCurrent() {
-        if (mGLX->xGetCurrentContext() != mContext) {
-            // printf(">>>>>>Func:%s::%d CurrCtx:%p, mCtx:%p\n", __PRETTY_FUNCTION__, __LINE__, mGLX->xGetCurrentContext(), mContext);
-        }
         return mGLX->xGetCurrentContext() == mContext;
     }
 

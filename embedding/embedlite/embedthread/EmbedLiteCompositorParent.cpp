@@ -7,7 +7,6 @@
 #include "EmbedLog.h"
 
 #include "EmbedLiteCompositorParent.h"
-#include "EmbedLiteRenderTarget.h"
 #include "BasicLayers.h"
 #include "EmbedLiteViewThreadParent.h"
 #include "EmbedLiteApp.h"
@@ -104,26 +103,24 @@ bool EmbedLiteCompositorParent::RenderGL()
   NS_ENSURE_TRUE(IsGLBackend(), false);
 
   const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(RootLayerTreeId());
+  NS_ENSURE_TRUE(state && state->mLayerManager, false);
 
   GLContext* context = static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->gl();
-  if (state && state->mLayerManager && state->mLayerManager->GetRoot()) {
-    retval = false;
-  }
+  NS_ENSURE_TRUE(context, false);
 
-  if (state && state->mLayerManager && IsGLBackend()) {
-    state->mLayerManager->SetWorldTransform(mWorldTransform);
-  }
-  if (state && state->mLayerManager && !mActiveClipping.IsEmpty() && state->mLayerManager->GetRoot()) {
+  state->mLayerManager->SetWorldTransform(mWorldTransform);
+
+  if (!mActiveClipping.IsEmpty() && state->mLayerManager->GetRoot()) {
     state->mLayerManager->GetRoot()->SetClipRect(&mActiveClipping);
   }
   CompositorParent::Composite();
 
-  bool published = context->PublishFrame();
-  SharedSurface* sharedSurf = context->RequestFrame();
-  while (sharedSurf->Type() == SharedSurfaceType::Basic) {
-    published = context->PublishFrame();
-    sharedSurf = context->RequestFrame();
- }
+  if (context->IsOffscreen() && context->PublishFrame()) {
+    SharedSurface* sharedSurf = context->RequestFrame();
+    while (sharedSurf->Type() == SharedSurfaceType::Basic && context->PublishFrame()) {
+      sharedSurf = context->RequestFrame();
+    }
+  }
 
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
   if (view) {

@@ -120,7 +120,7 @@ public:
   virtual bool RenderToImage(unsigned char* aData, int imgW, int imgH, int stride, int depth);
 
   //   GL Rendering setuo
-  virtual bool RenderGL(EmbedLiteRenderTarget* aTarget = 0);
+  virtual bool RenderGL();
   //   Setup renderable GL/EGL window surface size
   virtual void SetGLViewPortSize(int width, int height);
   //   GL world transform offset and simple rotation are allowed (orientation change)
@@ -147,9 +147,7 @@ public:
   virtual void SendAsyncMessage(const PRUnichar* aMessageName, const PRUnichar* aMessage);
 
   virtual uint32_t GetUniqueID();
-  virtual EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget(int width, int height);
-  virtual bool GetPendingTexture(void* aContextWrapper, int* textureID, int* width, int* height);
-  virtual bool PrepareTexture(void* aContextWrapper);
+  virtual bool GetPendingTexture(EmbedLiteRenderTarget* aContextWrapper, int* textureID, int* width, int* height);
 
 private:
   friend class EmbedLiteViewThreadParent;

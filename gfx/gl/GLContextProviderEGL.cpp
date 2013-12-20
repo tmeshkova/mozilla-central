@@ -321,6 +321,10 @@ public:
 
     bool Init()
     {
+        if (mInitialized) {
+            return true;
+        }
+
 #if defined(ANDROID)
         // We can't use LoadApitraceLibrary here because the GLContext
         // expects its own handle to the GL library
@@ -749,10 +753,7 @@ GLContextProviderEGL::CreateForEmbedded()
     EGLContext eglContext = sEGLLibrary.fGetCurrentContext();
     if (eglContext) {
         void* platformContext = eglContext;
-        SurfaceCaps caps = SurfaceCaps::Any();
-        int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
-        caps.bpp16 = depth == 16 ? true : false;
-        caps.depth = depth;
+        SurfaceCaps caps = SurfaceCaps::ForRGB();
         EGLConfig config = EGL_NO_CONFIG;
         EGLSurface surface = sEGLLibrary.fGetCurrentSurface(LOCAL_EGL_DRAW);
         nsRefPtr<GLContextEGL> glContext =
@@ -760,10 +761,6 @@ GLContextProviderEGL::CreateForEmbedded()
                              nullptr, false,
                              config, surface, eglContext);
 
-        if (!glContext->Init())
-            return nullptr;
-
-        glContext->MakeCurrent();
         glContext->SetIsDoubleBuffered(doubleBuffered);
         glContext->SetPlatformContext(platformContext);
 

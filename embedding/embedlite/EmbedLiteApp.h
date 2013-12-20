@@ -25,7 +25,7 @@ class EmbedLiteAppThreadChild;
 class EmbedLiteAppThreadParent;
 class EmbedLiteSubThread;
 class EmbedLiteView;
-class EmbedLiteContextWrapper;
+class EmbedLiteRenderTarget;
 class EmbedLiteAppListener
 {
 public:
@@ -132,7 +132,7 @@ public:
   // Only one EmbedHelper object allowed
   static EmbedLiteApp* GetInstance();
 
-  virtual EmbedLiteContextWrapper* CreateEmbedLiteContextWrapper();
+  virtual EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget();
 
 private:
   EmbedLiteApp();

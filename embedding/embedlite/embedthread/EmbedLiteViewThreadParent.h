@@ -35,7 +35,7 @@ public:
   virtual void LoadFrameScript(const char* aURI);
   virtual void DoSendAsyncMessage(const PRUnichar* aMessageName, const PRUnichar* aMessage);
   virtual bool RenderToImage(unsigned char* aData, int imgW, int imgH, int stride, int depth);
-  virtual bool RenderGL(mozilla::embedlite::EmbedLiteRenderTarget*);
+  virtual bool RenderGL();
   virtual void SetViewSize(int width, int height);
   virtual void SetGLViewPortSize(int width, int height);
   virtual void SetGLViewTransform(gfxMatrix matrix);
@@ -58,9 +58,7 @@ public:
   virtual void AddMessageListeners(const nsTArray<nsString>&);
   virtual void RemoveMessageListeners(const nsTArray<nsString>&);
 
-  virtual EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget(int width, int height);
-  virtual bool GetPendingTexture(void* aContextWrapper, int* textureID, int* width, int* height);
-  virtual bool PrepareTexture(void* aContextWrapper);
+  virtual bool GetPendingTexture(EmbedLiteRenderTarget* aContextWrapper, int* textureID, int* width, int* height);
 
   EmbedLiteCompositorParent* GetCompositor() { return mCompositor.get(); };
 

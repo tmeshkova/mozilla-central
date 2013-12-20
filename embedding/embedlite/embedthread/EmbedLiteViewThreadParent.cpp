@@ -13,11 +13,10 @@
 #include "gfxContext.h"
 
 #include "EmbedLiteCompositorParent.h"
-#include "EmbedLiteRenderTarget.h"
 #include "mozilla/unused.h"
 #include "EmbedContentController.h"
 #include "mozilla/layers/APZCTreeManager.h"
-#include "EmbedLiteContextWrapper.h"
+#include "EmbedLiteRenderTarget.h"
 
 #include "GLContext.h"                  // for GLContext
 #include "GLScreenBuffer.h"             // for GLScreenBuffer
@@ -474,7 +473,7 @@ EmbedLiteViewThreadParent::RenderToImage(unsigned char* aData, int imgW, int img
 }
 
 bool
-EmbedLiteViewThreadParent::RenderGL(mozilla::embedlite::EmbedLiteRenderTarget* aTarget)
+EmbedLiteViewThreadParent::RenderGL()
 {
   if (mCompositor) {
     return mCompositor->RenderGL();
@@ -713,73 +712,23 @@ EmbedLiteViewThreadParent::GetUniqueID()
   return mId;
 }
 
-EmbedLiteRenderTarget*
-EmbedLiteViewThreadParent::CreateEmbedLiteRenderTarget(int width, int height)
+bool EmbedLiteViewThreadParent::GetPendingTexture(EmbedLiteRenderTarget* aContextWrapper, int* textureID, int* width, int* height)
 {
-  return new EmbedLiteRenderTarget(width, height, mCompositor);
-}
+    NS_ENSURE_TRUE(aContextWrapper && textureID && width && height, false);
+    NS_ENSURE_TRUE(mCompositor, false);
 
-bool EmbedLiteViewThreadParent::PrepareTexture(void* aContextWrapper)
-{
-    return false;
-    if (!mCompositor) {
-        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No Compositor\n", __FUNCTION__, __LINE__);
-        return false;
-    }
     const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(mCompositor->RootLayerTreeId());
-    if (!state) {
-        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No State\n", __FUNCTION__, __LINE__);
-        return false;
-    }
+    NS_ENSURE_TRUE(state && state->mLayerManager, false);
 
     GLContext* context = static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->gl();
-    if (!context) {
-        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No GLContext\n", __FUNCTION__, __LINE__);
-        return false;
-    }
+    NS_ENSURE_TRUE(context && context->IsOffscreen(), false);
 
-    GLContext* consumerContext = static_cast<EmbedLiteContextWrapper*>(aContextWrapper)->GetConsumerContext();
-    consumerContext->MakeCurrent();
-
-    bool published = context->PublishFrame();
-    SharedSurface* sharedSurf = context->RequestFrame();
-    while (sharedSurf->Type() == SharedSurfaceType::Basic) {
-        published = context->PublishFrame();
-        sharedSurf = context->RequestFrame();
-    }
-    // printf(">>>>>>Func EmbedLiteCompositorParent:%s::%d Image: ctx:%p, publ:%i\n", __FUNCTION__, __LINE__, context, published);
-
-    return true;
-}
-
-bool EmbedLiteViewThreadParent::GetPendingTexture(void* aContextWrapper, int* textureID, int* width, int* height)
-{
-    if (!mCompositor) {
-        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No Compositor\n", __FUNCTION__, __LINE__);
-        return false;
-    }
-    const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(mCompositor->RootLayerTreeId());
-    if (!state) {
-        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No State\n", __FUNCTION__, __LINE__);
-        return false;
-    }
-    GLContext* context = static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->gl();
-    if (!context) {
-        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No GLContext\n", __FUNCTION__, __LINE__);
-        return false;
-    }
-
-    GLContext* consumerContext = static_cast<EmbedLiteContextWrapper*>(aContextWrapper)->GetConsumerContext();
-//    consumerContext->MakeCurrent();
+    GLContext* consumerContext = aContextWrapper->GetConsumerContext();
+    NS_ENSURE_TRUE(consumerContext && consumerContext->Init(), false);
 
     SharedSurface* sharedSurf = context->RequestFrame();
+    NS_ENSURE_TRUE(sharedSurf, false);
 
-    if (!sharedSurf) {
-        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d No sharedSurface\n", __FUNCTION__, __LINE__);
-        return false;
-    }
-
-    // printf(">>>>>>Func EmbedLiteCompositorParent:%s::%d Image: type:%d, sz[%i,%i] ctx:%p\n", __FUNCTION__, __LINE__, sharedSurf->Type(), sharedSurf->Size().width, sharedSurf->Size().height, context);
 
 
     if (sharedSurf->Type() == SharedSurfaceType::EGLImageShare) {
@@ -787,7 +736,7 @@ bool EmbedLiteViewThreadParent::GetPendingTexture(void* aContextWrapper, int* te
             SharedSurface_EGLImage::Cast(sharedSurf);
         GLint mTextureHandle = eglImageSurf->AcquireConsumerTexture(consumerContext);
         GLint mTextureTarget = eglImageSurf->TextureTarget();
-        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d Create EGL Share Image: tex:%d, sz[%i,%i] ctx:%p consCtx:%p\n", __FUNCTION__, __LINE__, mTextureHandle, sharedSurf->Size().width, sharedSurf->Size().height, context, consumerContext);
+        printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d Create EGL Share Image: tex:%d, sz[%i,%i] ctx:%p consCtx:%p\n", __FUNCTION__, __LINE__, mTextureHandle, sharedSurf->Size().width, sharedSurf->Size().height, context, consumerContext);
         *width = sharedSurf->Size().width;
         *height = sharedSurf->Size().height;
         *textureID = mTextureHandle;
