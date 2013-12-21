@@ -425,6 +425,7 @@ CompositorOGL::Initialize()
   if (mGLContext->IsOffscreen()) {
     GLScreenBuffer* screen = mGLContext->Screen();
     if (screen) {
+      printf(">>>>>>>>>>>>>>>>>>>>>> PRESERVE BUFFER:%i\n", screen->PreserveBuffer());
       SurfaceStreamType streamType =
         SurfaceStream::ChooseGLStreamType(SurfaceStream::OffMainThread,
                                           screen->PreserveBuffer());
