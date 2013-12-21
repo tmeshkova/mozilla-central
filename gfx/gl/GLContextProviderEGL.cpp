@@ -212,7 +212,7 @@ class GLContextEGL : public GLContext
 
     static already_AddRefed<GLContextEGL>
     CreateGLContext(const SurfaceCaps& caps,
-                    GLContextEGL *shareContext,
+                    GLContext *shareContext,
                     bool isOffscreen,
                     EGLConfig config,
                     EGLSurface surface)
@@ -222,7 +222,7 @@ class GLContextEGL : public GLContext
             return nullptr;
         }
 
-        EGLContext eglShareContext = shareContext ? shareContext->mContext
+        EGLContext eglShareContext = shareContext ? shareContext->GetEGLContext()
                                                   : EGL_NO_CONTEXT;
         EGLint* attribs = sEGLLibrary.HasRobustness() ? gContextAttribsRobustness
                                                       : gContextAttribs;
@@ -741,6 +741,8 @@ CreateConfig(EGLConfig* aConfig)
     }
 }
 
+static nsRefPtr<GLContext> gGlobalContext;
+
 already_AddRefed<GLContext>
 GLContextProviderEGL::CreateForEmbedded()
 {
@@ -763,6 +765,8 @@ GLContextProviderEGL::CreateForEmbedded()
 
         glContext->SetIsDoubleBuffered(doubleBuffered);
         glContext->SetPlatformContext(platformContext);
+        gGlobalContext = glContext;
+        gGlobalContext->SetIsGlobalSharedContext(true);
 
         return glContext.forget();
     }
@@ -848,9 +852,10 @@ GLContextEGL::CreateEGLPBufferOffscreenContext(const gfxIntSize& size)
     }
 
     SurfaceCaps dummyCaps = SurfaceCaps::Any();
+    GLContext *shareContext = GLContextProviderEGL::GetGlobalContext(ContextFlagsNone);
     nsRefPtr<GLContextEGL> glContext =
         GLContextEGL::CreateGLContext(dummyCaps,
-                                      nullptr, true,
+                                      shareContext, true,
                                       config, surface);
     if (!glContext) {
         NS_WARNING("Failed to create GLContext from PBuffer");
@@ -886,9 +891,10 @@ GLContextEGL::CreateEGLPixmapOffscreenContext(const gfxIntSize& size)
     MOZ_ASSERT(surface);
 
     SurfaceCaps dummyCaps = SurfaceCaps::Any();
+    GLContext *shareContext = GLContextProviderEGL::GetGlobalContext(ContextFlagsNone);
     nsRefPtr<GLContextEGL> glContext =
         GLContextEGL::CreateGLContext(dummyCaps,
-                                      nullptr, true,
+                                      shareContext, true,
                                       config, surface);
     if (!glContext) {
         NS_WARNING("Failed to create GLContext from XSurface");
@@ -937,12 +943,13 @@ GLContextProviderEGL::CreateOffscreen(const gfxIntSize& size,
 GLContext *
 GLContextProviderEGL::GetGlobalContext(const ContextFlags)
 {
-    return nullptr;
+    return gGlobalContext.get();
 }
 
 void
 GLContextProviderEGL::Shutdown()
 {
+    gGlobalContext = nullptr;
 }
 
 } /* namespace gl */

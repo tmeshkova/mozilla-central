@@ -2907,7 +2907,7 @@ protected:
 protected:
     GLint FixYValue(GLint y, GLint height)
     {
-        //MOZ_ASSERT( !(mIsOffscreen && mFlipped) );
+        MOZ_ASSERT( !(mIsOffscreen && mFlipped) );
         return mFlipped ? ViewportRect().height - (height + y) : y;
     }
 

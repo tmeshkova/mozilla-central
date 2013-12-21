@@ -417,20 +417,19 @@ CompositorOGL::Initialize()
   if (!mGLContext)
     return false;
 
-//  if (!mGLContext->IsOffscreen())
+  if (!mGLContext->IsOffscreen())
     mGLContext->SetFlipped(true);
 
   MakeCurrent();
 
   if (mGLContext->IsOffscreen()) {
-    printf(">>>>>>Func CompositorOGL:%s::%d ctx:%p\n", __FUNCTION__, __LINE__, mGLContext.get());
     GLScreenBuffer* screen = mGLContext->Screen();
     if (screen) {
       SurfaceStreamType streamType =
         SurfaceStream::ChooseGLStreamType(SurfaceStream::OffMainThread,
                                           screen->PreserveBuffer());
       SurfaceFactory_GL* factory = nullptr;
-      if (mGLContext->GetEGLContext()) {
+      if (mGLContext->GetEGLContext() && mGLContext->GetLibraryEGL()->HasKHRImageTexture2D()) {
         // [Basic/OGL Layers, OMTC] WebGL layer init.
         factory = SurfaceFactory_EGLImage::Create(mGLContext, screen->Caps());
       } else {
