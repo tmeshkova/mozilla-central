@@ -287,8 +287,10 @@ CompositorOGL::CreateContext()
 
   if (PR_GetEnv("MOZ_LAYERS_PREFER_OFFSCREEN")) {
     SurfaceCaps caps = SurfaceCaps::ForRGB();
-    gl::ContextFlags flag = gl::ContextFlagsNone;
-    context = gl::GLContextProvider::CreateOffscreen(gfxIntSize(mSurfaceSize.width, mSurfaceSize.height), caps, flag);
+    caps.preserve = true;
+    context = GLContextProvider::CreateOffscreen(gfxIntSize(mSurfaceSize.width,
+                                                            mSurfaceSize.height),
+                                                 caps);
   }
 
   if (!context)
@@ -425,7 +427,6 @@ CompositorOGL::Initialize()
   if (mGLContext->IsOffscreen()) {
     GLScreenBuffer* screen = mGLContext->Screen();
     if (screen) {
-      printf(">>>>>>>>>>>>>>>>>>>>>> PRESERVE BUFFER:%i\n", screen->PreserveBuffer());
       SurfaceStreamType streamType =
         SurfaceStream::ChooseGLStreamType(SurfaceStream::OffMainThread,
                                           screen->PreserveBuffer());

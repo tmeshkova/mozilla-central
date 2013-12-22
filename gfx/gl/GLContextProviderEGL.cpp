@@ -744,18 +744,17 @@ CreateConfig(EGLConfig* aConfig)
 static nsRefPtr<GLContext> gGlobalContext;
 
 already_AddRefed<GLContext>
-GLContextProviderEGL::CreateForEmbedded()
+GLContextProviderEGL::CreateForEmbedded(ContextFlags flags)
 {
     if (!sEGLLibrary.EnsureInitialized()) {
         MOZ_CRASH("Failed to load EGL library!\n");
         return nullptr;
     }
 
-    bool doubleBuffered = true;
     EGLContext eglContext = sEGLLibrary.fGetCurrentContext();
     if (eglContext) {
         void* platformContext = eglContext;
-        SurfaceCaps caps = SurfaceCaps::ForRGB();
+        SurfaceCaps caps = SurfaceCaps::Any();
         EGLConfig config = EGL_NO_CONFIG;
         EGLSurface surface = sEGLLibrary.fGetCurrentSurface(LOCAL_EGL_DRAW);
         nsRefPtr<GLContextEGL> glContext =
@@ -763,10 +762,12 @@ GLContextProviderEGL::CreateForEmbedded()
                              nullptr, false,
                              config, surface, eglContext);
 
-        glContext->SetIsDoubleBuffered(doubleBuffered);
+        glContext->SetIsDoubleBuffered(true);
         glContext->SetPlatformContext(platformContext);
-        gGlobalContext = glContext;
-        gGlobalContext->SetIsGlobalSharedContext(true);
+        if (flags == ContextFlagsGlobal) {
+            gGlobalContext = glContext;
+            gGlobalContext->SetIsGlobalSharedContext(true);
+        }
 
         return glContext.forget();
     }

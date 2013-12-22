@@ -207,7 +207,7 @@ GetGlobalContextCGL()
 }
 
 already_AddRefed<GLContext>
-GLContextProviderCGL::CreateForEmbedded()
+GLContextProviderCGL::CreateForEmbedded(ContextFlags flags)
 {
     return nullptr;
 }

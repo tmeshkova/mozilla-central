@@ -1029,7 +1029,7 @@ AreCompatibleVisuals(Visual *one, Visual *two)
 static nsRefPtr<GLContext> gGlobalContext[GLXLibrary::LIBS_MAX];
 
 already_AddRefed<GLContext>
-GLContextProviderGLX::CreateForEmbedded()
+GLContextProviderGLX::CreateForEmbedded(ContextFlags flags)
 {
     const LibType libType = GLXLibrary::OPENGL_LIB;
     if (!sDefGLXLib.EnsureInitialized(libType)) {
@@ -1040,7 +1040,7 @@ GLContextProviderGLX::CreateForEmbedded()
     GLXContext glxContext = sDefGLXLib.xGetCurrentContext();
     if (glxContext) {
         void* platformContext = glxContext;
-        SurfaceCaps caps = SurfaceCaps::ForRGB();
+        SurfaceCaps caps = SurfaceCaps::Any();
         nsRefPtr<GLContextGLX> glContext =
             new GLContextGLX(caps,
                              nullptr, // SharedContext
@@ -1053,15 +1053,12 @@ GLContextProviderGLX::CreateForEmbedded()
                              (gfxXlibSurface*)nullptr, // aPixmap
                              libType);
 
-//        if (!glContext->Init())
-//            return nullptr;
-
-//        glContext->MakeCurrent();
         glContext->SetPlatformContext(platformContext);
-        gGlobalContext[libType] = glContext;
-        gGlobalContext[libType]->SetIsGlobalSharedContext(true);
+        if (flags == ContextFlagsGlobal) {
+            gGlobalContext[libType] = glContext;
+            gGlobalContext[libType]->SetIsGlobalSharedContext(true);
+        }
 
-        // printf(">>>>>>Func:%s::%d new:%p, global:%p\n", __PRETTY_FUNCTION__, __LINE__, glContext.get(), gGlobalContext[GLXLibrary::OPENGL_LIB].get());
         return glContext.forget();
     }
     return nullptr;

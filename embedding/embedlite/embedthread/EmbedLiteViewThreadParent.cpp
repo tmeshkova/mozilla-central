@@ -736,7 +736,7 @@ bool EmbedLiteViewThreadParent::GetPendingTexture(EmbedLiteRenderTarget* aContex
             SharedSurface_EGLImage::Cast(sharedSurf);
         GLint mTextureHandle = eglImageSurf->AcquireConsumerTexture(consumerContext);
         GLint mTextureTarget = eglImageSurf->TextureTarget();
-        printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d Create EGL Share Image: tex:%d, sz[%i,%i] ctx:%p consCtx:%p\n", __FUNCTION__, __LINE__, mTextureHandle, sharedSurf->Size().width, sharedSurf->Size().height, context, consumerContext);
+//        printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d Create EGL Share Image: tex:%d, sz[%i,%i] ctx:%p consCtx:%p\n", __FUNCTION__, __LINE__, mTextureHandle, sharedSurf->Size().width, sharedSurf->Size().height, context, consumerContext);
         *width = sharedSurf->Size().width;
         *height = sharedSurf->Size().height;
         *textureID = mTextureHandle;

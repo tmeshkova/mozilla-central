@@ -62,7 +62,8 @@ public:
                     const SurfaceCaps& caps,
                     ContextFlags flags = ContextFlagsNone);
 
-    static already_AddRefed<GLContext> CreateForEmbedded();
+    static already_AddRefed<GLContext>
+    CreateForEmbedded(ContextFlags flags = ContextFlagsNone);
 
 
     /**

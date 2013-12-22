@@ -440,7 +440,7 @@ GetGlobalContextWGL(const ContextFlags aFlags = ContextFlagsNone)
 }
 
 already_AddRefed<GLContext>
-GLContextProviderWGL::CreateForEmbedded()
+GLContextProviderWGL::CreateForEmbedded(ContextFlags flags)
 {
     return nullptr;
 }
