@@ -729,14 +729,12 @@ bool EmbedLiteViewThreadParent::GetPendingTexture(EmbedLiteRenderTarget* aContex
     SharedSurface* sharedSurf = context->RequestFrame();
     NS_ENSURE_TRUE(sharedSurf, false);
 
-
-
     if (sharedSurf->Type() == SharedSurfaceType::EGLImageShare) {
         SharedSurface_EGLImage* eglImageSurf =
             SharedSurface_EGLImage::Cast(sharedSurf);
         GLint mTextureHandle = eglImageSurf->AcquireConsumerTexture(consumerContext);
+        NS_ASSERTION(mTextureHandle, "Failed to get texture handle from EGLImage, fallback to pixels?");
         GLint mTextureTarget = eglImageSurf->TextureTarget();
-//        printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d Create EGL Share Image: tex:%d, sz[%i,%i] ctx:%p consCtx:%p\n", __FUNCTION__, __LINE__, mTextureHandle, sharedSurf->Size().width, sharedSurf->Size().height, context, consumerContext);
         *width = sharedSurf->Size().width;
         *height = sharedSurf->Size().height;
         *textureID = mTextureHandle;
@@ -745,15 +743,15 @@ bool EmbedLiteViewThreadParent::GetPendingTexture(EmbedLiteRenderTarget* aContex
         SharedSurface_GLTexture* glTexSurf = SharedSurface_GLTexture::Cast(sharedSurf);
         glTexSurf->SetConsumerGL(consumerContext);
         GLint mTextureHandle = glTexSurf->Texture();
+        NS_ASSERTION(mTextureHandle, "Failed to get texture handle, fallback to pixels?");
         GLint mTextureTarget = glTexSurf->TextureTarget();
-        // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d Create GL Share Image: tex:%d, sz[%i,%i] ctx:%p consCtx:%p\n", __FUNCTION__, __LINE__, mTextureHandle, sharedSurf->Size().width, sharedSurf->Size().height, context, consumerContext);
         *width = sharedSurf->Size().width;
         *height = sharedSurf->Size().height;
         *textureID = mTextureHandle;
         return true;
+    } else {
+        NS_ERROR("Unhandled Image type");
     }
-
-    // printf(">>>>>>Func EmbedLiteViewThreadParent:%s::%d Failed Create EGL Share Image: type:%d, sz[%i,%i] ctx:%p consCtx:%p\n", __FUNCTION__, __LINE__, sharedSurf->Type(), sharedSurf->Size().width, sharedSurf->Size().height, context, consumerContext);
 
     return false;
 }

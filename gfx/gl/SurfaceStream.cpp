@@ -62,7 +62,6 @@ SurfaceStream::New(SurfaceFactory* factory, const gfxIntSize& size,
 {
     MOZ_ASSERT(!surf);
     surf = factory->NewSharedSurface(size);
-    // printf(">>>>>>Func SharedSurfaceGL:%s::%d gl:%p, Stream:%p, surf:%p\n", __FUNCTION__, __LINE__, GLContext(), this, surf);
 
     if (surf)
         mSurfaces.insert(surf);
@@ -160,7 +159,6 @@ SurfaceStream::SwapConsumer()
     MOZ_ASSERT(mIsAlive);
 
     SharedSurface* ret = SwapConsumer_NoWait();
-    // printf(">>>>>>Func SharedSurfaceGL:%s::%d gl:%p, Stream:%p, surf:%p\n", __FUNCTION__, __LINE__, GLContext(), this, ret);
     if (!ret)
         return nullptr;
 

@@ -287,7 +287,7 @@ CompositorOGL::CreateContext()
 
   if (PR_GetEnv("MOZ_LAYERS_PREFER_OFFSCREEN")) {
     SurfaceCaps caps = SurfaceCaps::ForRGB();
-    caps.preserve = true;
+    caps.preserve = false;
     context = GLContextProvider::CreateOffscreen(gfxIntSize(mSurfaceSize.width,
                                                             mSurfaceSize.height),
                                                  caps);

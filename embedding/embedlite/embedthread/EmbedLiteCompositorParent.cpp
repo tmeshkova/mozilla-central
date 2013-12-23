@@ -115,12 +115,12 @@ bool EmbedLiteCompositorParent::RenderGL()
   }
   CompositorParent::Composite();
 
-  int maxAttemts = 3;
+//  int maxAttemts = 3;
   if (context->IsOffscreen() && context->PublishFrame()) {
-    SharedSurface* sharedSurf = context->RequestFrame();
-    while (sharedSurf->Type() == SharedSurfaceType::Basic && context->PublishFrame() && --maxAttemts) {
-      sharedSurf = context->RequestFrame();
-    }
+//    SharedSurface* sharedSurf = context->RequestFrame();
+//    while (sharedSurf->Type() == SharedSurfaceType::Basic && context->PublishFrame() && --maxAttemts) {
+//      sharedSurf = context->RequestFrame();
+//    }
   }
 
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);

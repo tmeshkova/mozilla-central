@@ -831,10 +831,6 @@ TRY_AGAIN_NO_SHARING:
             error = true;
         }
 
-        // printf(">>>>>>Func:%s::%d newCtx:%p, sharedCtx:%p\n", __PRETTY_FUNCTION__, __LINE__, glContext->mContext, glxContext);
-
-
-
         error |= xErrorHandler.SyncAndGetError(display);
 
         if (error) {
@@ -1310,8 +1306,6 @@ GLContextProviderGLX::CreateOffscreen(const gfxIntSize& size,
 
     if (!glContext->InitOffscreen(size, caps))
         return nullptr;
-
-    // printf(">>>>>>Func:%s::%d new:%p, global:%p\n", __PRETTY_FUNCTION__, __LINE__, glContext.get(), gGlobalContext[GLXLibrary::OPENGL_LIB].get());
 
     return glContext.forget();
 }

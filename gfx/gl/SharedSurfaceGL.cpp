@@ -269,7 +269,6 @@ SharedSurface_Basic::Create(GLContext* gl,
         MOZ_CRASH("Unhandled Tex format.");
     }
     SharedSurface_Basic* retSurf = new SharedSurface_Basic(gl, size, hasAlpha, format, tex);
-    // printf(">>>>>>Func SharedSurfaceGL:%s::%d gl:%p, t:%p\n", __FUNCTION__, __LINE__, gl, retSurf);
     return retSurf;
 }
 
@@ -285,7 +284,6 @@ SharedSurface_Basic::SharedSurface_Basic(GLContext* gl,
                        hasAlpha)
     , mTex(tex)
 {
-    // printf(">>>>>>Func SharedSurfaceGL:%s::%d gl:%p, t:%p\n", __FUNCTION__, __LINE__, gl, this);
     mData = new gfxImageSurface(size, format);
 }
 
@@ -325,7 +323,6 @@ SharedSurface_GLTexture::Create(GLContext* prodGL,
     GLuint tex = CreateTextureForOffscreen(prodGL, formats, size);
 
     SharedSurface_GLTexture* retSurf = new SharedSurface_GLTexture(prodGL, consGL, size, hasAlpha, tex);
-    // printf(">>>>>>Func SharedSurfaceGL:%s::%d prod:%p, cons:%p, t:%p\n", __FUNCTION__, __LINE__, prodGL, consGL, retSurf);
     return retSurf;
 }
 
@@ -390,7 +387,6 @@ SharedSurface_GLTexture::WaitSync()
 void
 SharedSurface_GLTexture::SetConsumerGL(GLContext* consGL)
 {
-    // printf(">>>>>>Func SharedSurfaceGL:%s::%d\n", __FUNCTION__, __LINE__);
     MutexAutoLock lock(mMutex);
     MOZ_ASSERT(consGL);
     MOZ_ASSERT(mGL->SharesWith(consGL));

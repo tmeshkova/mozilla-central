@@ -10,6 +10,7 @@
 #include "GLContext.h"
 #include "GLBlitHelper.h"
 #include "SharedSurfaceGL.h"
+#include "SharedSurfaceEGL.h"           // for SurfaceFactory_EGLImage
 #include "SurfaceStream.h"
 #ifdef MOZ_WIDGET_GONK
 #include "SharedSurfaceGralloc.h"
@@ -54,17 +55,27 @@ GLScreenBuffer::Create(GLContext* gl,
     }
 #endif
 
-    if (!factory)
+    if (gl->GetEGLContext()) {
+        bool isCrossProcess = !(XRE_GetProcessType() == GeckoProcessType_Default);
+        if (!isCrossProcess) {
+            // [Basic/OGL Layers, OMTC] WebGL layer init.
+            factory = SurfaceFactory_EGLImage::Create(gl, caps);
+        }
+    } else {
+        factory = new SurfaceFactory_GLTexture(gl, nullptr, caps);
+    }
+
+    if (!factory) {
         factory = new SurfaceFactory_Basic(gl, caps);
+    }
 
     SurfaceStream* stream = SurfaceStream::CreateForType(
-        SurfaceStream::ChooseGLStreamType(SurfaceStream::MainThread,
+        SurfaceStream::ChooseGLStreamType(SurfaceStream::OffMainThread,
                                           caps.preserve),
         gl,
         nullptr);
 
     GLScreenBuffer* p = new GLScreenBuffer(gl, caps, factory, stream);
-    // printf(">>>>>>Func GLScreenBuffer:%s::%d gl:%p, buffer:%p, stream:%p\n", __FUNCTION__, __LINE__, gl, p, stream);
     return p;
 }
 
