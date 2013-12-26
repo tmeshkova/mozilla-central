@@ -102,7 +102,7 @@ private:
   ScreenIntSize mInnerSize;
   float mOldViewportWidth;
   nsRefPtr<EmbedTabChildGlobal> mTabChildGlobal;
-  mozilla::layers::FrameMetrics mLastMetrics;
+  mozilla::layers::FrameMetrics mLastRootMetrics;
 };
 
 }
