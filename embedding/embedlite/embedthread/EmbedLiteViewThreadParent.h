@@ -8,6 +8,7 @@
 
 #include "mozilla/embedlite/PEmbedLiteViewParent.h"
 #include "EmbedLiteViewImplIface.h"
+#include "GLDefs.h"
 
 namespace mozilla {
 namespace embedlite {
@@ -150,6 +151,7 @@ private:
 
   uint64_t mRootLayerTreeId;
   nsRefPtr<EmbedContentController> mController;
+  GLuint mUploadTexture;
 
   DISALLOW_EVIL_CONSTRUCTORS(EmbedLiteViewThreadParent);
 };

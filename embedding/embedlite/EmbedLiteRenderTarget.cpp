@@ -16,21 +16,20 @@ using namespace mozilla::embedlite;
 EmbedLiteRenderTarget::EmbedLiteRenderTarget()
 {
 #if defined(__ARM__) && defined(GL_PROVIDER_EGL)
-    ContextFlags flags = ContextFlagsNone;
+  ContextFlags flags = ContextFlagsNone;
 #else
-    ContextFlags flags = ContextFlagsGlobal;
+  ContextFlags flags = ContextFlagsGlobal;
 #endif
-    nsRefPtr<GLContext> ctx = GLContextProvider::CreateForEmbedded(flags);
+  nsRefPtr<GLContext> ctx = GLContextProvider::CreateForEmbedded(flags);
 
-    MOZ_ASSERT(ctx);
-    mGLContext = ctx;
+  MOZ_ASSERT(ctx);
+  mGLContext = ctx;
 }
-
 
 bool EmbedLiteRenderTarget::EnsureInitialized()
 {
-    MOZ_ASSERT(mGLContext);
-    return mGLContext->Init();
+  MOZ_ASSERT(mGLContext);
+  return mGLContext->Init();
 }
 
 EmbedLiteRenderTarget::~EmbedLiteRenderTarget()

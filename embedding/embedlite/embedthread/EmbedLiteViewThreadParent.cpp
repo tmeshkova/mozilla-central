@@ -25,6 +25,8 @@
 #include "SurfaceStream.h"              // for SurfaceStream, etc
 #include "SurfaceTypes.h"               // for SurfaceStreamType
 #include "ClientLayerManager.h"         // for ClientLayerManager, etc
+#include "GLUploadHelpers.h"
+#include "GLContextUtils.h"             // for GLContextUtils
 
 #include "BasicLayers.h"
 #include "mozilla/layers/LayerManagerComposite.h"
@@ -53,6 +55,7 @@ EmbedLiteViewThreadParent::EmbedLiteViewThreadParent(const uint32_t& id, const u
   , mInTouchProcess(false)
   , mUILoop(MessageLoop::current())
   , mLastIMEState(0)
+  , mUploadTexture(0)
 {
   MOZ_COUNT_CTOR(EmbedLiteViewThreadParent);
   MOZ_ASSERT(mView, "View destroyed during OMTC view construction");
@@ -714,46 +717,67 @@ EmbedLiteViewThreadParent::GetUniqueID()
 
 bool EmbedLiteViewThreadParent::GetPendingTexture(EmbedLiteRenderTarget* aContextWrapper, int* textureID, int* width, int* height)
 {
-    NS_ENSURE_TRUE(aContextWrapper && textureID && width && height, false);
-    NS_ENSURE_TRUE(mCompositor, false);
+  NS_ENSURE_TRUE(aContextWrapper && textureID && width && height, false);
+  NS_ENSURE_TRUE(mCompositor, false);
 
-    const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(mCompositor->RootLayerTreeId());
-    NS_ENSURE_TRUE(state && state->mLayerManager, false);
+  const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(mCompositor->RootLayerTreeId());
+  NS_ENSURE_TRUE(state && state->mLayerManager, false);
 
-    GLContext* context = static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->gl();
-    NS_ENSURE_TRUE(context && context->IsOffscreen(), false);
+  GLContext* context = static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->gl();
+  NS_ENSURE_TRUE(context && context->IsOffscreen(), false);
 
-    GLContext* consumerContext = aContextWrapper->GetConsumerContext();
-    NS_ENSURE_TRUE(consumerContext && consumerContext->Init(), false);
+  GLContext* consumerContext = aContextWrapper->GetConsumerContext();
+  NS_ENSURE_TRUE(consumerContext && consumerContext->Init(), false);
 
-    SharedSurface* sharedSurf = context->RequestFrame();
-    NS_ENSURE_TRUE(sharedSurf, false);
+  SharedSurface* sharedSurf = context->RequestFrame();
+  NS_ENSURE_TRUE(sharedSurf, false);
 
-    if (sharedSurf->Type() == SharedSurfaceType::EGLImageShare) {
-        SharedSurface_EGLImage* eglImageSurf =
-            SharedSurface_EGLImage::Cast(sharedSurf);
-        GLint mTextureHandle = eglImageSurf->AcquireConsumerTexture(consumerContext);
-        NS_ASSERTION(mTextureHandle, "Failed to get texture handle from EGLImage, fallback to pixels?");
-        GLint mTextureTarget = eglImageSurf->TextureTarget();
-        *width = sharedSurf->Size().width;
-        *height = sharedSurf->Size().height;
-        *textureID = mTextureHandle;
-        return true;
-    } else if (sharedSurf->Type() == SharedSurfaceType::GLTextureShare) {
-        SharedSurface_GLTexture* glTexSurf = SharedSurface_GLTexture::Cast(sharedSurf);
-        glTexSurf->SetConsumerGL(consumerContext);
-        GLint mTextureHandle = glTexSurf->Texture();
-        NS_ASSERTION(mTextureHandle, "Failed to get texture handle, fallback to pixels?");
-        GLint mTextureTarget = glTexSurf->TextureTarget();
-        *width = sharedSurf->Size().width;
-        *height = sharedSurf->Size().height;
-        *textureID = mTextureHandle;
-        return true;
-    } else {
-        NS_ERROR("Unhandled Image type");
+  gfxImageSurface* toUpload = nullptr;
+  GLint textureHandle = 0;
+  if (sharedSurf->Type() == SharedSurfaceType::EGLImageShare) {
+    SharedSurface_EGLImage* eglImageSurf = SharedSurface_EGLImage::Cast(sharedSurf);
+    textureHandle = eglImageSurf->AcquireConsumerTexture(consumerContext);
+    if (!textureHandle) {
+      NS_WARNING("Failed to get texture handle, fallback to pixels?");
+      toUpload = eglImageSurf->GetPixels();
     }
+  } else if (sharedSurf->Type() == SharedSurfaceType::GLTextureShare) {
+    SharedSurface_GLTexture* glTexSurf = SharedSurface_GLTexture::Cast(sharedSurf);
+    glTexSurf->SetConsumerGL(consumerContext);
+    textureHandle = glTexSurf->Texture();
+    NS_ASSERTION(textureHandle, "Failed to get texture handle, fallback to pixels?");
+  } else if (sharedSurf->Type() == SharedSurfaceType::Basic) {
+    toUpload = SharedSurface_Basic::Cast(sharedSurf)->GetData();
+  } else {
+    NS_ERROR("Unhandled Image type");
+  }
 
-    return false;
+  if (toUpload) {
+    // mBounds seems to end up as (0,0,0,0) a lot, so don't use it?
+    nsIntSize size(toUpload->GetSize());
+    nsIntRect rect(nsIntPoint(0,0), size);
+    nsIntRegion bounds(rect);
+    UploadSurfaceToTexture(consumerContext,
+                           toUpload,
+                           bounds,
+                           mUploadTexture,
+                           true);
+    textureHandle = mUploadTexture;
+  } else if (textureHandle) {
+    if (consumerContext) {
+      MOZ_ASSERT(consumerContext);
+      if (consumerContext->MakeCurrent()) {
+        consumerContext->fDeleteTextures(1, &mUploadTexture);
+      }
+    }
+  }
+
+  NS_ASSERTION(textureHandle, "Failed to get texture handle from EGLImage, fallback to pixels?");
+
+  *width = sharedSurf->Size().width;
+  *height = sharedSurf->Size().height;
+  *textureID = textureHandle;
+  return true;
 }
 
 } // namespace embedlite

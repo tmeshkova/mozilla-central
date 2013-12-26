@@ -115,12 +115,8 @@ bool EmbedLiteCompositorParent::RenderGL()
   }
   CompositorParent::Composite();
 
-//  int maxAttemts = 3;
-  if (context->IsOffscreen() && context->PublishFrame()) {
-//    SharedSurface* sharedSurf = context->RequestFrame();
-//    while (sharedSurf->Type() == SharedSurfaceType::Basic && context->PublishFrame() && --maxAttemts) {
-//      sharedSurf = context->RequestFrame();
-//    }
+  if (!context->IsOffscreen() || !context->PublishFrame()) {
+    NS_ERROR("Failed to publish context frame");
   }
 
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
