@@ -222,6 +222,65 @@ TabChildHelper::InitTabChildGlobal()
 }
 
 NS_IMETHODIMP
+TabChildHelper::HandleEvent(nsIDOMEvent* aEvent)
+{
+  nsAutoString eventType;
+  aEvent->GetType(eventType);
+  if (eventType.EqualsLiteral("DOMMetaAdded")) {
+    // This meta data may or may not have been a meta viewport tag. If it was,
+    // we should handle it immediately.
+    HandlePossibleViewportChange();
+  } else if (eventType.EqualsLiteral("scroll")) {
+    // Handle a scroll event originated from content.
+    nsCOMPtr<nsIDOMEventTarget> target;
+    aEvent->GetTarget(getter_AddRefs(target));
+
+    FrameMetrics::ViewID viewId;
+    uint32_t presShellId;
+
+    nsCOMPtr<nsIContent> content;
+    if (nsCOMPtr<nsIDocument> doc = do_QueryInterface(target))
+      content = doc->GetDocumentElement();
+    else
+      content = do_QueryInterface(target);
+
+    nsCOMPtr<nsIDOMWindowUtils> utils = ::GetDOMWindowUtils(content);
+    utils->GetPresShellId(&presShellId);
+
+    if (!nsLayoutUtils::FindIDFor(content, &viewId))
+      return NS_ERROR_UNEXPECTED;
+
+    nsIScrollableFrame* scrollFrame = nsLayoutUtils::FindScrollableFrameFor(viewId);
+    if (!scrollFrame)
+      return NS_OK;
+
+    CSSIntPoint scrollOffset = scrollFrame->GetScrollPositionCSSPixels();
+
+    if (viewId == mLastMetrics.mScrollId) {
+      // For the root frame, we store the last metrics, including the last
+      // scroll offset, sent by APZC. (This is updated in ProcessUpdateFrame()).
+      // We use this here to avoid sending APZC back a scroll event that
+      // originally came from APZC (besides being unnecessary, the event might
+      // be slightly out of date by the time it reaches APZC).
+      // We should probably do this for subframes, too.
+      if (RoundedToInt(mLastMetrics.mScrollOffset) == scrollOffset) {
+        return NS_OK;
+      }
+
+      // Update the last scroll offset now, otherwise RecvUpdateDimensions()
+      // might trigger a scroll to the old offset before RecvUpdateFrame()
+      // gets a chance to update it.
+      mLastMetrics.mScrollOffset = scrollOffset;
+    }
+
+    // TODO: currently presShellId, viewId are not used in EmbedLiteViewThread
+    mView->SendUpdateScrollOffset(presShellId, viewId, scrollOffset);
+  }
+
+  return NS_OK;
+}
+
+NS_IMETHODIMP
 TabChildHelper::Observe(nsISupports* aSubject,
                         const char* aTopic,
                         const PRUnichar* aData)
@@ -284,63 +343,168 @@ TabChildHelper::Observe(nsISupports* aSubject,
   return NS_OK;
 }
 
-NS_IMETHODIMP
-TabChildHelper::HandleEvent(nsIDOMEvent* aEvent)
+void
+TabChildHelper::SetCSSViewport(const CSSSize& aSize)
 {
-  nsAutoString eventType;
-  aEvent->GetType(eventType);
-  if (eventType.EqualsLiteral("DOMMetaAdded")) {
-    // This meta data may or may not have been a meta viewport tag. If it was,
-    // we should handle it immediately.
-    HandlePossibleViewportChange();
-  } else if (eventType.EqualsLiteral("scroll")) {
-    // Handle a scroll event originated from content.
-    nsCOMPtr<nsIDOMEventTarget> target;
-    aEvent->GetTarget(getter_AddRefs(target));
+  mOldViewportWidth = aSize.width;
 
-    FrameMetrics::ViewID viewId;
-    uint32_t presShellId;
+  if (mContentDocumentIsDisplayed) {
+    nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
+    utils->SetCSSViewport(aSize.width, aSize.height);
+  }
+}
 
-    nsCOMPtr<nsIContent> content;
-    if (nsCOMPtr<nsIDocument> doc = do_QueryInterface(target))
-      content = doc->GetDocumentElement();
-    else
-      content = do_QueryInterface(target);
+void
+TabChildHelper::HandlePossibleViewportChange()
+{
+  if (sDisableViewportHandler) {
+    return;
+  }
+  nsCOMPtr<nsIDOMDocument> domDoc;
+  mView->mWebNavigation->GetDocument(getter_AddRefs(domDoc));
+  nsCOMPtr<nsIDocument> document(do_QueryInterface(domDoc));
 
-    nsCOMPtr<nsIDOMWindowUtils> utils = ::GetDOMWindowUtils(content);
-    utils->GetPresShellId(&presShellId);
+  nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
 
-    if (!nsLayoutUtils::FindIDFor(content, &viewId))
-      return NS_ERROR_UNEXPECTED;
+  nsViewportInfo viewportInfo = nsContentUtils::GetViewportInfo(document, mInnerSize);
+  mView->SendUpdateZoomConstraints(viewportInfo.IsZoomAllowed(),
+                                   viewportInfo.GetMinZoom().scale,
+                                   viewportInfo.GetMaxZoom().scale);
 
-    nsIScrollableFrame* scrollFrame = nsLayoutUtils::FindScrollableFrameFor(viewId);
-    if (!scrollFrame)
-      return NS_OK;
+  float screenW = mInnerSize.width;
+  float screenH = mInnerSize.height;
+  CSSSize viewport(viewportInfo.GetSize());
 
-    CSSIntPoint scrollOffset = scrollFrame->GetScrollPositionCSSPixels();
-
-    if (viewId == mLastMetrics.mScrollId) {
-      // For the root frame, we store the last metrics, including the last
-      // scroll offset, sent by APZC. (This is updated in ProcessUpdateFrame()).
-      // We use this here to avoid sending APZC back a scroll event that
-      // originally came from APZC (besides being unnecessary, the event might
-      // be slightly out of date by the time it reaches APZC).
-      // We should probably do this for subframes, too.
-      if (RoundedToInt(mLastMetrics.mScrollOffset) == scrollOffset) {
-        return NS_OK;
-      }
-
-      // Update the last scroll offset now, otherwise RecvUpdateDimensions()
-      // might trigger a scroll to the old offset before RecvUpdateFrame()
-      // gets a chance to update it.
-      mLastMetrics.mScrollOffset = scrollOffset;
-    }
-
-    // TODO: currently presShellId, viewId are not used in EmbedLiteViewThread
-    mView->SendUpdateScrollOffset(presShellId, viewId, scrollOffset);
+  // We're not being displayed in any way; don't bother doing anything because
+  // that will just confuse future adjustments.
+  if (!screenW || !screenH) {
+    return;
   }
 
-  return NS_OK;
+  // Make sure the viewport height is not shorter than the window when the page
+  // is zoomed out to show its full width. Note that before we set the viewport
+  // width, the "full width" of the page isn't properly defined, so that's why
+  // we have to call SetCSSViewport twice - once to set the width, and the
+  // second time to figure out the height based on the layout at that width.
+  float oldBrowserWidth = mOldViewportWidth;
+  mLastMetrics.mViewport.SizeTo(viewport);
+  if (!oldBrowserWidth) {
+    oldBrowserWidth = kDefaultViewportSize.width;
+  }
+  SetCSSViewport(viewport);
+
+  // If this page has not been painted yet, then this must be getting run
+  // because a meta-viewport element was added (via the DOMMetaAdded handler).
+  // in this case, we should not do anything that forces a reflow (see bug
+  // 759678) such as requesting the page size or sending a viewport update. this
+  // code will get run again in the before-first-paint handler and that point we
+  // will run though all of it. the reason we even bother executing up to this
+  // point on the DOMMetaAdded handler is so that scripts that use
+  // window.innerWidth before they are painted have a correct value (bug
+  // 771575).
+  if (!mContentDocumentIsDisplayed) {
+    return;
+  }
+
+  nsPresContext* presContext = GetPresContext();
+  if (presContext) {
+    int32_t auPerDevPixel = presContext->AppUnitsPerDevPixel();
+    mLastMetrics.mDevPixelsPerCSSPixel = CSSToLayoutDeviceScale(
+      (float)nsPresContext::AppUnitsPerCSSPixel() / auPerDevPixel);
+  }
+
+  nsCOMPtr<Element> htmlDOMElement = document->GetHtmlElement();
+  HTMLBodyElement* bodyDOMElement = document->GetBodyElement();
+
+  int32_t htmlWidth = 0, htmlHeight = 0;
+  if (htmlDOMElement) {
+    htmlWidth = htmlDOMElement->ScrollWidth();
+    htmlHeight = htmlDOMElement->ScrollHeight();
+  }
+  int32_t bodyWidth = 0, bodyHeight = 0;
+  if (bodyDOMElement) {
+    bodyWidth = bodyDOMElement->ScrollWidth();
+    bodyHeight = bodyDOMElement->ScrollHeight();
+  }
+
+  CSSSize pageSize;
+  if (htmlDOMElement || bodyDOMElement) {
+    pageSize = CSSSize(std::max(htmlWidth, bodyWidth),
+                       std::max(htmlHeight, bodyHeight));
+  } else {
+    // For non-HTML content (e.g. SVG), just assume page size == viewport size.
+    pageSize = viewport;
+  }
+  if (!pageSize.width) {
+    // Return early rather than divide by 0.
+    return;
+  }
+
+  CSSToScreenScale minScale(mInnerSize.width / pageSize.width);
+  minScale = clamped(minScale, viewportInfo.GetMinZoom(), viewportInfo.GetMaxZoom());
+  NS_ENSURE_TRUE_VOID(minScale.scale); // (return early rather than divide by 0)
+
+  viewport.height = std::max(viewport.height, screenH / minScale.scale);
+  SetCSSViewport(viewport);
+
+  float oldScreenWidth = mLastMetrics.mCompositionBounds.width;
+  if (!oldScreenWidth) {
+    oldScreenWidth = mInnerSize.width;
+  }
+
+  FrameMetrics metrics(mLastMetrics);
+  metrics.mViewport = CSSRect(CSSPoint(), viewport);
+  metrics.mScrollableRect = CSSRect(CSSPoint(), pageSize);
+  metrics.mCompositionBounds = ScreenIntRect(ScreenIntPoint(), mInnerSize);
+
+  // This change to the zoom accounts for all types of changes I can conceive:
+  // 1. screen size changes, CSS viewport does not (pages with no meta viewport
+  //    or a fixed size viewport)
+  // 2. screen size changes, CSS viewport also does (pages with a device-width
+  //    viewport)
+  // 3. screen size remains constant, but CSS viewport changes (meta viewport
+  //    tag is added or removed)
+  // 4. neither screen size nor CSS viewport changes
+  //
+  // In all of these cases, we maintain how much actual content is visible
+  // within the screen width. Note that "actual content" may be different with
+  // respect to CSS pixels because of the CSS viewport size changing.
+  float oldIntrinsicScale = oldScreenWidth / oldBrowserWidth;
+  metrics.mZoom.scale *= metrics.CalculateIntrinsicScale().scale / oldIntrinsicScale;
+
+  // Changing the zoom when we're not doing a first paint will get ignored
+  // by AsyncPanZoomController and causes a blurry flash.
+  bool isFirstPaint;
+  nsresult rv = utils->GetIsFirstPaint(&isFirstPaint);
+  MOZ_ASSERT(NS_SUCCEEDED(rv));
+  if (NS_FAILED(rv) || isFirstPaint) {
+    // FIXME/bug 799585(?): GetViewportInfo() returns a defaultZoom of
+    // 0.0 to mean "did not calculate a zoom".  In that case, we default
+    // it to the intrinsic scale.
+    if (viewportInfo.GetDefaultZoom().scale < 0.01f) {
+      viewportInfo.SetDefaultZoom(metrics.CalculateIntrinsicScale());
+    }
+
+    CSSToScreenScale defaultZoom = viewportInfo.GetDefaultZoom();
+    MOZ_ASSERT(viewportInfo.GetMinZoom() <= defaultZoom &&
+               defaultZoom <= viewportInfo.GetMaxZoom());
+    metrics.mZoom = defaultZoom;
+  }
+
+  metrics.mDisplayPort = AsyncPanZoomController::CalculatePendingDisplayPort(
+    // The page must have been refreshed in some way such as a new document or
+    // new CSS viewport, so we know that there's no velocity, acceleration, and
+    // we have no idea how long painting will take.
+    metrics, gfx::Point(0.0f, 0.0f), gfx::Point(0.0f, 0.0f), 0.0);
+  metrics.mCumulativeResolution = metrics.mZoom / metrics.mDevPixelsPerCSSPixel * ScreenToLayerScale(1);
+  // This is the root layer, so the cumulative resolution is the same
+  // as the resolution.
+  metrics.mResolution = metrics.mCumulativeResolution / LayoutDeviceToParentLayerScale(1);
+  utils->SetResolution(metrics.mResolution.scale, metrics.mResolution.scale);
+
+  // Force a repaint with these metrics. This, among other things, sets the
+  // displayport, so we start with async painting.
+  ProcessUpdateFrame(metrics);
 }
 
 bool
@@ -854,166 +1018,3 @@ TabChildHelper::GetDOMWindowUtils()
   return utils.forget();
 }
 
-void
-TabChildHelper::SetCSSViewport(const CSSSize& aSize)
-{
-  mOldViewportWidth = aSize.width;
-
-  if (mContentDocumentIsDisplayed) {
-    nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
-    utils->SetCSSViewport(aSize.width, aSize.height);
-  }
-}
-
-void
-TabChildHelper::HandlePossibleViewportChange()
-{
-  if (sDisableViewportHandler) {
-    return;
-  }
-  nsCOMPtr<nsIDOMDocument> domDoc;
-  mView->mWebNavigation->GetDocument(getter_AddRefs(domDoc));
-  nsCOMPtr<nsIDocument> document(do_QueryInterface(domDoc));
-
-  nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
-
-  nsViewportInfo viewportInfo = nsContentUtils::GetViewportInfo(document, mInnerSize);
-  mView->SendUpdateZoomConstraints(viewportInfo.IsZoomAllowed(),
-                                   viewportInfo.GetMinZoom().scale,
-                                   viewportInfo.GetMaxZoom().scale);
-
-  float screenW = mInnerSize.width;
-  float screenH = mInnerSize.height;
-  CSSSize viewport(viewportInfo.GetSize());
-
-  // We're not being displayed in any way; don't bother doing anything because
-  // that will just confuse future adjustments.
-  if (!screenW || !screenH) {
-    return;
-  }
-
-  // Make sure the viewport height is not shorter than the window when the page
-  // is zoomed out to show its full width. Note that before we set the viewport
-  // width, the "full width" of the page isn't properly defined, so that's why
-  // we have to call SetCSSViewport twice - once to set the width, and the
-  // second time to figure out the height based on the layout at that width.
-  float oldBrowserWidth = mOldViewportWidth;
-  mLastMetrics.mViewport.SizeTo(viewport);
-  if (!oldBrowserWidth) {
-    oldBrowserWidth = kDefaultViewportSize.width;
-  }
-  SetCSSViewport(viewport);
-
-  // If this page has not been painted yet, then this must be getting run
-  // because a meta-viewport element was added (via the DOMMetaAdded handler).
-  // in this case, we should not do anything that forces a reflow (see bug
-  // 759678) such as requesting the page size or sending a viewport update. this
-  // code will get run again in the before-first-paint handler and that point we
-  // will run though all of it. the reason we even bother executing up to this
-  // point on the DOMMetaAdded handler is so that scripts that use
-  // window.innerWidth before they are painted have a correct value (bug
-  // 771575).
-  if (!mContentDocumentIsDisplayed) {
-    return;
-  }
-
-  nsPresContext* presContext = GetPresContext();
-  if (presContext) {
-    int32_t auPerDevPixel = presContext->AppUnitsPerDevPixel();
-    mLastMetrics.mDevPixelsPerCSSPixel = CSSToLayoutDeviceScale(
-      (float)nsPresContext::AppUnitsPerCSSPixel() / auPerDevPixel);
-  }
-
-  nsCOMPtr<Element> htmlDOMElement = document->GetHtmlElement();
-  HTMLBodyElement* bodyDOMElement = document->GetBodyElement();
-
-  int32_t htmlWidth = 0, htmlHeight = 0;
-  if (htmlDOMElement) {
-    htmlWidth = htmlDOMElement->ScrollWidth();
-    htmlHeight = htmlDOMElement->ScrollHeight();
-  }
-  int32_t bodyWidth = 0, bodyHeight = 0;
-  if (bodyDOMElement) {
-    bodyWidth = bodyDOMElement->ScrollWidth();
-    bodyHeight = bodyDOMElement->ScrollHeight();
-  }
-
-  CSSSize pageSize;
-  if (htmlDOMElement || bodyDOMElement) {
-    pageSize = CSSSize(std::max(htmlWidth, bodyWidth),
-                       std::max(htmlHeight, bodyHeight));
-  } else {
-    // For non-HTML content (e.g. SVG), just assume page size == viewport size.
-    pageSize = viewport;
-  }
-  if (!pageSize.width) {
-    // Return early rather than divide by 0.
-    return;
-  }
-
-  CSSToScreenScale minScale(mInnerSize.width / pageSize.width);
-  minScale = clamped(minScale, viewportInfo.GetMinZoom(), viewportInfo.GetMaxZoom());
-  NS_ENSURE_TRUE_VOID(minScale.scale); // (return early rather than divide by 0)
-
-  viewport.height = std::max(viewport.height, screenH / minScale.scale);
-  SetCSSViewport(viewport);
-
-  float oldScreenWidth = mLastMetrics.mCompositionBounds.width;
-  if (!oldScreenWidth) {
-    oldScreenWidth = mInnerSize.width;
-  }
-
-  FrameMetrics metrics(mLastMetrics);
-  metrics.mViewport = CSSRect(CSSPoint(), viewport);
-  metrics.mScrollableRect = CSSRect(CSSPoint(), pageSize);
-  metrics.mCompositionBounds = ScreenIntRect(ScreenIntPoint(), mInnerSize);
-
-  // This change to the zoom accounts for all types of changes I can conceive:
-  // 1. screen size changes, CSS viewport does not (pages with no meta viewport
-  //    or a fixed size viewport)
-  // 2. screen size changes, CSS viewport also does (pages with a device-width
-  //    viewport)
-  // 3. screen size remains constant, but CSS viewport changes (meta viewport
-  //    tag is added or removed)
-  // 4. neither screen size nor CSS viewport changes
-  //
-  // In all of these cases, we maintain how much actual content is visible
-  // within the screen width. Note that "actual content" may be different with
-  // respect to CSS pixels because of the CSS viewport size changing.
-  float oldIntrinsicScale = oldScreenWidth / oldBrowserWidth;
-  metrics.mZoom.scale *= metrics.CalculateIntrinsicScale().scale / oldIntrinsicScale;
-
-  // Changing the zoom when we're not doing a first paint will get ignored
-  // by AsyncPanZoomController and causes a blurry flash.
-  bool isFirstPaint;
-  nsresult rv = utils->GetIsFirstPaint(&isFirstPaint);
-  MOZ_ASSERT(NS_SUCCEEDED(rv));
-  if (NS_FAILED(rv) || isFirstPaint) {
-    // FIXME/bug 799585(?): GetViewportInfo() returns a defaultZoom of
-    // 0.0 to mean "did not calculate a zoom".  In that case, we default
-    // it to the intrinsic scale.
-    if (viewportInfo.GetDefaultZoom().scale < 0.01f) {
-      viewportInfo.SetDefaultZoom(metrics.CalculateIntrinsicScale());
-    }
-
-    CSSToScreenScale defaultZoom = viewportInfo.GetDefaultZoom();
-    MOZ_ASSERT(viewportInfo.GetMinZoom() <= defaultZoom &&
-               defaultZoom <= viewportInfo.GetMaxZoom());
-    metrics.mZoom = defaultZoom;
-  }
-
-  metrics.mDisplayPort = AsyncPanZoomController::CalculatePendingDisplayPort(
-    // The page must have been refreshed in some way such as a new document or
-    // new CSS viewport, so we know that there's no velocity, acceleration, and
-    // we have no idea how long painting will take.
-    metrics, gfx::Point(0.0f, 0.0f), gfx::Point(0.0f, 0.0f), 0.0);
-  metrics.mCumulativeResolution = metrics.mZoom / metrics.mDevPixelsPerCSSPixel * ScreenToLayerScale(1);
-  // This is the root layer, so the cumulative resolution is the same
-  // as the resolution.
-  metrics.mResolution = metrics.mCumulativeResolution / LayoutDeviceToParentLayerScale(1);
-  utils->SetResolution(metrics.mResolution.scale, metrics.mResolution.scale);
-
-  // Force a repaint with these metrics. This, among other things, sets the
-  // displayport, so we start with async painting.
-  ProcessUpdateFrame(metrics);
-}
