@@ -14,6 +14,7 @@
 #include "InputData.h"
 #include "nsDataHashtable.h"
 #include "nsIDOMEventListener.h"
+#include "nsIDocument.h"
 
 class CancelableTask;
 class nsPresContext;
@@ -61,6 +62,8 @@ public:
   bool RecvAsyncMessage(const nsAString& aMessage,
                         const nsAString& aData);
 
+  bool IsAsyncPanZoomEnabled();
+
 protected:
   nsIWidget* GetWidget(nsPoint* aOffset);
   nsPresContext* GetPresContext();
@@ -80,10 +83,11 @@ private:
   void Disconnect();
   void Unload();
   bool ProcessUpdateFrame(const mozilla::layers::FrameMetrics& aFrameMetrics);
-  bool ProcessUpdateSubframe(nsIContent* aContent, const mozilla::layers::FrameMetrics& aMetrics);
 
   // Get the DOMWindowUtils for the top-level window in this tab.
   already_AddRefed<nsIDOMWindowUtils> GetDOMWindowUtils();
+  // Get the Document for the top-level window in this tab.
+  already_AddRefed<nsIDocument> GetDocument();
 
   // Wrapper for nsIDOMWindowUtils.setCSSViewport(). This updates some state
   // variables local to this class before setting it.
@@ -103,6 +107,7 @@ private:
   float mOldViewportWidth;
   nsRefPtr<EmbedTabChildGlobal> mTabChildGlobal;
   mozilla::layers::FrameMetrics mLastRootMetrics;
+  mozilla::layers::FrameMetrics mLastSubFrameMetrics;
 };
 
 }

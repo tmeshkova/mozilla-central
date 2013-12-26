@@ -110,11 +110,15 @@ protected:
                                const nsString& aJSON,
                                InfallibleTArray<nsString>* aJSONRetVal);
   virtual bool
-  RecvUpdateZoomConstraints(const bool&, const float&, const float&);
+  RecvUpdateZoomConstraints(const uint32_t& aPresShellId,
+                            const mozilla::layers::FrameMetrics::ViewID& aViewId,
+                            const bool&, const CSSToScreenScale&, const CSSToScreenScale&);
   virtual bool RecvUpdateScrollOffset(const uint32_t& aPresShellId,
                                       const mozilla::layers::FrameMetrics::ViewID& aViewId,
                                       const CSSIntPoint& aScrollOffset);
-  virtual bool RecvZoomToRect(const CSSRect& aRect);
+  virtual bool RecvZoomToRect(const uint32_t& aPresShellId,
+                              const mozilla::layers::FrameMetrics::ViewID& aViewId,
+                              const CSSRect& aRect);
   virtual bool RecvSetBackgroundColor(const nscolor& aColor);
   virtual bool RecvContentReceivedTouch(const bool& aPreventDefault);
 

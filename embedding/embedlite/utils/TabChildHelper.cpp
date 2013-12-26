@@ -22,10 +22,11 @@
 #include "mozilla/dom/HTMLBodyElement.h"
 #include "nsGlobalWindow.h"
 #include "nsIDocShell.h"
-#include "nsViewportInfo.h"
 #include "nsPIWindowRoot.h"
 #include "StructuredCloneUtils.h"
+#include "nsViewportInfo.h"
 #include "mozilla/Preferences.h"
+#include "APZCCallbackHelper.h"
 #include "nsIFrame.h"
 #include "nsView.h"
 #include "nsLayoutUtils.h"
@@ -38,36 +39,16 @@ static const char DETECT_SCROLLABLE_SUBFRAME[] = "detect-scrollable-subframe";
 static bool sDisableViewportHandler = getenv("NO_VIEWPORT") != 0;
 
 using namespace mozilla;
-using namespace mozilla::embedlite;
-using namespace mozilla::layers;
 using namespace mozilla::dom;
+using namespace mozilla::layers;
+using namespace mozilla::widget;
+using namespace mozilla::embedlite;
+
+typedef FrameMetrics::ViewID ViewID;
 
 static const CSSSize kDefaultViewportSize(980, 480);
 
 static bool sPostAZPCAsJsonViewport(false);
-
-// Get the DOMWindowUtils for the window corresponding to the given document.
-static already_AddRefed<nsIDOMWindowUtils> GetDOMWindowUtils(nsIDocument* doc)
-{
-  nsCOMPtr<nsIDOMWindowUtils> utils;
-  nsCOMPtr<nsIDOMWindow> window = doc->GetDefaultView();
-  if (window) {
-    utils = do_GetInterface(window);
-  }
-  return utils.forget();
-}
-
-// Get the DOMWindowUtils for the window corresponding to the givent content
-// element. This might be an iframe inside the tab, for instance.
-static already_AddRefed<nsIDOMWindowUtils> GetDOMWindowUtils(nsIContent* content)
-{
-  nsCOMPtr<nsIDOMWindowUtils> utils;
-  nsIDocument* doc = content->GetCurrentDoc();
-  if (doc) {
-    utils = GetDOMWindowUtils(doc);
-  }
-  return utils.forget();
-}
 
 TabChildHelper::TabChildHelper(EmbedLiteViewThreadChild* aView)
   : mView(aView)
@@ -235,7 +216,7 @@ TabChildHelper::HandleEvent(nsIDOMEvent* aEvent)
     nsCOMPtr<nsIDOMEventTarget> target;
     aEvent->GetTarget(getter_AddRefs(target));
 
-    FrameMetrics::ViewID viewId;
+    ViewID viewId;
     uint32_t presShellId;
 
     nsCOMPtr<nsIContent> content;
@@ -244,7 +225,7 @@ TabChildHelper::HandleEvent(nsIDOMEvent* aEvent)
     else
       content = do_QueryInterface(target);
 
-    nsCOMPtr<nsIDOMWindowUtils> utils = ::GetDOMWindowUtils(content);
+    nsCOMPtr<nsIDOMWindowUtils> utils = APZCCallbackHelper::GetDOMWindowUtils(content);
     utils->GetPresShellId(&presShellId);
 
     if (!nsLayoutUtils::FindIDFor(content, &viewId))
@@ -271,9 +252,13 @@ TabChildHelper::HandleEvent(nsIDOMEvent* aEvent)
       // might trigger a scroll to the old offset before RecvUpdateFrame()
       // gets a chance to update it.
       mLastRootMetrics.mScrollOffset = scrollOffset;
+    } else if (viewId == mLastSubFrameMetrics.mScrollId) {
+      if (RoundedToInt(mLastSubFrameMetrics.mScrollOffset) == scrollOffset) {
+        return NS_OK;
+      }
+      mLastSubFrameMetrics.mScrollOffset = scrollOffset;
     }
 
-    // TODO: currently presShellId, viewId are not used in EmbedLiteViewThread
     mView->SendUpdateScrollOffset(presShellId, viewId, scrollOffset);
   }
 
@@ -281,29 +266,35 @@ TabChildHelper::HandleEvent(nsIDOMEvent* aEvent)
 }
 
 NS_IMETHODIMP
-TabChildHelper::Observe(nsISupports* aSubject,
-                        const char* aTopic,
-                        const PRUnichar* aData)
+TabChildHelper::Observe(nsISupports *aSubject,
+                        const char *aTopic,
+                        const PRUnichar *aData)
 {
   if (!strcmp(aTopic, BROWSER_ZOOM_TO_RECT)) {
     nsCOMPtr<nsIDocShell> docShell(do_QueryInterface(aSubject));
-    CSSRect rect;
-    sscanf(NS_ConvertUTF16toUTF8(aData).get(),
-           "{\"x\":%f,\"y\":%f,\"w\":%f,\"h\":%f}",
-           &rect.x, &rect.y, &rect.width, &rect.height);
-    mView->SendZoomToRect(rect);
+    if (this == this) { // FIXME: 'this' must be compared with (TabChildHelper*)aSubject. Can we use SameCOMIdentity() here?
+      nsCOMPtr<nsIDocument> doc(GetDocument());
+      uint32_t presShellId;
+      ViewID viewId;
+      if (APZCCallbackHelper::GetScrollIdentifiers(doc->GetDocumentElement(),
+                                                   &presShellId, &viewId)) {
+        CSSRect rect;
+        sscanf(NS_ConvertUTF16toUTF8(aData).get(),
+               "{\"x\":%f,\"y\":%f,\"w\":%f,\"h\":%f}",
+               &rect.x, &rect.y, &rect.width, &rect.height);
+        mView->SendZoomToRect(presShellId, viewId, rect);
+      }
+    }
   } else if (!strcmp(aTopic, BEFORE_FIRST_PAINT)) {
-    nsCOMPtr<nsIDocument> subject(do_QueryInterface(aSubject));
-    nsCOMPtr<nsIDOMDocument> domDoc;
-    mView->mWebNavigation->GetDocument(getter_AddRefs(domDoc));
-    nsCOMPtr<nsIDocument> doc(do_QueryInterface(domDoc));
+    if (IsAsyncPanZoomEnabled()) {
+      nsCOMPtr<nsIDocument> subject(do_QueryInterface(aSubject));
+      nsCOMPtr<nsIDocument> doc(GetDocument());
 
-    if (SameCOMIdentity(subject, doc)) {
-      nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
+      if (SameCOMIdentity(subject, doc)) {
+        nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
 
-      mContentDocumentIsDisplayed = true;
+        mContentDocumentIsDisplayed = true;
 
-      if (!sDisableViewportHandler) {
         // Reset CSS viewport and zoom to default on new page, then
         // calculate them properly using the actual metadata from the
         // page.
@@ -327,15 +318,15 @@ TabChildHelper::Observe(nsISupports* aSubject,
 
         utils->SetResolution(mLastRootMetrics.mResolution.scale,
                              mLastRootMetrics.mResolution.scale);
-      }
 
-      HandlePossibleViewportChange();
+        HandlePossibleViewportChange();
 
-      nsCOMPtr<nsIObserverService> observerService =
-        do_GetService(NS_OBSERVERSERVICE_CONTRACTID);
-      utils->SetIsFirstPaint(true);
-      if (observerService) {
-        observerService->NotifyObservers(aSubject, "embedlite-before-first-paint", nullptr);
+        nsCOMPtr<nsIObserverService> observerService =
+          do_GetService(NS_OBSERVERSERVICE_CONTRACTID);
+        utils->SetIsFirstPaint(true);
+        if (observerService) {
+          observerService->NotifyObservers(aSubject, "embedlite-before-first-paint", nullptr);
+        }
       }
     }
   }
@@ -357,9 +348,10 @@ TabChildHelper::SetCSSViewport(const CSSSize& aSize)
 void
 TabChildHelper::HandlePossibleViewportChange()
 {
-  if (sDisableViewportHandler) {
+  if (!IsAsyncPanZoomEnabled()) {
     return;
   }
+
   nsCOMPtr<nsIDOMDocument> domDoc;
   mView->mWebNavigation->GetDocument(getter_AddRefs(domDoc));
   nsCOMPtr<nsIDocument> document(do_QueryInterface(domDoc));
@@ -367,9 +359,17 @@ TabChildHelper::HandlePossibleViewportChange()
   nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
 
   nsViewportInfo viewportInfo = nsContentUtils::GetViewportInfo(document, mInnerSize);
-  mView->SendUpdateZoomConstraints(viewportInfo.IsZoomAllowed(),
-                                   viewportInfo.GetMinZoom().scale,
-                                   viewportInfo.GetMaxZoom().scale);
+  uint32_t presShellId;
+  ViewID viewId;
+  if (APZCCallbackHelper::GetScrollIdentifiers(document->GetDocumentElement(),
+                                               &presShellId, &viewId)) {
+    mView->SendUpdateZoomConstraints(presShellId,
+                              viewId,
+                              viewportInfo.IsZoomAllowed(),
+                              viewportInfo.GetMinZoom(),
+                              viewportInfo.GetMaxZoom());
+  }
+
 
   float screenW = mInnerSize.width;
   float screenH = mInnerSize.height;
@@ -406,13 +406,6 @@ TabChildHelper::HandlePossibleViewportChange()
     return;
   }
 
-  nsPresContext* presContext = GetPresContext();
-  if (presContext) {
-    int32_t auPerDevPixel = presContext->AppUnitsPerDevPixel();
-    mLastRootMetrics.mDevPixelsPerCSSPixel = CSSToLayoutDeviceScale(
-      (float)nsPresContext::AppUnitsPerCSSPixel() / auPerDevPixel);
-  }
-
   nsCOMPtr<Element> htmlDOMElement = document->GetHtmlElement();
   HTMLBodyElement* bodyDOMElement = document->GetBodyElement();
 
@@ -439,13 +432,6 @@ TabChildHelper::HandlePossibleViewportChange()
     // Return early rather than divide by 0.
     return;
   }
-
-  CSSToScreenScale minScale(mInnerSize.width / pageSize.width);
-  minScale = clamped(minScale, viewportInfo.GetMinZoom(), viewportInfo.GetMaxZoom());
-  NS_ENSURE_TRUE_VOID(minScale.scale); // (return early rather than divide by 0)
-
-  viewport.height = std::max(viewport.height, screenH / minScale.scale);
-  SetCSSViewport(viewport);
 
   float oldScreenWidth = mLastRootMetrics.mCompositionBounds.width;
   if (!oldScreenWidth) {
@@ -489,6 +475,8 @@ TabChildHelper::HandlePossibleViewportChange()
     MOZ_ASSERT(viewportInfo.GetMinZoom() <= defaultZoom &&
                defaultZoom <= viewportInfo.GetMaxZoom());
     metrics.mZoom = defaultZoom;
+
+    metrics.mScrollId = viewId;
   }
 
   metrics.mDisplayPort = AsyncPanZoomController::CalculatePendingDisplayPort(
@@ -513,12 +501,8 @@ TabChildHelper::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
   MOZ_ASSERT(aFrameMetrics.mScrollId != FrameMetrics::NULL_SCROLL_ID);
 
   if (aFrameMetrics.mIsRoot) {
-    uint32_t presShellId;
     nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
-    nsresult rv = utils->GetPresShellId(&presShellId);
-    MOZ_ASSERT(NS_SUCCEEDED(rv));
-
-    if (NS_SUCCEEDED(rv) && aFrameMetrics.mPresShellId == presShellId) {
+    if (APZCCallbackHelper::HasValidPresShellId(utils, aFrameMetrics)) {
       return ProcessUpdateFrame(aFrameMetrics);
     }
   } else {
@@ -527,7 +511,10 @@ TabChildHelper::RecvUpdateFrame(const FrameMetrics& aFrameMetrics)
     nsCOMPtr<nsIContent> content = nsLayoutUtils::FindContentFor(
                                       aFrameMetrics.mScrollId);
     if (content) {
-      return ProcessUpdateSubframe(content, aFrameMetrics);
+      FrameMetrics newSubFrameMetrics(aFrameMetrics);
+      APZCCallbackHelper::UpdateSubFrame(content, newSubFrameMetrics);
+      mLastSubFrameMetrics = newSubFrameMetrics;
+      return true;
     }
   }
 
@@ -541,130 +528,74 @@ bool
 TabChildHelper::ProcessUpdateFrame(const FrameMetrics& aFrameMetrics)
 {
   LOGF();
-  mozilla::CSSRect cssCompositedRect = aFrameMetrics.CalculateCompositedRectInCssPixels();
-  // The BrowserElementScrolling helper must know about these updated metrics
-  // for other functions it performs, such as double tap handling.
-  if (sPostAZPCAsJsonViewport) {
-    nsString data;
-    data.AppendPrintf("{ \"x\" : %d", NS_lround(aFrameMetrics.mScrollOffset.x));
-    data.AppendPrintf(", \"y\" : %d", NS_lround(aFrameMetrics.mScrollOffset.y));
-    data.AppendPrintf(", \"viewport\" : ");
-        data.AppendPrintf("{ \"width\" : ");
-            data.AppendFloat(aFrameMetrics.mViewport.width);
-        data.AppendPrintf(", \"height\" : ");
-            data.AppendFloat(aFrameMetrics.mViewport.height);
-        data.AppendPrintf(" }");
-    data.AppendPrintf(", \"displayPort\" : ");
-        data.AppendPrintf("{ \"x\" : ");
-            data.AppendFloat(aFrameMetrics.mDisplayPort.x);
-        data.AppendPrintf(", \"y\" : ");
-            data.AppendFloat(aFrameMetrics.mDisplayPort.y);
-        data.AppendPrintf(", \"width\" : ");
-            data.AppendFloat(aFrameMetrics.mDisplayPort.width);
-        data.AppendPrintf(", \"height\" : ");
-            data.AppendFloat(aFrameMetrics.mDisplayPort.height);
-        data.AppendPrintf(" }");
-    data.AppendPrintf(", \"compositionBounds\" : ");
-        data.AppendPrintf("{ \"x\" : %d", aFrameMetrics.mCompositionBounds.x);
-        data.AppendPrintf(", \"y\" : %d", aFrameMetrics.mCompositionBounds.y);
-        data.AppendPrintf(", \"width\" : %d", aFrameMetrics.mCompositionBounds.width);
-        data.AppendPrintf(", \"height\" : %d", aFrameMetrics.mCompositionBounds.height);
-        data.AppendPrintf(" }");
-    data.AppendPrintf(", \"cssPageRect\" : ");
-        data.AppendPrintf("{ \"x\" : ");
-            data.AppendFloat(aFrameMetrics.mScrollableRect.x);
-        data.AppendPrintf(", \"y\" : ");
-            data.AppendFloat(aFrameMetrics.mScrollableRect.y);
-        data.AppendPrintf(", \"width\" : ");
-            data.AppendFloat(aFrameMetrics.mScrollableRect.width);
-        data.AppendPrintf(", \"height\" : ");
-            data.AppendFloat(aFrameMetrics.mScrollableRect.height);
-        data.AppendPrintf(" }");
-        data.AppendPrintf(", \"resolution\" : "); // TODO: check if it's actually used?
-        data.AppendPrintf("{ \"width\" : ");
-            data.AppendFloat(aFrameMetrics.mZoom.scale);
-        data.AppendPrintf(", \"height\" : ");
-            data.AppendFloat(aFrameMetrics.mZoom.scale);
-        data.AppendPrintf(", \"scale\" : ");
-            data.AppendFloat(aFrameMetrics.mZoom.scale);
-        data.AppendPrintf(" }");
-    data.AppendPrintf(", \"cssCompositedRect\" : ");
-        data.AppendPrintf("{ \"width\" : ");
-            data.AppendFloat(cssCompositedRect.width);
-        data.AppendPrintf(", \"height\" : ");
-            data.AppendFloat(cssCompositedRect.height);
-        data.AppendPrintf(" }");
-    data.AppendPrintf(" }");
 
-    RecvAsyncMessage(NS_LITERAL_STRING("Viewport:Change"), data);
-  }
+    nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
 
-  nsCOMPtr<nsIDOMWindowUtils> utils(GetDOMWindowUtils());
-  nsCOMPtr<nsIDOMWindow> window = do_GetInterface(mView->mWebNavigation);
+    FrameMetrics newMetrics = aFrameMetrics;
+    APZCCallbackHelper::UpdateRootFrame(utils, newMetrics);
 
-  // set the scroll port size, which determines the scroll range
-  utils->SetScrollPositionClampingScrollPortSize(
-    cssCompositedRect.width, cssCompositedRect.height);
+    mozilla::CSSRect cssCompositedRect = aFrameMetrics.CalculateCompositedRectInCssPixels();
+    // The BrowserElementScrolling helper must know about these updated metrics
+    // for other functions it performs, such as double tap handling.
+    // Note, %f must not be used because it is locale specific!
+    if (sPostAZPCAsJsonViewport) {
+      nsString data;
+      data.AppendPrintf("{ \"x\" : %d", NS_lround(aFrameMetrics.mScrollOffset.x));
+      data.AppendPrintf(", \"y\" : %d", NS_lround(aFrameMetrics.mScrollOffset.y));
+      data.AppendPrintf(", \"viewport\" : ");
+          data.AppendPrintf("{ \"width\" : ");
+              data.AppendFloat(aFrameMetrics.mViewport.width);
+          data.AppendPrintf(", \"height\" : ");
+              data.AppendFloat(aFrameMetrics.mViewport.height);
+          data.AppendPrintf(" }");
+      data.AppendPrintf(", \"displayPort\" : ");
+          data.AppendPrintf("{ \"x\" : ");
+              data.AppendFloat(aFrameMetrics.mDisplayPort.x);
+          data.AppendPrintf(", \"y\" : ");
+              data.AppendFloat(aFrameMetrics.mDisplayPort.y);
+          data.AppendPrintf(", \"width\" : ");
+              data.AppendFloat(aFrameMetrics.mDisplayPort.width);
+          data.AppendPrintf(", \"height\" : ");
+              data.AppendFloat(aFrameMetrics.mDisplayPort.height);
+          data.AppendPrintf(" }");
+      data.AppendPrintf(", \"compositionBounds\" : ");
+          data.AppendPrintf("{ \"x\" : %d", aFrameMetrics.mCompositionBounds.x);
+          data.AppendPrintf(", \"y\" : %d", aFrameMetrics.mCompositionBounds.y);
+          data.AppendPrintf(", \"width\" : %d", aFrameMetrics.mCompositionBounds.width);
+          data.AppendPrintf(", \"height\" : %d", aFrameMetrics.mCompositionBounds.height);
+          data.AppendPrintf(" }");
+      data.AppendPrintf(", \"cssPageRect\" : ");
+          data.AppendPrintf("{ \"x\" : ");
+              data.AppendFloat(aFrameMetrics.mScrollableRect.x);
+          data.AppendPrintf(", \"y\" : ");
+              data.AppendFloat(aFrameMetrics.mScrollableRect.y);
+          data.AppendPrintf(", \"width\" : ");
+              data.AppendFloat(aFrameMetrics.mScrollableRect.width);
+          data.AppendPrintf(", \"height\" : ");
+              data.AppendFloat(aFrameMetrics.mScrollableRect.height);
+          data.AppendPrintf(" }");
+          data.AppendPrintf(", \"resolution\" : ");
+          data.AppendPrintf("{ \"width\" : ");
+              data.AppendFloat(aFrameMetrics.mZoom.scale);
+          data.AppendPrintf(", \"height\" : ");
+              data.AppendFloat(aFrameMetrics.mZoom.scale);
+          data.AppendPrintf(", \"scale\" : ");
+              data.AppendFloat(aFrameMetrics.mZoom.scale);
+          data.AppendPrintf(" }");
+      data.AppendPrintf(", \"cssCompositedRect\" : ");
+          data.AppendPrintf("{ \"width\" : ");
+              data.AppendFloat(cssCompositedRect.width);
+          data.AppendPrintf(", \"height\" : ");
+              data.AppendFloat(cssCompositedRect.height);
+          data.AppendPrintf(" }");
+      data.AppendPrintf(" }");
 
-  // scroll the window to the desired spot
-  nsIScrollableFrame* sf = static_cast<nsGlobalWindow*>(window.get())->GetScrollFrame();
-  if (sf) {
-      sf->ScrollToCSSPixelsApproximate(aFrameMetrics.mScrollOffset);
-  }
-
-  // set the resolution
-  LayoutDeviceToLayerScale resolution = aFrameMetrics.mZoom
-    / aFrameMetrics.mDevPixelsPerCSSPixel * ScreenToLayerScale(1);
-  utils->SetResolution(resolution.scale, resolution.scale);
-
-  // and set the display port
-  nsCOMPtr<nsIDOMDocument> domDoc;
-  mView->mWebNavigation->GetDocument(getter_AddRefs(domDoc));
-  if (domDoc) {
-    nsCOMPtr<nsIDOMElement> element;
-    domDoc->GetDocumentElement(getter_AddRefs(element));
-    if (element) {
-      utils->SetDisplayPortForElement(
-        aFrameMetrics.mDisplayPort.x, aFrameMetrics.mDisplayPort.y,
-        aFrameMetrics.mDisplayPort.width, aFrameMetrics.mDisplayPort.height,
-        element);
+      RecvAsyncMessage(NS_LITERAL_STRING("Viewport:Change"), data);
     }
-  }
 
-  mLastRootMetrics = aFrameMetrics;
+    mLastRootMetrics = newMetrics;
 
-  // ScrollWindowTo() can make some small adjustments to the offset before
-  // actually scrolling the window. To ensure that the scroll offset stored
-  // in mLastRootMetrics is the same as the offset stored in the window,
-  // re-query the latter.
-  CSSIntPoint actualScrollOffset;
-  utils->GetScrollXY(false, &actualScrollOffset.x, &actualScrollOffset.y);
-  mLastRootMetrics.mScrollOffset = actualScrollOffset;
-
-  return true;
-}
-
-bool
-TabChildHelper::ProcessUpdateSubframe(nsIContent* aContent,
-                                const FrameMetrics& aMetrics)
-{
-  // scroll the frame to the desired spot
-  nsIScrollableFrame* scrollFrame = nsLayoutUtils::FindScrollableFrameFor(aMetrics.mScrollId);
-  if (scrollFrame) {
-    scrollFrame->ScrollToCSSPixelsApproximate(aMetrics.mScrollOffset);
-  }
-
-  nsCOMPtr<nsIDOMWindowUtils> utils(::GetDOMWindowUtils(aContent));
-  nsCOMPtr<nsIDOMElement> element = do_QueryInterface(aContent);
-  if (utils && element) {
-    // and set the display port
-    utils->SetDisplayPortForElement(
-      aMetrics.mDisplayPort.x, aMetrics.mDisplayPort.y,
-      aMetrics.mDisplayPort.width, aMetrics.mDisplayPort.height,
-      element);
-  }
-
-  return true;
+    return true;
 }
 
 nsIWebNavigation*
@@ -1018,3 +949,17 @@ TabChildHelper::GetDOMWindowUtils()
   return utils.forget();
 }
 
+already_AddRefed<nsIDocument>
+TabChildHelper::GetDocument()
+{
+  nsCOMPtr<nsIDOMDocument> domDoc;
+  mView->mWebNavigation->GetDocument(getter_AddRefs(domDoc));
+  nsCOMPtr<nsIDocument> doc(do_QueryInterface(domDoc));
+  return doc.forget();
+}
+
+bool
+TabChildHelper::IsAsyncPanZoomEnabled()
+{
+  return !sDisableViewportHandler;
+}

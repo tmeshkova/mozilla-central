@@ -240,10 +240,13 @@ EmbedLiteViewThreadParent::RecvOnTitleChanged(const nsString& aTitle)
 }
 
 bool
-EmbedLiteViewThreadParent::RecvUpdateZoomConstraints(const bool& aAllowZoom, const float& min, const float& max)
+EmbedLiteViewThreadParent::RecvUpdateZoomConstraints(const uint32_t& aPresShellId,
+                                                     const mozilla::layers::FrameMetrics::ViewID& aViewId,
+                                                     const bool& aAllowZoom,
+                                                     const CSSToScreenScale& min, const CSSToScreenScale& max)
 {
   if (mController) {
-    mController->GetManager()->UpdateZoomConstraints(ScrollableLayerGuid(mRootLayerTreeId, 0, 0), aAllowZoom, CSSToScreenScale(min), CSSToScreenScale(max));
+    mController->GetManager()->UpdateZoomConstraints(ScrollableLayerGuid(mRootLayerTreeId, aPresShellId, aViewId), aAllowZoom, min, max);
   }
   return true;
 }
@@ -254,16 +257,18 @@ EmbedLiteViewThreadParent::RecvUpdateScrollOffset(const uint32_t& aPresShellId,
                                   const CSSIntPoint& aScrollOffset)
 {
   if (mController) {
-    mController->GetManager()->UpdateScrollOffset(ScrollableLayerGuid(mRootLayerTreeId, aPresShellId, 0), aScrollOffset);
+    mController->GetManager()->UpdateScrollOffset(ScrollableLayerGuid(mRootLayerTreeId, aPresShellId, aViewId), aScrollOffset);
   }
   return true;
 }
 
 bool
-EmbedLiteViewThreadParent::RecvZoomToRect(const CSSRect& aRect)
+EmbedLiteViewThreadParent::RecvZoomToRect(const uint32_t& aPresShellId,
+                                          const ViewID& aViewId,
+                                          const CSSRect& aRect)
 {
   if (mController) {
-    mController->GetManager()->ZoomToRect(ScrollableLayerGuid(mRootLayerTreeId, 0, 0), aRect);
+    mController->GetManager()->ZoomToRect(ScrollableLayerGuid(mRootLayerTreeId, aPresShellId, aViewId), aRect);
   }
   return true;
 }
