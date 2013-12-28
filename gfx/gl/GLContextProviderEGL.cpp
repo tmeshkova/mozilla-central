@@ -764,10 +764,13 @@ GLContextProviderEGL::CreateForEmbedded(ContextFlags flags)
 
         glContext->SetIsDoubleBuffered(true);
         glContext->SetPlatformContext(platformContext);
+#if !defined(__arm__) // Must not use context sharing on arm (EGLImage should be enough)
+
         if (flags == ContextFlagsGlobal) {
             gGlobalContext = glContext;
             gGlobalContext->SetIsGlobalSharedContext(true);
         }
+#endif
 
         return glContext.forget();
     }

@@ -278,21 +278,28 @@ CompositorOGL::CreateContext()
 {
   nsRefPtr<GLContext> context;
 
-#ifdef XP_WIN
-  if (PR_GetEnv("MOZ_LAYERS_PREFER_EGL")) {
-    printf_stderr("Trying GL layers...\n");
-    context = gl::GLContextProviderEGL::CreateForWindow(mWidget);
+  // If widget has active GL context then we can try to wrap it into Moz GL Context
+  if (mWidget->HasGLContext()) {
+    context = GLContextProvider::CreateForEmbedded(ContextFlagsGlobal);
+    if (!context->Init()) {
+      context = nullptr;
+    }
   }
-#endif
 
-  if (PR_GetEnv("MOZ_LAYERS_PREFER_OFFSCREEN")) {
+  if (!context && !mWidget->GetNativeData(NS_NATIVE_WINDOW)) {
     SurfaceCaps caps = SurfaceCaps::ForRGB();
     caps.preserve = false;
     caps.bpp16 = true;
     context = GLContextProvider::CreateOffscreen(gfxIntSize(mSurfaceSize.width,
-                                                            mSurfaceSize.height),
-                                                 caps);
+                                                            mSurfaceSize.height), caps);
   }
+
+#ifdef XP_WIN
+  if (!context && PR_GetEnv("MOZ_LAYERS_PREFER_EGL")) {
+    printf_stderr("Trying GL layers...\n");
+    context = gl::GLContextProviderEGL::CreateForWindow(mWidget);
+  }
+#endif
 
   if (!context)
     context = gl::GLContextProvider::CreateForWindow(mWidget);

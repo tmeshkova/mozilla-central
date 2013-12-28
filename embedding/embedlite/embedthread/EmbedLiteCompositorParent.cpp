@@ -115,8 +115,10 @@ bool EmbedLiteCompositorParent::RenderGL()
   }
   CompositorParent::Composite();
 
-  if (!context->IsOffscreen() || !context->PublishFrame()) {
-    NS_ERROR("Failed to publish context frame");
+  if (context->IsOffscreen()) {
+    if (!context->PublishFrame()) {
+      NS_ERROR("Failed to publish context frame");
+    }
   }
 
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);

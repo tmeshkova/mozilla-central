@@ -454,11 +454,11 @@ EmbedLiteApp::SetIsAccelerated(bool aIsAccelerated)
 void
 EmbedLiteApp::Initialized()
 {
-  if (mIsCompositeInMainThread) {
-    mozilla::layers::CompositorParent::StartUpWithExistingThread(MessageLoop::current(), PlatformThread::CurrentId());
-  }
   if (mListener) {
     mListener->Initialized();
+  }
+  if (mIsCompositeInMainThread) {
+    mozilla::layers::CompositorParent::StartUpWithExistingThread(MessageLoop::current(), PlatformThread::CurrentId());
   }
 }
 
