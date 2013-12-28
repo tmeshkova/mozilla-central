@@ -129,10 +129,11 @@ public:
   virtual void AddObservers(nsTArray<nsCString>& observersList);
   virtual void RemoveObservers(nsTArray<nsCString>& observersList);
 
+  // Create wrapper for current active GL context, for proper GL sharing.
+  virtual EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget();
+
   // Only one EmbedHelper object allowed
   static EmbedLiteApp* GetInstance();
-
-  virtual EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget();
 
 private:
   EmbedLiteApp();
