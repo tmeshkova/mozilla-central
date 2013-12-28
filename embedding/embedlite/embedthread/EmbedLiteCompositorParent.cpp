@@ -40,6 +40,7 @@ EmbedLiteCompositorParent::EmbedLiteCompositorParent(nsIWidget* aWidget,
   : CompositorParent(aWidget, aRenderToEGLSurface, aSurfaceWidth, aSurfaceHeight)
   , mId(id)
   , mCurrentCompositeTask(nullptr)
+  , mWorldOpacity(1.0f)
 {
   AddRef();
   EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
@@ -109,6 +110,7 @@ bool EmbedLiteCompositorParent::RenderGL()
   NS_ENSURE_TRUE(context, false);
 
   state->mLayerManager->SetWorldTransform(mWorldTransform);
+  state->mLayerManager->GetCompositor()->SetWorldOpacity(mWorldOpacity);
 
   if (!mActiveClipping.IsEmpty() && state->mLayerManager->GetRoot()) {
     state->mLayerManager->GetRoot()->SetClipRect(&mActiveClipping);
@@ -145,6 +147,11 @@ void EmbedLiteCompositorParent::SetSurfaceSize(int width, int height)
 void EmbedLiteCompositorParent::SetWorldTransform(gfxMatrix aMatrix)
 {
   mWorldTransform = aMatrix;
+}
+
+void EmbedLiteCompositorParent::SetWorldOpacity(float aOpacity)
+{
+  mWorldOpacity = aOpacity;
 }
 
 void EmbedLiteCompositorParent::SetClipping(const gfxRect& aClipRect)

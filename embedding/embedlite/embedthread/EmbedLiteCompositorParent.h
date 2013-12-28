@@ -34,6 +34,7 @@ public:
   void SetSurfaceSize(int width, int height);
   void SetWorldTransform(gfxMatrix);
   void SetClipping(const gfxRect& aClipRect);
+  void SetWorldOpacity(float aOpacity);
 
   virtual bool RecvStop() MOZ_OVERRIDE;
   virtual void SetChildCompositor(mozilla::layers::CompositorChild*, MessageLoop*);
@@ -66,6 +67,7 @@ protected:
   gfxMatrix mWorldTransform;
   nsIntRect mActiveClipping;
   CancelableTask *mCurrentCompositeTask;
+  float mWorldOpacity;
 };
 
 } // embedlite

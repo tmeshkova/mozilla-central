@@ -1303,7 +1303,7 @@ CompositorOGL::DrawQuadInternal(const Rect& aRect,
                                 source->AsSourceOGL()->GetTextureTarget());
 
       program->SetTextureUnit(0);
-      program->SetLayerOpacity(aOpacity);
+      program->SetLayerOpacity(aOpacity * mWorldOpacity);
 
       AutoSaveTexture bindMask(mGLContext, LOCAL_GL_TEXTURE1);
       if (maskType != MaskNone) {
@@ -1342,7 +1342,7 @@ CompositorOGL::DrawQuadInternal(const Rect& aRect,
       ApplyFilterToBoundTexture(mGLContext, filter);
 
       program->SetYCbCrTextureUnits(Y, Cb, Cr);
-      program->SetLayerOpacity(aOpacity);
+      program->SetLayerOpacity(aOpacity * mWorldOpacity);
       program->SetTextureTransform(gfx3DMatrix());
 
       AutoSaveTexture bindMask(mGLContext, LOCAL_GL_TEXTURE3);
@@ -1364,7 +1364,7 @@ CompositorOGL::DrawQuadInternal(const Rect& aRect,
 
       program->Activate();
       program->SetTextureUnit(0);
-      program->SetLayerOpacity(aOpacity);
+      program->SetLayerOpacity(aOpacity * mWorldOpacity);
       program->SetTextureTransform(gfx3DMatrix());
 
       AutoSaveTexture bindMask(mGLContext, LOCAL_GL_TEXTURE1);
@@ -1422,7 +1422,7 @@ CompositorOGL::DrawQuadInternal(const Rect& aRect,
         program->Activate();
         program->SetBlackTextureUnit(0);
         program->SetWhiteTextureUnit(1);
-        program->SetLayerOpacity(aOpacity);
+        program->SetLayerOpacity(aOpacity * mWorldOpacity);
         program->SetLayerTransform(aTransform);
         program->SetTextureTransform(gfx3DMatrix());
         program->SetRenderOffset(offset.x, offset.y);
