@@ -117,6 +117,18 @@ bool EmbedLiteCompositorParent::RenderGL(EmbedLiteRenderTarget* aTarget)
   }
   CompositorParent::Composite();
 
+  GLContext* context = static_cast<CompositorOGL*>(mgr->GetCompositor())->gl();
+  if (context && context->IsOffscreen()) {
+    if (!context->PublishFrame()) {
+      NS_ERROR("Failed to publish context frame");
+    }
+  }
+
+  EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
+  if (view) {
+    view->GetListener()->CompositingFinished();
+  }
+
   return retval;
 }
 
