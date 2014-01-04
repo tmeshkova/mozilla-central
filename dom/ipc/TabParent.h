@@ -156,7 +156,8 @@ public:
     virtual bool RecvGetDefaultScale(double* aValue);
     virtual bool RecvGetWidgetNativeData(WindowsHandle* aValue);
     virtual bool RecvZoomToRect(const CSSRect& aRect);
-    virtual bool RecvUpdateZoomConstraints(const bool& aAllowZoom,
+    virtual bool RecvUpdateZoomConstraints(const bool& aIsRoot,
+                                           const bool& aAllowZoom,
                                            const CSSToScreenScale& aMinZoom,
                                            const CSSToScreenScale& aMaxZoom);
     virtual bool RecvUpdateScrollOffset(const uint32_t& aPresShellId, const ViewID& aViewId, const CSSIntPoint& aScrollOffset);

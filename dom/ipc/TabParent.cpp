@@ -1561,12 +1561,13 @@ TabParent::RecvZoomToRect(const CSSRect& aRect)
 }
 
 bool
-TabParent::RecvUpdateZoomConstraints(const bool& aAllowZoom,
+TabParent::RecvUpdateZoomConstraints(const bool& aIsRoot,
+                                     const bool& aAllowZoom,
                                      const CSSToScreenScale& aMinZoom,
                                      const CSSToScreenScale& aMaxZoom)
 {
   if (RenderFrameParent* rfp = GetRenderFrame()) {
-    rfp->UpdateZoomConstraints(aAllowZoom, aMinZoom, aMaxZoom);
+    rfp->UpdateZoomConstraints(aIsRoot, aAllowZoom, aMinZoom, aMaxZoom);
   }
   return true;
 }
