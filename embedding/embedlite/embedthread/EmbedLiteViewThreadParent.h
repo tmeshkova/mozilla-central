@@ -8,6 +8,7 @@
 
 #include "mozilla/embedlite/PEmbedLiteViewParent.h"
 #include "EmbedLiteViewImplIface.h"
+#include "GLDefs.h"
 
 namespace mozilla {
 namespace layers {
@@ -39,7 +40,7 @@ public:
   virtual void LoadFrameScript(const char* aURI);
   virtual void DoSendAsyncMessage(const PRUnichar* aMessageName, const PRUnichar* aMessage);
   virtual bool RenderToImage(unsigned char* aData, int imgW, int imgH, int stride, int depth);
-  virtual bool RenderGL(mozilla::embedlite::EmbedLiteRenderTarget*);
+  virtual bool RenderGL();
   virtual void SetViewSize(int width, int height);
   virtual void SetGLViewPortSize(int width, int height);
   virtual void SetGLViewTransform(gfxMatrix matrix);
@@ -64,7 +65,7 @@ public:
   virtual void RemoveMessageListeners(const nsTArray<nsString>&);
 
   mozilla::layers::AsyncPanZoomController* GetDefaultPanZoomController();
-  EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget(int width, int height);
+  virtual bool GetPendingTexture(EmbedLiteRenderTarget* aContextWrapper, int* textureID, int* width, int* height);
 
 protected:
   virtual void ActorDestroy(ActorDestroyReason aWhy) MOZ_OVERRIDE;
@@ -158,6 +159,7 @@ private:
   MessageLoop* mUILoop;
   int mLastIMEState;
   float mLastResolution;
+  GLuint mUploadTexture;
 
   DISALLOW_EVIL_CONSTRUCTORS(EmbedLiteViewThreadParent);
 };

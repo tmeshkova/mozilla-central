@@ -7,7 +7,6 @@
 #include "EmbedLog.h"
 
 #include "EmbedLiteCompositorParent.h"
-#include "EmbedLiteRenderTarget.h"
 #include "LayerManagerOGL.h"
 #include "BasicLayers.h"
 #include "EmbedLiteAppThreadParent.h"
@@ -21,7 +20,17 @@
 #include "mozilla/layers/CompositorOGL.h"
 #include "gfxUtils.h"
 
+#include "GLContext.h"                  // for GLContext
+#include "GLScreenBuffer.h"             // for GLScreenBuffer
+#include "SharedSurfaceEGL.h"           // for SurfaceFactory_EGLImage
+#include "SharedSurfaceGL.h"            // for SurfaceFactory_GLTexture, etc
+#include "SurfaceStream.h"              // for SurfaceStream, etc
+#include "SurfaceTypes.h"               // for SurfaceStreamType
+#include "ClientLayerManager.h"         // for ClientLayerManager, etc
+
 using namespace mozilla::layers;
+using namespace mozilla::gfx;
+using namespace mozilla::gl;
 
 namespace mozilla {
 namespace embedlite {
@@ -33,6 +42,7 @@ EmbedLiteCompositorParent::EmbedLiteCompositorParent(nsIWidget* aWidget,
                                                      uint32_t id)
   : CompositorParent(aWidget, aRenderToEGLSurface, aSurfaceWidth, aSurfaceHeight)
   , mId(id)
+  , mCurrentCompositeTask(nullptr)
   , mWorldOpacity(1.0f)
 {
   AddRef();
@@ -85,17 +95,16 @@ bool EmbedLiteCompositorParent::RenderToContext(gfxContext* aContext)
   return true;
 }
 
-bool EmbedLiteCompositorParent::RenderGL(mozilla::embedlite::EmbedLiteRenderTarget* aTarget)
+bool EmbedLiteCompositorParent::RenderGL()
 {
   LOGF();
+
+  mCurrentCompositeTask = nullptr;
+
   bool retval = true;
   NS_ENSURE_TRUE(IsGLBackend(), false);
 
   LayerManagerComposite* mgr = GetLayerManager();
-
-  if (mgr && IsGLBackend() && aTarget) {
-    static_cast<CompositorOGL*>(mgr->GetCompositor())->SetUserRenderTarget(aTarget->GetRenderSurface());
-  }
 
   if (mgr && !mgr->GetRoot()) {
     retval = false;
@@ -110,8 +119,15 @@ bool EmbedLiteCompositorParent::RenderGL(mozilla::embedlite::EmbedLiteRenderTarg
   }
   CompositorParent::Composite();
 
-  if (mgr && IsGLBackend() && aTarget) {
-    static_cast<CompositorOGL*>(mgr->GetCompositor())->SetUserRenderTarget(nullptr);
+  if (context->IsOffscreen()) {
+    if (!context->PublishFrame()) {
+      NS_ERROR("Failed to publish context frame");
+    }
+  }
+
+  EmbedLiteView* view = EmbedLiteApp::GetInstance()->GetViewByID(mId);
+  if (view) {
+    view->GetListener()->CompositingFinished();
   }
 
   return retval;
@@ -212,9 +228,11 @@ void EmbedLiteCompositorParent::ScheduleTask(CancelableTask* task, int time)
     LOGE("view not available.. forgot SuspendComposition call?");
     return;
   }
+  task->Cancel();
   EmbedLiteViewListener* list = view->GetListener();
   if (!list || !list->Invalidate()) {
-    CompositorParent::ScheduleTask(task, time);
+    mCurrentCompositeTask = NewRunnableMethod(this, &EmbedLiteCompositorParent::RenderGL);
+    CompositorParent::ScheduleTask(mCurrentCompositeTask, time);
   }
 }
 

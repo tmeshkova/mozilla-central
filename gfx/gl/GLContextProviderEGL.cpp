@@ -206,7 +206,7 @@ class GLContextEGL : public GLContext
 
     static already_AddRefed<GLContextEGL>
     CreateGLContext(const SurfaceCaps& caps,
-                    GLContextEGL *shareContext,
+                    GLContext *shareContext,
                     bool isOffscreen,
                     EGLConfig config,
                     EGLSurface surface)
@@ -216,7 +216,7 @@ class GLContextEGL : public GLContext
             return nullptr;
         }
 
-        EGLContext eglShareContext = shareContext ? shareContext->mContext
+        EGLContext eglShareContext = shareContext ? shareContext->GetEGLContext()
                                                   : EGL_NO_CONTEXT;
         EGLint* attribs = sEGLLibrary.HasRobustness() ? gContextAttribsRobustness
                                                       : gContextAttribs;
@@ -323,6 +323,10 @@ public:
 
     bool Init()
     {
+        if (mInitialized) {
+            return true;
+        }
+
 #if defined(ANDROID)
         // We can't use LoadApitraceLibrary here because the GLContext
         // expects its own handle to the GL library
@@ -1718,34 +1722,19 @@ CreateSurfaceForWindow(nsIWidget *aWidget, EGLConfig config)
 }
 #endif
 
+static nsRefPtr<GLContext> gGlobalContext;
+
 already_AddRefed<GLContext>
-GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
+GLContextProviderEGL::CreateForEmbedded(ContextFlags flags)
 {
     if (!sEGLLibrary.EnsureInitialized()) {
         return nullptr;
     }
 
-    bool doubleBuffered = true;
-
-    bool hasNativeContext = aWidget->HasGLContext();
     EGLContext eglContext = sEGLLibrary.fGetCurrentContext();
-    if (hasNativeContext && eglContext) {
+    if (eglContext) {
         void* platformContext = eglContext;
         SurfaceCaps caps = SurfaceCaps::Any();
-#ifdef MOZ_WIDGET_QT
-        int depth = gfxPlatform::GetPlatform()->GetScreenDepth();
-        QGLContext* context = const_cast<QGLContext*>(QGLContext::currentContext());
-        if (context && context->device()) {
-            depth = context->device()->depth();
-        }
-        const QGLFormat& format = context->format();
-        doubleBuffered = format.doubleBuffer();
-        platformContext = context;
-        caps.bpp16 = depth == 16 ? true : false;
-        caps.alpha = format.rgba();
-        caps.depth = format.depth();
-        caps.stencil = format.stencil();
-#endif
         EGLConfig config = EGL_NO_CONFIG;
         EGLSurface surface = sEGLLibrary.fGetCurrentSurface(LOCAL_EGL_DRAW);
         nsRefPtr<GLContextEGL> glContext =
@@ -1753,14 +1742,33 @@ GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
                              nullptr, false,
                              config, surface, eglContext);
 
-        if (!glContext->Init())
-            return nullptr;
-
-        glContext->MakeCurrent();
-        glContext->SetIsDoubleBuffered(doubleBuffered);
+        glContext->SetIsDoubleBuffered(true);
         glContext->SetPlatformContext(platformContext);
+#if !defined(__arm__) // Must not use context sharing on arm (EGLImage should be enough)
+
+        if (flags == ContextFlagsGlobal) {
+            gGlobalContext = glContext;
+            gGlobalContext->SetIsGlobalSharedContext(true);
+        }
+#endif
 
         return glContext.forget();
+    }
+    return nullptr;
+}
+
+already_AddRefed<GLContext>
+GLContextProviderEGL::CreateForWindow(nsIWidget *aWidget)
+{
+    if (!sEGLLibrary.EnsureInitialized()) {
+        MOZ_CRASH("Failed to load EGL library!\n");
+        return nullptr;
+    }
+
+    bool doubleBuffered = true;
+
+    if (aWidget->HasGLContext()) {
+        return CreateForEmbedded();
     }
 
     EGLConfig config;
@@ -2053,12 +2061,13 @@ GLContextProviderEGL::GetSharedHandleAsSurface(SharedTextureShareType shareType,
 GLContext *
 GLContextProviderEGL::GetGlobalContext(const ContextFlags)
 {
-    return nullptr;
+    return gGlobalContext.get();
 }
 
 void
 GLContextProviderEGL::Shutdown()
 {
+    gGlobalContext = nullptr;
 }
 
 } /* namespace gl */

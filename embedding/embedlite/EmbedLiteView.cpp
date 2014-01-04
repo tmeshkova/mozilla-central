@@ -200,17 +200,10 @@ EmbedLiteView::RenderToImage(unsigned char* aData, int imgW, int imgH, int strid
 }
 
 bool
-EmbedLiteView::RenderGL(EmbedLiteRenderTarget* aTarget)
+EmbedLiteView::RenderGL()
 {
   NS_ENSURE_TRUE(mViewImpl, false);
-  return mViewImpl->RenderGL(aTarget);
-}
-
-EmbedLiteRenderTarget*
-EmbedLiteView::CreateEmbedLiteRenderTarget(int width, int height)
-{
-  NS_ENSURE_TRUE(mViewImpl, nullptr);
-  return mViewImpl->CreateEmbedLiteRenderTarget(width, height);
+  return mViewImpl->RenderGL();
 }
 
 char*
@@ -427,6 +420,13 @@ EmbedLiteView::GetUniqueID()
     NS_ERROR("Something went wrong");
   }
   return mUniqueID;
+}
+
+bool
+EmbedLiteView::GetPendingTexture(EmbedLiteRenderTarget* aContextWrapper, int* textureID, int* width, int* height)
+{
+  NS_ENSURE_TRUE(mViewImpl, false);
+  return mViewImpl->GetPendingTexture(aContextWrapper, textureID, width, height);
 }
 
 } // namespace embedlite

@@ -15,6 +15,7 @@
 #include "nsIURI.h"
 #include "nsIStyleSheetService.h"
 #include "nsNetUtil.h"
+#include "gfxPlatform.h"
 
 #include "EmbedLiteAppThreadParent.h"
 #include "EmbedLiteViewThreadChild.h"
@@ -75,6 +76,7 @@ EmbedLiteAppThreadChild::Init(EmbedLiteAppThreadParent* aParent)
   mModulesService = new EmbedLiteModulesService();
   mModulesService->Init();
   SendInitialized();
+
   nsCOMPtr<nsIObserverService> observerService =
     do_GetService(NS_OBSERVERSERVICE_CONTRACTID);
   if (observerService) {

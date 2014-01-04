@@ -7,36 +7,27 @@
 #include "EmbedLog.h"
 
 #include "EmbedLiteRenderTarget.h"
-#include "EmbedLiteApp.h"
-#include "mozilla/layers/CompositingRenderTargetOGL.h"
-#include "mozilla/layers/LayerManagerComposite.h"
-#include "mozilla/gfx/Rect.h"
-
-using namespace mozilla::layers;
-using namespace mozilla::gfx;
+#include "GLContext.h"
+#include "GLContextProvider.h"
+ 
+using namespace mozilla::gl;
 using namespace mozilla::embedlite;
-
-EmbedLiteRenderTarget::EmbedLiteRenderTarget(int width, int height, mozilla::layers::LayerManagerComposite* aComposite)
+ 
+EmbedLiteRenderTarget::EmbedLiteRenderTarget()
 {
-  SurfaceInitMode mode = INIT_MODE_CLEAR;
-  IntRect rect(0, 0, width, height);
-  mCurrentRenderTarget = static_cast<CompositorOGL*>(aComposite->GetCompositor())->CreateRenderTarget(rect, mode);
+  nsRefPtr<GLContext> ctx = GLContextProvider::CreateForEmbedded(ContextFlagsGlobal);
+ 
+  MOZ_ASSERT(ctx);
+  mGLContext = ctx;
 }
-
+ 
+bool EmbedLiteRenderTarget::EnsureInitialized()
+{
+  MOZ_ASSERT(mGLContext);
+  return mGLContext->Init();
+}
+ 
 EmbedLiteRenderTarget::~EmbedLiteRenderTarget()
 {
 }
 
-int
-EmbedLiteRenderTarget::texture()
-{
-    mozilla::layers::CompositingRenderTargetOGL* ml = static_cast<mozilla::layers::CompositingRenderTargetOGL*>(mCurrentRenderTarget.get());
-    return (int)ml->GetTextureHandle();
-}
-
-int
-EmbedLiteRenderTarget::fbo()
-{
-    mozilla::layers::CompositingRenderTargetOGL* ml = static_cast<mozilla::layers::CompositingRenderTargetOGL*>(mCurrentRenderTarget.get());
-    return (int)ml->GetFBO();
-}

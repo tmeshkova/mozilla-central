@@ -22,6 +22,7 @@ class EmbedLiteUILoop;
 class EmbedLiteSubThread;
 class EmbedLiteAppThread;
 class EmbedLiteView;
+class EmbedLiteRenderTarget;
 class EmbedLiteAppListener
 {
 public:
@@ -129,6 +130,9 @@ public:
   EmbedLiteAppListener* GetListener() {
     return mListener;
   }
+
+  // Create wrapper for current active GL context, for proper GL sharing.
+  virtual EmbedLiteRenderTarget* CreateEmbedLiteRenderTarget();
 
   // Only one EmbedHelper object allowed
   static EmbedLiteApp* GetInstance();
