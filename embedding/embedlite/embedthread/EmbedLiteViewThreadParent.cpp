@@ -26,8 +26,6 @@
 #include "SurfaceStream.h"              // for SurfaceStream, etc
 #include "SurfaceTypes.h"               // for SurfaceStreamType
 #include "ClientLayerManager.h"         // for ClientLayerManager, etc
-#include "GLUploadHelpers.h"
-#include "GLContextUtils.h"             // for GLContextUtils
 
 #include "BasicLayers.h"
 #include "mozilla/layers/LayerManagerComposite.h"
@@ -864,7 +862,7 @@ EmbedLiteViewThreadParent::MousePress(int x, int y, int mstime, unsigned int but
 {
   LOGT("pt[%i,%i], t:%i, bt:%u, mod:%u", x, y, mstime, buttons, modifiers);
   if (mController) {
-    MultiTouchInput event(MultiTouchInput::MULTITOUCH_START, mstime);
+    MultiTouchInput event(MultiTouchInput::MULTITOUCH_START, mstime, modifiers);
     event.mTouches.AppendElement(SingleTouchData(0,
                                                  mozilla::ScreenIntPoint(x, y),
                                                  mozilla::ScreenSize(1, 1),
@@ -882,7 +880,7 @@ EmbedLiteViewThreadParent::MouseRelease(int x, int y, int mstime, unsigned int b
 {
   LOGT("pt[%i,%i], t:%i, bt:%u, mod:%u", x, y, mstime, buttons, modifiers);
   if (mController) {
-    MultiTouchInput event(MultiTouchInput::MULTITOUCH_END, mstime);
+    MultiTouchInput event(MultiTouchInput::MULTITOUCH_END, mstime, modifiers);
     event.mTouches.AppendElement(SingleTouchData(0,
                                                  mozilla::ScreenIntPoint(x, y),
                                                  mozilla::ScreenSize(1, 1),
@@ -900,7 +898,7 @@ EmbedLiteViewThreadParent::MouseMove(int x, int y, int mstime, unsigned int butt
 {
   LOGT("pt[%i,%i], t:%i, bt:%u, mod:%u", x, y, mstime, buttons, modifiers);
   if (mController) {
-    MultiTouchInput event(MultiTouchInput::MULTITOUCH_MOVE, mstime);
+    MultiTouchInput event(MultiTouchInput::MULTITOUCH_MOVE, mstime, modifiers);
     event.mTouches.AppendElement(SingleTouchData(0,
                                                  mozilla::ScreenIntPoint(x, y),
                                                  mozilla::ScreenSize(1, 1),
@@ -965,11 +963,11 @@ bool EmbedLiteViewThreadParent::GetPendingTexture(EmbedLiteRenderTarget* aContex
 {
   NS_ENSURE_TRUE(aContextWrapper && textureID && width && height, false);
   NS_ENSURE_TRUE(mCompositor, false);
- 
-  const CompositorParent::LayerTreeState* state = CompositorParent::GetIndirectShadowTree(mCompositor->RootLayerTreeId());
-  NS_ENSURE_TRUE(state && state->mLayerManager, false);
 
-  GLContext* context = static_cast<CompositorOGL*>(state->mLayerManager->GetCompositor())->gl();
+  LayerManagerComposite* mgr = mCompositor->GetLayerManager();
+  NS_ENSURE_TRUE(mgr, false);
+
+  GLContext* context = static_cast<CompositorOGL*>(mgr->GetCompositor())->gl();
   NS_ENSURE_TRUE(context && context->IsOffscreen(), false);
 
   GLContext* consumerContext = aContextWrapper->GetConsumerContext();
@@ -1003,11 +1001,10 @@ bool EmbedLiteViewThreadParent::GetPendingTexture(EmbedLiteRenderTarget* aContex
     nsIntSize size(toUpload->GetSize());
     nsIntRect rect(nsIntPoint(0,0), size);
     nsIntRegion bounds(rect);
-    UploadSurfaceToTexture(consumerContext,
-                           toUpload,
-                           bounds,
-                           mUploadTexture,
-                           true);
+    consumerContext->UploadSurfaceToTexture(toUpload,
+                                            bounds,
+                                            mUploadTexture,
+                                            true);
     textureHandle = mUploadTexture;
   } else if (textureHandle) {
     if (consumerContext) {

@@ -11,9 +11,9 @@
 #include "SharedSurfaceGL.h"
 #include "SharedSurfaceEGL.h"           // for SurfaceFactory_EGLImage
 #include "SurfaceStream.h"
+#include "nsXULAppAPI.h"
 #ifdef MOZ_WIDGET_GONK
 #include "SharedSurfaceGralloc.h"
-#include "nsXULAppAPI.h"
 #endif
 #ifdef XP_MACOSX
 #include "SharedSurfaceIO.h"

@@ -82,7 +82,7 @@ void ApzcPan(AsyncPanZoomController* apzc, int& aTime, int aTouchStartY, int aTo
   MultiTouchInput mti;
   nsEventStatus status;
 
-  mti = MultiTouchInput(MultiTouchInput::MULTITOUCH_START, aTime);
+  mti = MultiTouchInput(MultiTouchInput::MULTITOUCH_START, aTime, 0);
   aTime += TIME_BETWEEN_TOUCH_EVENT;
   // Make sure the move is large enough to not be handled as a tap
   mti.mTouches.AppendElement(SingleTouchData(0, ScreenIntPoint(10, aTouchStartY+OVERCOME_TOUCH_TOLERANCE), ScreenSize(0, 0), 0, 0));
@@ -90,20 +90,20 @@ void ApzcPan(AsyncPanZoomController* apzc, int& aTime, int aTouchStartY, int aTo
   EXPECT_EQ(status, nsEventStatus_eConsumeNoDefault);
   // APZC should be in TOUCHING state
 
-  mti = MultiTouchInput(MultiTouchInput::MULTITOUCH_MOVE, aTime);
+  mti = MultiTouchInput(MultiTouchInput::MULTITOUCH_MOVE, aTime, 0);
   aTime += TIME_BETWEEN_TOUCH_EVENT;
   mti.mTouches.AppendElement(SingleTouchData(0, ScreenIntPoint(10, aTouchStartY), ScreenSize(0, 0), 0, 0));
   status = apzc->HandleInputEvent(mti);
   EXPECT_EQ(status, nsEventStatus_eConsumeNoDefault);
   // APZC should be in PANNING, otherwise status != ConsumeNoDefault
 
-  mti = MultiTouchInput(MultiTouchInput::MULTITOUCH_MOVE, aTime);
+  mti = MultiTouchInput(MultiTouchInput::MULTITOUCH_MOVE, aTime, 0);
   aTime += TIME_BETWEEN_TOUCH_EVENT;
   mti.mTouches.AppendElement(SingleTouchData(0, ScreenIntPoint(10, aTouchEndY), ScreenSize(0, 0), 0, 0));
   status = apzc->HandleInputEvent(mti);
   EXPECT_EQ(status, nsEventStatus_eConsumeNoDefault);
 
-  mti = MultiTouchInput(MultiTouchInput::MULTITOUCH_END, aTime);
+  mti = MultiTouchInput(MultiTouchInput::MULTITOUCH_END, aTime, 0);
   aTime += TIME_BETWEEN_TOUCH_EVENT;
   mti.mTouches.AppendElement(SingleTouchData(0, ScreenIntPoint(10, aTouchEndY), ScreenSize(0, 0), 0, 0));
   status = apzc->HandleInputEvent(mti);

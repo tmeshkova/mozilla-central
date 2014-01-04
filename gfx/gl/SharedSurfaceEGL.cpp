@@ -174,7 +174,7 @@ SharedSurface_EGLImage::Fence()
         if (!mPixels) {
             gfxASurface::gfxImageFormat format =
                   HasAlpha() ? gfxASurface::ImageFormatARGB32
-                             : gfxImageFormatRGB16_565;
+                             : gfxASurface::ImageFormatRGB16_565;
             mPixels = new gfxImageSurface(Size(), format);
         }
 
