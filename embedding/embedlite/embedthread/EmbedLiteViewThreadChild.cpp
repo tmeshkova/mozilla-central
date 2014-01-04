@@ -593,7 +593,7 @@ EmbedLiteViewThreadChild::RecvHandleDoubleTap(const nsIntPoint& aPoint)
   }
 
   for (unsigned int i = 0; i < mControllerListeners.Length(); i++) {
-    mControllerListeners[i]->HandleDoubleTap(CSSIntPoint(aPoint.x, aPoint.y));
+    mControllerListeners[i]->HandleDoubleTap(CSSIntPoint(aPoint.x, aPoint.y), 0);
   }
 
   if (sPostAZPCAsJson.doubleTap) {
@@ -620,7 +620,7 @@ EmbedLiteViewThreadChild::RecvHandleSingleTap(const nsIntPoint& aPoint)
   }
 
   for (unsigned int i = 0; i < mControllerListeners.Length(); i++) {
-    mControllerListeners[i]->HandleSingleTap(CSSIntPoint(aPoint.x, aPoint.y));
+    mControllerListeners[i]->HandleSingleTap(CSSIntPoint(aPoint.x, aPoint.y), 0);
   }
 
   if (sPostAZPCAsJson.singleTap) {
@@ -642,7 +642,7 @@ bool
 EmbedLiteViewThreadChild::RecvHandleLongTap(const nsIntPoint& aPoint)
 {
   for (unsigned int i = 0; i < mControllerListeners.Length(); i++) {
-    mControllerListeners[i]->HandleLongTap(CSSIntPoint(aPoint.x, aPoint.y));
+    mControllerListeners[i]->HandleLongTap(CSSIntPoint(aPoint.x, aPoint.y), 0);
   }
 
   if (sPostAZPCAsJson.longTap) {

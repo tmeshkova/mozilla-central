@@ -25,9 +25,9 @@ using ::testing::_;
 class MockContentController : public GeckoContentController {
 public:
   MOCK_METHOD1(RequestContentRepaint, void(const FrameMetrics&));
-  MOCK_METHOD1(HandleDoubleTap, void(const CSSIntPoint&));
-  MOCK_METHOD1(HandleSingleTap, void(const CSSIntPoint&));
-  MOCK_METHOD1(HandleLongTap, void(const CSSIntPoint&));
+  MOCK_METHOD2(HandleDoubleTap, void(const CSSIntPoint&, int32_t));
+  MOCK_METHOD2(HandleSingleTap, void(const CSSIntPoint&, int32_t));
+  MOCK_METHOD2(HandleLongTap, void(const CSSIntPoint&, int32_t));
   MOCK_METHOD2(ScrollUpdate, void(const CSSPoint& aPosition, const float aResolution));
   MOCK_METHOD3(SendAsyncScrollDOMEvent, void(FrameMetrics::ViewID aScrollId, const CSSRect &aContentRect, const CSSSize &aScrollableSize));
   MOCK_METHOD2(PostDelayedTask, void(Task* aTask, int aDelayMs));

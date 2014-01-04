@@ -87,14 +87,13 @@ class EmbedContentController : public GeckoContentController
       aFrameMetrics));
     }
 
-    virtual void HandleDoubleTap(const CSSIntPoint& aPoint) MOZ_OVERRIDE {
+    virtual void HandleDoubleTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE {
       if (MessageLoop::current() != mUILoop) {
         // We have to send this message from the "UI thread" (main
         // thread).
         mUILoop->PostTask(
           FROM_HERE,
-          NewRunnableMethod(this, &EmbedContentController::HandleDoubleTap,
-        aPoint));
+          NewRunnableMethod(this, &EmbedContentController::HandleDoubleTap, aPoint, aModifiers));
         return;
       }
       EmbedLiteViewListener* listener = GetListener();
@@ -103,14 +102,13 @@ class EmbedContentController : public GeckoContentController
       }
     }
 
-    virtual void HandleSingleTap(const CSSIntPoint& aPoint) MOZ_OVERRIDE {
+    virtual void HandleSingleTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE {
       if (MessageLoop::current() != mUILoop) {
         // We have to send this message from the "UI thread" (main
         // thread).
         mUILoop->PostTask(
           FROM_HERE,
-          NewRunnableMethod(this, &EmbedContentController::HandleSingleTap,
-        aPoint));
+          NewRunnableMethod(this, &EmbedContentController::HandleSingleTap, aPoint, aModifiers));
         return;
       }
       EmbedLiteViewListener* listener = GetListener();
@@ -119,14 +117,13 @@ class EmbedContentController : public GeckoContentController
       }
     }
 
-    virtual void HandleLongTap(const CSSIntPoint& aPoint) MOZ_OVERRIDE {
+    virtual void HandleLongTap(const CSSIntPoint& aPoint, int32_t aModifiers) MOZ_OVERRIDE {
       if (MessageLoop::current() != mUILoop) {
         // We have to send this message from the "UI thread" (main
         // thread).
         mUILoop->PostTask(
           FROM_HERE,
-          NewRunnableMethod(this, &EmbedContentController::HandleLongTap,
-        aPoint));
+          NewRunnableMethod(this, &EmbedContentController::HandleLongTap, aPoint, aModifiers));
         return;
       }
       EmbedLiteViewListener* listener = GetListener();

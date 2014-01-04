@@ -41,6 +41,7 @@
 #include "nsAutoPtr.h"                  // for nsRefPtr
 #include "nsCOMPtr.h"                   // for already_AddRefed
 #include "nsDebug.h"                    // for NS_WARNING
+#include "nsIDOMWindowUtils.h"          // for nsIDOMWindowUtils
 #include "nsEvent.h"
 #include "nsGUIEvent.h"                 // for nsInputEvent, nsTouchEvent, etc
 #include "nsISupportsImpl.h"
@@ -686,7 +687,7 @@ nsEventStatus AsyncPanZoomController::OnLongPress(const TapGestureInput& aEvent)
     ReentrantMonitorAutoEnter lock(mMonitor);
 
     CSSPoint point = WidgetSpaceToCompensatedViewportSpace(aEvent.mPoint, mFrameMetrics.mZoom);
-    controller->HandleLongTap(gfx::RoundedToInt(point));
+    controller->HandleLongTap(gfx::RoundedToInt(point), 0);
     return nsEventStatus_eConsumeNoDefault;
   }
   return nsEventStatus_eIgnore;
@@ -702,7 +703,7 @@ nsEventStatus AsyncPanZoomController::OnSingleTapConfirmed(const TapGestureInput
     ReentrantMonitorAutoEnter lock(mMonitor);
 
     CSSPoint point = WidgetSpaceToCompensatedViewportSpace(aEvent.mPoint, mFrameMetrics.mZoom);
-    controller->HandleSingleTap(gfx::RoundedToInt(point));
+    controller->HandleSingleTap(gfx::RoundedToInt(point), 0);
     return nsEventStatus_eConsumeNoDefault;
   }
   return nsEventStatus_eIgnore;
@@ -715,7 +716,7 @@ nsEventStatus AsyncPanZoomController::OnDoubleTap(const TapGestureInput& aEvent)
 
     if (mAllowZoom) {
       CSSPoint point = WidgetSpaceToCompensatedViewportSpace(aEvent.mPoint, mFrameMetrics.mZoom);
-      controller->HandleDoubleTap(gfx::RoundedToInt(point));
+      controller->HandleDoubleTap(gfx::RoundedToInt(point), 0);
     }
 
     return nsEventStatus_eConsumeNoDefault;
