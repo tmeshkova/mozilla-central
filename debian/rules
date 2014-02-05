@@ -4,6 +4,10 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+ifneq (,$(findstring Maemo 5,$(shell cat /etc/issue)))
+	export PYTHON=/usr/bin/python2.7
+endif
+
 package=xulrunner
 prefix=usr
 
@@ -56,6 +60,9 @@ GREVERSION=$(shell cat $(CURDIR)/config/milestone.txt | sed '/^\#/d' | sed '/^$$
 
 configure: configure-$(DEB_HOST_ARCH)-stamp
 configure-$(DEB_HOST_ARCH)-stamp:
+ifneq (,$(findstring Maemo 5,$(shell cat /etc/issue)))
+	QUILT_PATCHES=debian/patches/fremantle quilt push -a
+endif
 	dh_testdir
 	cp $(CURDIR)/embedding/embedlite/config/$(MOZCONFIG_FILE) $(CURDIR)/$(MOZCONFIG_FILE)
 ifneq (,$(findstring cs2009q3-hard-67-sb16,$(shell gcc --version)))
@@ -94,6 +101,10 @@ clean:
 	rm -f build-$(DEB_HOST_ARCH)-stamp
 	rm -f configure-$(DEB_HOST_ARCH)-stamp
 #	$(MAKE) distclean
+	rm -rf $(DEST_OBJ_DIR)
+ifneq (,$(findstring Maemo 5,$(shell cat /etc/issue)))
+	QUILT_PATCHES=debian/patches/fremantle quilt pop -a || true
+endif
 	dh_clean
 
 install: build
@@ -145,6 +156,9 @@ binary-arch: build install
 	dh_installdeb
 	dh_shlibdeps
 	dh_gencontrol
+ifneq (,$(findstring Maemo 5,$(shell cat /etc/issue)))
+	maemo-optify
+endif
 	dh_md5sums
 	dh_builddeb
 
